@@ -1,0 +1,367 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id          String   @id @default(uuid()) // Mã nhân viên / User ID
+  username    String   @unique              // e.g. gv.huong
+  password    String                        // Hashed password
+  fullName    String
+  phone       String?
+  email       String?
+  role        String   // DIRECTOR, ACCOUNTANT, ADVISOR, CSKH, TEACHER
+  branchId    String?  // CN1, CN2... or null for system director
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Quan hệ
+  classes     Class[]             @relation("ClassTeacher")
+  attendances AttendanceSummary[] @relation("AttendanceTeacher")
+}
+
+model CourseConfig {
+  id            Int      @id @default(autoincrement())
+  program       String   // e.g. THIẾU NHI, THIẾU NIÊN (Độ tuổi)
+  capDo         String   @default("") // e.g. STARTERS, MOVERS, KET, PET (Cấp độ)
+  level         String   @unique // e.g. S1, S2, KET 1, Lớp 9 (Mã khóa học)
+  price         Float    // Học phí
+  totalSessions Int      // Số buổi học
+  bookName      String?  // Giáo trình đi kèm
+  bookPrice     Float?   // Giá giáo trình
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Class {
+  code            String       @id // e.g., CN1_S1 Ms My_35_01
+  level           String       // Liên kết tới CourseConfig level
+  teacherName     String?
+  teacherId       String?      // Liên kết tới User (Giáo viên chính)
+  teacher         User?        @relation("ClassTeacher", fields: [teacherId], references: [id])
+  startDate       DateTime
+  schedule        String       // e.g. "35", "24"
+  expectedEndDate DateTime
+  careStaff       String?      // CSKH phụ trách lớp (Sprint 5)
+  branchId        String       @default("CN1_BinhDuong") // Chi nhánh quản lý lớp
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  enrollments     Enrollment[]
+  orders          OrderFinance[]
+  attendances     Attendance[]
+  attendanceSummaries AttendanceSummary[]
+  examResults     ExamResult[] // Kết quả thi
+}
+
+model Student {
+  id                  String       @id // HV_ID, e.g. HV2606_001
+  name                String
+  phone               String?
+  dob                 DateTime?
+  email               String?
+  address             String?
+  nationalId          String?      // Số định danh / CCCD
+  specialPolicy       String?      // Tên chính sách cũ (giữ tương thích)
+  specialPolicyType   String?      // Loại ưu đãi: Không giảm, Miễn giảm nội bộ, Khó khăn, Học bổng, Khác
+  specialPolicyValue  Float?       @default(0) // Mức giảm cố định VND
+  referralCode        String?      // Ma_Gioi_Thieu
+  saleStaff           String?      // Nhân viên Sale/Tư vấn phụ trách học viên (Sprint 5)
+  
+  // Trạng thái & Quản trị học viên nâng cao (MỚI BỔ SUNG)
+  status              String       @default("Đang học") // Đang học, Tạm nghỉ, Bảo lưu, Nghỉ luôn
+  callbackDate        DateTime?    // Ngày hẹn liên hệ lại (Tạm nghỉ)
+  walletBalance       Float?       @default(0)          // Ví học viên (Chuyển lớp dư tiền)
+  reservationAmount   Float?       @default(0)          // Số tiền bảo lưu
+  reservationDeadline DateTime?    // Hạn chót bảo lưu
+  dropoutReason       String?      // Lý do nghỉ luôn
+  branchId            String       @default("CN1_BinhDuong") // Chi nhánh quản lý học viên
+  
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  enrollments         Enrollment[]
+  certificates        Certificate[]
+  orders              OrderFinance[]
+  attendances         Attendance[] // Liên kết tới bảng Điểm danh
+  inventoryLogs       InventoryLog[] // Liên kết tới bảng Quản lý Kho (Cấp phát vật tư)
+  examResults         ExamResult[] // Liên kết tới bảng Kết quả thi (Sprint 4)
+}
+
+model Enrollment {
+  id               Int       @id @default(autoincrement())
+  studentId        String
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classCode        String
+  class            Class     @relation(fields: [classCode], references: [code], onDelete: Cascade)
+  
+  // Điểm số theo kỹ năng
+  midTermListening Float?
+  midTermSpeaking  Float?
+  midTermReading   Float?
+  midTermWriting   Float?
+  
+  finalListening   Float?
+  finalSpeaking    Float?
+  finalReading     Float?
+  finalWriting     Float?
+  
+  teacherNotes     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Certificate {
+  id        Int       @id @default(autoincrement())
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examName  String    // Kỳ thi đánh giá năng lực
+  examDate  DateTime?
+  score     String?   // Điểm số / Kết quả đạt được
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model OrderFinance {
+  id              String    @id // Order_ID tự sinh
+  studentId       String
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classCode       String
+  class           Class     @relation(fields: [classCode], references: [code], onDelete: Cascade)
+  promoType       String?   // Loại miễn giảm (mùa vụ, tháng...)
+  promoDiscount   Float?    // Giá trị giảm giá
+  feeToPay        Float     // HP_Thu (Số học phí cần hoàn thành)
+  amountPaid      Float     // HP_dong (Số tiền đóng tại thời điểm đó)
+  paymentStatus   String    // Đã đóng / Chưa đóng / Bảo lưu
+  paymentDeadline DateTime? // Hạn chót thanh toán
+  giftName        String?   // Tên tặng phẩm được tặng kèm
+  paymentPolicy   String    @default("Đóng trước") // Đóng trước (Thu trước học) / Đóng sau (Thu sau học)
+  branchId        String    @default("CN1_BinhDuong") // Chi nhánh ghi nhận doanh thu
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Lead {
+  id            Int          @id @default(autoincrement())
+  name          String
+  phone         String?
+  dob           DateTime?
+  email         String?
+  address       String?
+  painPoints    String?      // Vấn đề gặp phải
+  goals         String?      // Mục tiêu mong muốn
+  status        String       // Trạng thái chăm sóc (Mới, Đang tư vấn, Học thử, Đã chốt, Trượt)
+  trialClassCode String?     // Lớp học thử (nếu status = Học thử)
+  trialStartDate DateTime?   // Ngày bắt đầu học thử (nếu status = Học thử)
+  lastContacted DateTime?    // Ngày cập nhật chăm sóc gần nhất
+  followUpDate  DateTime?    // Ngày hẹn liên lạc lại
+  followUpNote  String?      // Nội dung/Lý do hẹn gọi lại
+  salesRep      String?      // Nhân viên Sale phụ trách
+  notes         String?      // Ghi chú thêm
+  branchId      String       @default("CN1_BinhDuong") // Chi nhánh quản lý Lead
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  attendances   Attendance[] // Liên kết tới bảng Điểm danh học thử
+}
+
+model Inventory {
+  id           String         @id // ID_Vat_Tu (e.g., TP_01, GT_01)
+  name         String
+  category     String         // Tặng phẩm, Giáo trình, Vật phẩm
+  threshold    Int            @default(5) // Mức cảnh báo tồn tối thiểu
+  alertSent    Boolean        @default(false)
+  currentStock Int            @default(0)
+  branchId     String         @default("CN1_BinhDuong") // Chi nhánh chứa kho
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  logs         InventoryLog[]
+}
+
+model InventoryLog {
+  id          Int       @id @default(autoincrement())
+  receiptCode String?   // Mã phiếu (VD: PX-001, PN-002) - dùng để gom nhóm giao dịch
+  type        String    // XUAT_TANG, XUAT_MUON, NHAP_TRA, NHAP_MOI, KIEM_KE
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  quantity    Int       // Số lượng nhập (+) hoặc xuất (-)
+  
+  // Thông tin đối tượng
+  targetType  String?   // STUDENT, TEACHER, STAFF, SYSTEM, SUPPLIER
+  targetName  String?   // Tên người nhận/trả/nhà cung cấp
+  studentId   String?   // Link tới bảng Student nếu là học viên (targetType = STUDENT)
+  student     Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  
+  notes       String?   // Ghi chú chi tiết
+  createdAt   DateTime  @default(now())
+}
+
+model Holiday {
+  id        Int      @id @default(autoincrement())
+  name      String   // Lý do nghỉ
+  startDate DateTime // Ngày bắt đầu nghỉ
+  endDate   DateTime // Ngày kết thúc nghỉ
+  scope     String   // GLOBAL, SHIFT, CLASS
+  targetId  String?  // Mã ca học hoặc Mã lớp nếu scope không phải GLOBAL
+  createdAt DateTime @default(now())
+}
+
+// Bảng Điểm Danh (Hỗ trợ cả Học viên chính thức & Lead học thử)
+model Attendance {
+  id               Int      @id @default(autoincrement())
+  studentId        String?
+  student          Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  leadId           Int?
+  lead             Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  classCode        String
+  class            Class    @relation(fields: [classCode], references: [code], onDelete: Cascade)
+  date             DateTime // Ngày điểm danh (lưu dưới dạng YYYY-MM-DD 00:00:00)
+  status           String   // Có mặt, Vắng có phép, Vắng không phép
+  checkInTime      String?  // Ghi nhận thời gian thực tế vào ca (e.g. "+15 phút", "Đúng giờ")
+  teacherNotes     String?  // Lời phê / nhận xét của giáo viên buổi học đó
+  
+  // Vi phạm bài tập (Sprint 1 - Điểm danh nâng cao)
+  missingWb        Boolean  @default(false) // Chưa hoàn thành Workbook
+  missingVideo     Boolean  @default(false) // Chưa nộp Video
+  copyError        Boolean  @default(false) // Lỗi Copy / Vi phạm khác
+  adjustmentNotes  String?                  // Cần điều chỉnh: chi tiết lỗi cụ thể (multiline)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([studentId, classCode, date]) // Ràng buộc: Mỗi học viên chỉ có 1 trạng thái điểm danh/lớp/ngày
+  @@unique([leadId, classCode, date])    // Ràng buộc: Mỗi Lead học thử chỉ có 1 trạng thái điểm danh/lớp/ngày
+}
+
+// Bảng Nhật Ký & Nhận Xét Chung Của Lớp Theo Buổi Học
+model AttendanceSummary {
+  id                   Int      @id @default(autoincrement())
+  classCode            String
+  class                Class    @relation(fields: [classCode], references: [code], onDelete: Cascade)
+  date                 DateTime // Ngày điểm danh (lưu dưới dạng YYYY-MM-DD 00:00:00)
+  classNotes           String?  // Nhật ký & Nhận xét chung của lớp
+  
+  // Nội dung bài học (Sprint 1)
+  vocabularyTopic      String?  // Từ vựng / Hoạt động
+  grammarTopic         String?  // Cấu trúc ngữ pháp
+  readingTopic         String?  // Bài đọc / Câu chuyện
+  
+  // Bài tập về nhà (Sprint 1)
+  hwWbPages            String?  // Trang Workbook cần làm
+  hwCopyLines          String?  // Số dòng cần Copy
+  hwVideoDeadline      String?  // Hạn chót nộp Video (text: "Trước CN 20/07")
+  hwOther              String?  // Yêu cầu khác
+  
+  // Dạy thay & Tính lương (Sprint 7)
+  teacherId            String?  // User ID của giáo viên thực tế đã dạy hôm nay
+  teacher              User?    @relation("AttendanceTeacher", fields: [teacherId], references: [id])
+  isSubstitute         Boolean  @default(false) // Cờ đánh dấu dạy thay
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([classCode, date])
+}
+
+// Bảng Cài đặt Ngưỡng Cảnh Báo (Sprint 2)
+model AlertConfig {
+  id                    Int      @id @default(autoincrement())
+  // Ngưỡng cảnh báo điểm danh
+  consecutiveAbsences   Int      @default(2)  // Số buổi nghỉ liên tiếp → cảnh báo
+  totalAbsencesLimit    Int      @default(5)  // Tổng buổi vắng → cảnh báo
+  // Ngưỡng cảnh báo vi phạm bài tập
+  missingWbLimit        Int      @default(2)  // Số lần thiếu WB → cảnh báo
+  missingVideoLimit     Int      @default(2)  // Số lần thiếu Video → cảnh báo
+  copyErrorLimit        Int      @default(2)  // Số lần lỗi Copy → cảnh báo
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ============================================
+// SPRINT 4: ĐÁNH GIÁ & BÁO CÁO CUỐI KHÓA
+// ============================================
+
+// Bảng Cấu hình Đề thi 
+model ExamConfig {
+  id              Int      @id @default(autoincrement())
+  level           String   // Ví dụ: M2, S3 (Liên kết tới CourseConfig level)
+  examType        String   // Loại kỳ thi (VD: "Giữa khóa", "Cuối khóa")
+  
+  // Trọng số và cấu hình điểm
+  processWeight   Float    @default(10) // Trọng số đánh giá quá trình (%)
+  examWeight      Float    @default(90) // Trọng số bài thi (%)
+  
+  speakingWeight  Float    @default(30) // Kỹ năng Nói (%)
+  speakingMax     Float    @default(40) // Điểm tối đa Nói
+  
+  listeningWeight Float    @default(20) // Kỹ năng Nghe (%)
+  listeningMax    Float    @default(26) // Điểm tối đa Nghe
+  
+  rwWeight        Float    @default(40) // Kỹ năng Đọc & Viết (%)
+  rwMax           Float    @default(36) // Điểm tối đa Đọc & Viết
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  results         ExamResult[] // Các bài thi thuộc cấu hình này
+  
+  @@unique([level, examType])
+}
+
+// Bảng Kết quả Thi & Nhận xét của Học viên
+model ExamResult {
+  id              Int      @id @default(autoincrement())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classCode       String
+  class           Class    @relation(fields: [classCode], references: [code], onDelete: Cascade)
+  configId        Int
+  config          ExamConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+  examDate        DateTime
+  
+  // Điểm Quá trình (10%)
+  attendanceScore Float?   // Tự động tính từ tỷ lệ vắng
+  hwScore         Float?   // Tự động tính từ tỷ lệ thiếu WB/Video
+  activityScore   Float?   // GV chấm
+  pronunciationScore Float? // GV chấm
+  communicationScore Float? // GV chấm
+  processTotal    Float?   // Điểm trung bình quá trình
+  
+  // Điểm Bài thi (90%)
+  speakingScore   Float?   // Số câu đúng / Điểm đạt được
+  listeningScore  Float?
+  rwScore         Float?
+  
+  // Tổng kết
+  totalScore      Float?   // Tổng điểm cuối cùng (100%)
+  grade           String?  // Xếp loại (A, B, C...)
+  
+  // Nhận xét (AI sinh)
+  commentSpeaking String?
+  commentListening String?
+  commentRW       String?
+  commentDev      String?  // Định hướng phát triển
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([studentId, classCode, configId])
+}
+
+// Bảng Cấu hình Trí Tuệ Nhân Tạo (AI) Đa Mô Hình
+model AiConfig {
+  id              Int      @id @default(autoincrement())
+  provider        String   @default("gemini") // "gemini", "deepseek", "chatgpt", "claude"
+  apiKey          String?  // Mã API Key của nhà cung cấp
+  modelName       String?  // Ví dụ: deepseek-chat, gpt-4o, claude-3-opus
+  isActive        Boolean  @default(true) // Có đang sử dụng không
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([provider])
+}
