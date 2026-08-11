@@ -29,11 +29,17 @@ export async function GET(request) {
     };
 
     if (classCode && classCode !== 'all') {
-      where.enrollments = {
-        some: {
-          classCode: classCode
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { enrollments: { some: { classCode: classCode } } },
+            { attendances: { some: { classCode: classCode } } },
+            { examResults: { some: { classCode: classCode } } },
+            { orders: { some: { classCode: classCode } } }
+          ]
         }
-      };
+      ];
     }
 
     if (search) {

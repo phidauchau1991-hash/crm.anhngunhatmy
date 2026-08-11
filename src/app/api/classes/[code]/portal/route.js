@@ -42,6 +42,38 @@ export async function GET(request, { params }) {
     const studentsData = [];
     const matrix = {};
 
+    // 5. Find historical students who have attendance or exam records but are no longer enrolled
+    const enrolledIds = new Set(enrollments.map(e => e.student.id));
+    const historicalIds = new Set();
+    
+    attendances.forEach(a => {
+      if (a.studentId && !enrolledIds.has(a.studentId)) {
+        historicalIds.add(a.studentId);
+      }
+    });
+    
+    // For exam grades (from ExamResult table Sprint 4)
+    const examResults = await prisma.examResult.findMany({
+      where: { classCode },
+      include: { config: true }
+    });
+
+    examResults.forEach(e => {
+      if (e.studentId && !enrolledIds.has(e.studentId)) {
+        historicalIds.add(e.studentId);
+      }
+    });
+
+    const historicalStudents = await prisma.student.findMany({
+      where: { id: { in: Array.from(historicalIds) } }
+    });
+
+    // Combine current enrollments and historical students for full class list
+    const allStudents = [
+      ...enrollments.map(e => e.student),
+      ...historicalStudents
+    ];
+
     // Helper to calculate student stats
     const processStudent = (id, name, isTrial) => {
       let totalAbsent = 0;
@@ -75,26 +107,22 @@ export async function GET(request, { params }) {
         isTrial,
         totalAbsent,
         totalWb,
-        totalVideo
+        totalVideo,
+        isHistorical: !isTrial && !enrolledIds.has(id) // Đánh dấu học viên đã chuyển lớp/nghỉ
       });
     };
 
-    enrollments.forEach(e => processStudent(e.student.id, e.student.name, false));
+    allStudents.forEach(s => processStudent(s.id, s.name, false));
     trialLeads.forEach(l => processStudent(l.id, l.name, true));
 
-    // For exam grades (from ExamResult table Sprint 4)
-    const examResults = await prisma.examResult.findMany({
-      where: { classCode },
-      include: { config: true }
-    });
-
-    const grades = enrollments.map(e => {
-      const midTerm = examResults.find(r => r.studentId === e.student.id && r.config.examType === 'Giữa khóa');
-      const finalTerm = examResults.find(r => r.studentId === e.student.id && r.config.examType === 'Cuối khóa');
+    const grades = allStudents.map(student => {
+      const midTerm = examResults.find(r => r.studentId === student.id && r.config.examType === 'Giữa khóa');
+      const finalTerm = examResults.find(r => r.studentId === student.id && r.config.examType === 'Cuối khóa');
       
       return {
-        id: e.student.id,
-        name: e.student.name,
+        id: student.id,
+        name: student.name,
+        isHistorical: !enrolledIds.has(student.id),
         midTerm: midTerm ? {
           processTotal: midTerm.processTotal,
           speakingScore: midTerm.speakingScore,
