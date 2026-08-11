@@ -108,7 +108,10 @@ export async function POST(request) {
           commentSpeaking: r.commentSpeaking,
           commentListening: r.commentListening,
           commentRW: r.commentRW,
-          commentDev: r.commentDev
+          commentDev: r.commentDev,
+          keywordSpeaking: r.keywordSpeaking,
+          keywordListening: r.keywordListening,
+          keywordRW: r.keywordRW
         },
         create: {
           studentId: r.studentId,
@@ -129,7 +132,10 @@ export async function POST(request) {
           commentSpeaking: r.commentSpeaking,
           commentListening: r.commentListening,
           commentRW: r.commentRW,
-          commentDev: r.commentDev
+          commentDev: r.commentDev,
+          keywordSpeaking: r.keywordSpeaking,
+          keywordListening: r.keywordListening,
+          keywordRW: r.keywordRW
         }
       });
     });

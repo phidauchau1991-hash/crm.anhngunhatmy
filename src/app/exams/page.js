@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
 
@@ -179,6 +180,18 @@ export default function ExamsPage() {
           };
         });
         setResults(initialResults);
+
+        // Load keywords
+        const initialKeywords = {};
+        clsData.data.forEach(student => {
+          const existing = resData.data?.find(r => r.studentId === student.id);
+          initialKeywords[student.id] = {
+            speaking: existing?.keywordSpeaking || '',
+            listening: existing?.keywordListening || '',
+            rw: existing?.keywordRW || ''
+          };
+        });
+        setAiKeywords(initialKeywords);
       }
     } catch (error) {
       console.error('Error loading class data:', error);
@@ -236,6 +249,13 @@ export default function ExamsPage() {
   const handleSaveResults = async () => {
     setIsSavingResults(true);
     try {
+      const payloadResults = results.map(r => ({
+        ...r,
+        keywordSpeaking: aiKeywords[r.studentId]?.speaking || '',
+        keywordListening: aiKeywords[r.studentId]?.listening || '',
+        keywordRW: aiKeywords[r.studentId]?.rw || ''
+      }));
+
       const res = await fetch('/api/exams/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,7 +263,7 @@ export default function ExamsPage() {
           classCode: selectedClass,
           configId: selectedConfig,
           examDate,
-          results
+          results: payloadResults
         })
       });
       const data = await res.json();
@@ -609,7 +629,7 @@ export default function ExamsPage() {
       {/* Preview & Edit AI Comment Modal */}
       {previewModalData && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '900px', maxHeight: '90vh', overflowY: 'auto', padding: '25px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '1200px', maxHeight: '90vh', overflowY: 'auto', padding: '25px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0D88C4', paddingBottom: '15px' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#0D88C4', fontSize: '24px' }}>👁️ Xem trước & Chỉnh sửa Nhận xét</h3>
@@ -665,11 +685,56 @@ export default function ExamsPage() {
               </div>
             </div>
 
-            {/* Live Preview of Comments Report Card */}
-            <div style={{ marginTop: '10px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#334155' }}>📋 Xem trước Phiếu Nhận xét A4 (tự động cập nhật khi gõ):</h4>
-              <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', zoom: 0.7, overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <CommentsReportTemplate student={previewModalData.student} result={previewModalData} />
+            {/* Live Preview of Reports */}
+            <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Comments Report */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0, color: '#334155' }}>📋 Phiếu Nhận Xét A4</h4>
+                  <button onClick={() => {
+                     const el = document.getElementById(`modal-comment-report-${previewModalData.student.id}`);
+                     if(el) {
+                       htmlToImage.toPng(el, { quality: 1, backgroundColor: '#fff' }).then(dataUrl => {
+                         const link = document.createElement('a');
+                         link.download = `Nhan_Xet_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                         link.href = dataUrl;
+                         link.click();
+                       });
+                     }
+                  }} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
+                    <i className="fa-solid fa-download"></i> Tải Nhận Xét
+                  </button>
+                </div>
+                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', zoom: 0.55, overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                  <div id={`modal-comment-report-${previewModalData.student.id}`}>
+                    <CommentsReportTemplate student={previewModalData.student} result={previewModalData} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Score Report */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0, color: '#334155' }}>📋 Bảng Điểm Cuối Khóa</h4>
+                  <button onClick={() => {
+                     const el = document.getElementById(`modal-score-report-${previewModalData.student.id}`);
+                     if(el) {
+                       htmlToImage.toPng(el, { quality: 1, backgroundColor: '#fff' }).then(dataUrl => {
+                         const link = document.createElement('a');
+                         link.download = `Bang_Diem_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                         link.href = dataUrl;
+                         link.click();
+                       });
+                     }
+                  }} style={{ padding: '6px 12px', background: '#0D88C4', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
+                    <i className="fa-solid fa-download"></i> Tải Bảng Điểm
+                  </button>
+                </div>
+                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', zoom: 0.55, overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                  <div id={`modal-score-report-${previewModalData.student.id}`}>
+                    <ScoreReportTemplate student={previewModalData.student} config={configs.find(c => c.id === parseInt(selectedConfig))} result={previewModalData} />
+                  </div>
+                </div>
               </div>
             </div>
 

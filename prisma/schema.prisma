@@ -347,6 +347,11 @@ model ExamResult {
   commentRW       String?
   commentDev      String?  // Định hướng phát triển
   
+  // Từ khóa (Giáo viên nhập)
+  keywordSpeaking String?
+  keywordListening String?
+  keywordRW       String?
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
