@@ -46,6 +46,7 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'completed'
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -456,6 +457,12 @@ export default function ClassesPage() {
     }
   };
 
+  const filteredClasses = classes.filter(cls => {
+    if (statusFilter === 'active') return cls.sessionsRemaining > 0;
+    if (statusFilter === 'completed') return cls.sessionsRemaining <= 0;
+    return true;
+  });
+
   return (
     <div className="classes-container">
       {/* Header */}
@@ -464,11 +471,23 @@ export default function ClassesPage() {
           <h1><i className="fa-solid fa-school"></i> Quản lý Lớp học</h1>
           <p>Danh sách các lớp học hiện tại, tiến độ giảng dạy và danh sách học viên.</p>
         </div>
-        {!userRole?.includes('TEACHER') && (
-          <button className="btn btn-primary animated-scale" onClick={() => setIsModalOpen(true)}>
-            <i className="fa-solid fa-plus"></i> Thêm lớp học mới
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <select 
+            className="filter-select" 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)', background: 'var(--color-bg)' }}
+          >
+            <option value="all">Tất cả lớp học</option>
+            <option value="active">Đang hoạt động</option>
+            <option value="completed">Đã kết thúc (Đủ số buổi)</option>
+          </select>
+          {!userRole?.includes('TEACHER') && (
+            <button className="btn btn-primary animated-scale" onClick={() => setIsModalOpen(true)}>
+              <i className="fa-solid fa-plus"></i> Thêm lớp học mới
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Classes Table */}
@@ -478,10 +497,10 @@ export default function ClassesPage() {
             <i className="fa-solid fa-spinner fa-spin"></i>
             <p>Đang tải danh sách lớp học...</p>
           </div>
-        ) : classes.length === 0 ? (
+        ) : filteredClasses.length === 0 ? (
           <div className="empty-table-state">
             <i className="fa-solid fa-school-circle-xmark"></i>
-            <p>Chưa có lớp học nào được tạo.</p>
+            <p>Không có lớp học nào phù hợp.</p>
           </div>
         ) : (
           <table className="custom-table">
@@ -503,9 +522,14 @@ export default function ClassesPage() {
               </tr>
             </thead>
             <tbody>
-              {classes.map((cls) => (
-                <tr key={cls.code} className="table-row">
-                  <td className="class-code">{cls.code}</td>
+              {filteredClasses.map((cls) => {
+                const isCompleted = cls.sessionsRemaining <= 0;
+                return (
+                <tr key={cls.code} className="table-row" style={isCompleted ? { backgroundColor: '#f1f5f9', opacity: 0.7, filter: 'grayscale(0.5)' } : {}}>
+                  <td className="class-code">
+                    {cls.code}
+                    {isCompleted && <span style={{display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 'normal'}}>Đã kết thúc</span>}
+                  </td>
                   <td>
                     <span className="badge-level">{cls.level}</span>
                   </td>
@@ -555,7 +579,8 @@ export default function ClassesPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

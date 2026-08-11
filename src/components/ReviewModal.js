@@ -120,7 +120,7 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content glass-panel animated-scale" style={{ maxWidth: '850px', width: '95%', maxHeight: '90vh', overflowY: 'auto', zIndex: 9999 }}>
+      <div className="modal-content glass-panel animated-scale" style={{ maxWidth: step === 2 ? '1200px' : '850px', width: '95%', maxHeight: '90vh', overflowY: 'auto', zIndex: 9999 }}>
         <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--color-primary)' }}>
             <i className="fa-solid fa-wand-magic-sparkles"></i> AI Viết Nhận Xét
@@ -141,6 +141,10 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
 
             {type === 'trial' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>Số buổi học thử</label>
+                  <input type="number" min="1" value={sessions} onChange={e => setSessions(parseInt(e.target.value) || 1)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                </div>
                 <div>
                   <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>Thái độ & Hòa nhập</label>
                   <input type="text" placeholder="VD: ngoan, nhút nhát, thích chơi trò chơi" value={attitude} onChange={e => setAttitude(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
@@ -193,19 +197,72 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <button onClick={() => setStep(1)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
-                <i className="fa-solid fa-arrow-left"></i> Quay lại sửa
+                <i className="fa-solid fa-arrow-left"></i> Nhập lại từ khóa
               </button>
               <button onClick={handleDownload} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                 <i className="fa-solid fa-download"></i> Tải Ảnh Nhận Xét
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto', background: '#f1f5f9', padding: '2rem', borderRadius: '8px', display: 'flex', justifyContent: 'center' }}>
-              {type === 'trial' ? (
-                <TrialReportTemplate student={{ name: studentName, classCode }} result={generatedResult} sessions={sessions} />
-              ) : (
-                <PeriodicReportTemplate student={{ name: studentName, classCode }} result={generatedResult} />
-              )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+              
+              {/* Cột 1: Live Editor */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#fff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <h3 style={{ margin: 0, color: 'var(--color-primary-dark)', fontSize: '1.1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                  <i className="fa-solid fa-pen-nib"></i> Chỉnh sửa Nội dung
+                </h3>
+                {type === 'trial' ? (
+                  <>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Thái độ & Hòa nhập</label>
+                      <textarea value={generatedResult.attitude || ''} onChange={e => setGeneratedResult({...generatedResult, attitude: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Ngôn ngữ</label>
+                      <textarea value={generatedResult.skills || ''} onChange={e => setGeneratedResult({...generatedResult, skills: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Tiềm năng & Định hướng</label>
+                      <textarea value={generatedResult.potential || ''} onChange={e => setGeneratedResult({...generatedResult, potential: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Lời khuyên cho Phụ huynh</label>
+                      <textarea value={generatedResult.advice || ''} onChange={e => setGeneratedResult({...generatedResult, advice: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nói (Speaking)</label>
+                      <textarea value={generatedResult.speaking || ''} onChange={e => setGeneratedResult({...generatedResult, speaking: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nghe (Listening)</label>
+                      <textarea value={generatedResult.listening || ''} onChange={e => setGeneratedResult({...generatedResult, listening: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Đọc & Viết (Read/Write)</label>
+                      <textarea value={generatedResult.rw || ''} onChange={e => setGeneratedResult({...generatedResult, rw: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Định hướng phát triển</label>
+                      <textarea value={generatedResult.dev || ''} onChange={e => setGeneratedResult({...generatedResult, dev: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Cột 2: Preview */}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ overflowX: 'auto', background: '#f1f5f9', padding: '1rem', borderRadius: '8px', display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'flex-start' }}>
+                  {type === 'trial' ? (
+                    <TrialReportTemplate student={{ name: studentName, classCode }} result={generatedResult} sessions={sessions} />
+                  ) : (
+                    <PeriodicReportTemplate student={{ name: studentName, classCode }} result={generatedResult} />
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
