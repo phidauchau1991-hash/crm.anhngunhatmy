@@ -89,6 +89,19 @@ export const formatClassCodeForParent = (code) => {
   return formatted;
 };
 
+export const extractTeacherNickname = (code) => {
+  if (!code) return '';
+  const parts = code.split('_');
+  if (parts.length >= 3) {
+    const namePart = parts[2];
+    if (namePart.match(/^(Ms|Mr|Mrs)/i)) {
+      return namePart.replace(/^(Ms|Mr|Mrs)(.*)/i, '$1 $2');
+    }
+    return namePart;
+  }
+  return '';
+};
+
 // ==========================================
 // ẢNH 2: BẢNG ĐIỂM KẾT QUẢ CUỐI KHÓA
 // ==========================================
@@ -129,6 +142,9 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
 
   const displayClassCode = formatClassCodeForParent(result.classCode || student.classCode || "Chưa có");
   const displayDate = result.examDate ? new Date(result.examDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN');
+  
+  const teacherNickname = extractTeacherNickname(result.classCode) || 'Giáo viên phụ trách';
+  const teacherFullName = result.class?.teacherName || '';
 
   return (
     <div style={styles.container} id={`score-report-${student.id}`}>
@@ -150,7 +166,7 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
             <td style={{ ...styles.td, width: '40%' }}><b>Lớp:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{displayClassCode}</span></td>
           </tr>
           <tr>
-            <td style={{ ...styles.td }}><b>Giáo viên:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>Giáo viên phụ trách</span></td>
+            <td style={{ ...styles.td }}><b>Giáo viên:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{teacherNickname}</span></td>
             <td style={{ ...styles.td }}><b>Ngày thi:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{displayDate}</span></td>
           </tr>
         </tbody>
@@ -255,7 +271,9 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
           </tr>
           <tr>
             <td style={{ ...styles.td, fontWeight: 'bold', height: '100px', verticalAlign: 'top' }}>Chữ ký GVCN</td>
-            <td colSpan="2" style={styles.td}></td>
+            <td colSpan="2" style={{ ...styles.td, textAlign: 'center', verticalAlign: 'bottom', paddingBottom: '10px' }}>
+              <b>{teacherFullName}</b>
+            </td>
           </tr>
         </tbody>
       </table>

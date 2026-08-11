@@ -20,6 +20,9 @@ export async function GET(request) {
       include: {
         student: {
           select: { name: true, phone: true }
+        },
+        class: {
+          select: { teacherName: true }
         }
       }
     });
