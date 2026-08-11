@@ -270,8 +270,8 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
             </td>
           </tr>
           <tr>
-            <td style={{ ...styles.td, fontWeight: 'bold', height: '100px', verticalAlign: 'top' }}>Chữ ký GVCN</td>
-            <td colSpan="2" style={{ ...styles.td, textAlign: 'center', verticalAlign: 'bottom', paddingBottom: '10px' }}>
+            <td style={{ ...styles.td, fontWeight: 'bold' }}>Chữ ký GVCN</td>
+            <td colSpan="2" style={{ ...styles.td, textAlign: 'center' }}>
               <b>{teacherFullName}</b>
             </td>
           </tr>
