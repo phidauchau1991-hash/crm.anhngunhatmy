@@ -102,7 +102,7 @@ export default async function RootLayout({ children }) {
                 <span>Điểm danh</span>
               </a>
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER' || userRole === 'CSKH' || userRole === 'ADVISOR') && (
+              {(userRole === 'DIRECTOR' || userRole === 'MANAGER' || userRole === 'CSKH' || userRole === 'ADVISOR' || userRole === 'TEACHER') && (
                 <a href="/exams" className="nav-item">
                   <i className="fa-solid fa-ranking-star"></i>
                   <span>Đánh giá & Báo cáo</span>
