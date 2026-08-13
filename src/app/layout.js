@@ -76,14 +76,14 @@ export default async function RootLayout({ children }) {
                 </a>
               )}
               
-              {(userRole !== 'TEACHER') && (
+              {userRole !== 'TEACHER' && (
                 <a href="/leads" className="nav-item">
                   <i className="fa-solid fa-user-plus"></i>
                   <span>KHTN (Leads)</span>
                 </a>
               )}
 
-              {(userRole !== 'TEACHER') && (
+              {userRole !== 'TEACHER' && (
                 <a href="/students" className="nav-item">
                   <i className="fa-solid fa-user-graduate"></i>
                   <span>Học viên & Phụ huynh</span>
@@ -102,42 +102,42 @@ export default async function RootLayout({ children }) {
                 <span>Điểm danh</span>
               </a>
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER' || userRole === 'CSKH' || userRole === 'ADVISOR' || userRole === 'TEACHER') && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
                 <a href="/exams" className="nav-item">
                   <i className="fa-solid fa-ranking-star"></i>
                   <span>Đánh giá & Báo cáo</span>
                 </a>
               )}
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER' || userRole === 'ACCOUNTANT' || userRole === 'CSKH' || userRole === 'ADVISOR') && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('ACCOUNTANT') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
                 <a href="/finance" className="nav-item">
                   <i className="fa-solid fa-wallet"></i>
                   <span>Học phí & Công nợ</span>
                 </a>
               )}
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER') && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER')) && (
                 <a href="/inventory" className="nav-item">
                   <i className="fa-solid fa-boxes-stacked"></i>
                   <span>Quản lý kho</span>
                 </a>
               )}
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER' || userRole === 'CSKH' || userRole === 'ADVISOR') && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
                 <a href="/holidays" className="nav-item">
                   <i className="fa-solid fa-calendar-minus"></i>
                   <span>Ngày nghỉ</span>
                 </a>
               )}
 
-              {userRole === 'DIRECTOR' && (
+              {userRole.includes('DIRECTOR') && (
                 <a href="/configs" className="nav-item">
                   <i className="fa-solid fa-gears"></i>
                   <span>Cấu hình</span>
                 </a>
               )}
 
-              {(userRole === 'DIRECTOR' || userRole === 'MANAGER') && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER')) && (
                 <a href="/users" className="nav-item">
                   <i className="fa-solid fa-users-gear"></i>
                   <span>Nhân sự & Phân quyền</span>
