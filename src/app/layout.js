@@ -69,38 +69,40 @@ export default async function RootLayout({ children }) {
             </div>
             
             <nav className="sidebar-nav">
-              {userRole !== 'TEACHER' && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('ACCOUNTANT')) && (
                 <a href="/" className="nav-item active">
                   <i className="fa-solid fa-chart-line"></i>
                   <span>Tổng quan</span>
                 </a>
               )}
               
-              {userRole !== 'TEACHER' && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
                 <a href="/leads" className="nav-item">
                   <i className="fa-solid fa-user-plus"></i>
                   <span>KHTN (Leads)</span>
                 </a>
               )}
 
-              {userRole !== 'TEACHER' && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('ACCOUNTANT')) && (
                 <a href="/students" className="nav-item">
                   <i className="fa-solid fa-user-graduate"></i>
                   <span>Học viên & Phụ huynh</span>
                 </a>
               )}
 
-              {userRole !== 'ACCOUNTANT' && (
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
                 <a href="/classes" className="nav-item">
                   <i className="fa-solid fa-chalkboard-user"></i>
                   <span>Lớp học</span>
                 </a>
               )}
 
-              <a href="/attendance" className="nav-item">
-                <i className="fa-solid fa-list-check"></i>
-                <span>Điểm danh</span>
-              </a>
+              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
+                <a href="/attendance" className="nav-item">
+                  <i className="fa-solid fa-list-check"></i>
+                  <span>Điểm danh</span>
+                </a>
+              )}
 
               {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
                 <a href="/exams" className="nav-item">
