@@ -590,15 +590,15 @@ export default function AttendancePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Từ vựng / Hoạt động</label>
-                <input type="text" className="detail-text-input" placeholder="VD: Unit 5 - Animals" value={lessonContent.vocabularyTopic} onChange={e => setLessonContent(p => ({...p, vocabularyTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: Unit 5 - Animals" value={lessonContent.vocabularyTopic} onChange={e => setLessonContent(p => ({...p, vocabularyTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Cấu trúc ngữ pháp</label>
-                <input type="text" className="detail-text-input" placeholder="VD: Present Continuous" value={lessonContent.grammarTopic} onChange={e => setLessonContent(p => ({...p, grammarTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: Present Continuous" value={lessonContent.grammarTopic} onChange={e => setLessonContent(p => ({...p, grammarTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Bài đọc / Câu chuyện</label>
-                <input type="text" className="detail-text-input" placeholder="VD: The Lion and the Mouse" value={lessonContent.readingTopic} onChange={e => setLessonContent(p => ({...p, readingTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: The Lion and the Mouse" value={lessonContent.readingTopic} onChange={e => setLessonContent(p => ({...p, readingTopic: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
             </div>
           </div>
@@ -611,19 +611,19 @@ export default function AttendancePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Trang Workbook</label>
-                <input type="text" className="detail-text-input" placeholder="VD: trang 28-29" value={lessonContent.hwWbPages} onChange={e => setLessonContent(p => ({...p, hwWbPages: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: trang 28-29" value={lessonContent.hwWbPages} onChange={e => setLessonContent(p => ({...p, hwWbPages: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Số dòng Copy</label>
-                <input type="text" className="detail-text-input" placeholder="VD: 10 dòng" value={lessonContent.hwCopyLines} onChange={e => setLessonContent(p => ({...p, hwCopyLines: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: 10 dòng" value={lessonContent.hwCopyLines} onChange={e => setLessonContent(p => ({...p, hwCopyLines: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Hạn nộp Video</label>
-                <input type="text" className="detail-text-input" placeholder="VD: Trước CN 20/07" value={lessonContent.hwVideoDeadline} onChange={e => setLessonContent(p => ({...p, hwVideoDeadline: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: Trước CN 20/07" value={lessonContent.hwVideoDeadline} onChange={e => setLessonContent(p => ({...p, hwVideoDeadline: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-text-muted)', marginBottom: '0.25rem', display: 'block' }}>Yêu cầu khác</label>
-                <input type="text" className="detail-text-input" placeholder="VD: Chuẩn bị SGK bài 6" value={lessonContent.hwOther} onChange={e => setLessonContent(p => ({...p, hwOther: e.target.value}))} disabled={isLocked || !isDateValid} />
+                <textarea rows={2} style={{ resize: 'vertical' }} className="detail-text-input" placeholder="VD: Chuẩn bị SGK bài 6" value={lessonContent.hwOther} onChange={e => setLessonContent(p => ({...p, hwOther: e.target.value}))} disabled={isLocked || !isDateValid} />
               </div>
             </div>
           </div>
