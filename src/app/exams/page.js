@@ -881,13 +881,14 @@ export default function ExamsPage() {
                             <th style={{ padding: '0.5rem', width: '40px', textAlign: 'center' }}>Chọn</th>
                             <th style={{ padding: '0.5rem' }}>Học viên</th>
                             <th style={{ padding: '0.5rem', width: '120px' }}>Ưu đãi (đ)</th>
+                            <th style={{ padding: '0.5rem', width: '90px', textAlign: 'center' }}>Đã có sách</th>
                             <th style={{ padding: '0.5rem', width: '90px', textAlign: 'center' }}>Tặng sách</th>
                             <th style={{ padding: '0.5rem', width: '70px', textAlign: 'center' }}>Xem</th>
                           </tr>
                         </thead>
                         <tbody>
                           {students.map(s => {
-                            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false };
+                            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false, hasBook: false };
                             const isFocused = previewStudentId === s.id;
                             return (
                               <tr key={s.id} style={{ borderBottom: '1px solid #e2e8f0', background: isFocused ? '#f0f9ff' : 'white' }}>
@@ -907,6 +908,13 @@ export default function ExamsPage() {
                                     value={sn.discount || 0} 
                                     onChange={e => setStudentNotices({...studentNotices, [s.id]: { ...sn, discount: parseInt(e.target.value) || 0 }})} 
                                     style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+                                  />
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!!sn.hasBook} 
+                                    onChange={e => setStudentNotices({...studentNotices, [s.id]: { ...sn, hasBook: e.target.checked }})} 
                                   />
                                 </td>
                                 <td style={{ padding: '0.5rem', textAlign: 'center' }}>
@@ -981,7 +989,7 @@ export default function ExamsPage() {
                   noticeForm.newCourseLevel && courseConfigs.find(c => c.level === noticeForm.newCourseLevel) ? (() => {
                     const activeCourse = courseConfigs.find(c => c.level === noticeForm.newCourseLevel);
                     const focusedStudent = students.find(s => s.id === previewStudentId) || students[0];
-                    const sn = focusedStudent ? (studentNotices[focusedStudent.id] || { discount: 0, isGiftBook: false }) : { discount: 0, isGiftBook: false };
+                    const sn = focusedStudent ? (studentNotices[focusedStudent.id] || { discount: 0, isGiftBook: false, hasBook: false }) : { discount: 0, isGiftBook: false, hasBook: false };
                     return (
                       <PromotionNoticeTemplate 
                         className={classes.find(c => c.code === selectedClass)?.code}
@@ -990,6 +998,7 @@ export default function ExamsPage() {
                         endDate={noticeForm.endDate}
                         discount={noticeMode === 'personalized' ? (sn.discount || 0) : 0}
                         isGiftBook={noticeMode === 'personalized' ? (sn.isGiftBook || false) : false}
+                        hasBook={noticeMode === 'personalized' ? (sn.hasBook || false) : false}
                         studentName={noticeMode === 'personalized' && focusedStudent ? focusedStudent.name : ''}
                         isPersonalized={noticeMode === 'personalized'}
                       />
@@ -1012,7 +1021,7 @@ export default function ExamsPage() {
       {activeTab === 'notices' && noticeType === 'promotion' && noticeMode === 'personalized' && (
         <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '794px', overflow: 'hidden', zIndex: -1 }}>
           {students.map(s => {
-            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false };
+            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false, hasBook: false };
             const activeCourse = courseConfigs.find(c => c.level === noticeForm.newCourseLevel);
             if (!activeCourse || !sn.selected) return null;
             return (
@@ -1024,6 +1033,7 @@ export default function ExamsPage() {
                   endDate={noticeForm.endDate}
                   discount={sn.discount || 0}
                   isGiftBook={sn.isGiftBook || false}
+                  hasBook={sn.hasBook || false}
                   studentName={s.name}
                   isPersonalized={true}
                 />

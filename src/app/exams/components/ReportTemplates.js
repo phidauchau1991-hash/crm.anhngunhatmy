@@ -464,7 +464,7 @@ export const ExamNoticeTemplate = ({ className, examDates, notes }) => {
 // ==========================================
 // ẢNH 4: THƯ THÔNG BÁO KHÓA MỚI & QR THANH TOÁN
 // ==========================================
-export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, discount, isGiftBook, studentName, isPersonalized }) => {
+export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, discount, isGiftBook, hasBook, studentName, isPersonalized }) => {
   const displayClassCode = formatClassCodeForParent(className || "");
   const targetName = studentName ? studentName.toUpperCase() : `LỚP ${displayClassCode}`;
   const bankMemoName = studentName 
@@ -485,7 +485,7 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
   })();
 
   const basePrice = newCourse?.price || 0;
-  const bookPrice = (isPersonalized && isGiftBook) ? 0 : (newCourse?.bookPrice || 0);
+  const bookPrice = (isPersonalized && (isGiftBook || hasBook)) ? 0 : (newCourse?.bookPrice || 0);
   const discountVal = (isPersonalized && discount > 0) ? parseInt(discount) : 0;
   const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
 
@@ -532,7 +532,11 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
             <td style={{ ...styles.td, fontWeight: '500' }}>{newCourse?.bookName || 'Theo chuẩn quốc tế'}</td>
             <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Giá giáo trình</td>
             <td style={{ ...styles.td, fontWeight: 'bold' }}>
-              {isPersonalized && isGiftBook ? (
+              {isPersonalized && hasBook ? (
+                <div style={{ color: '#0ea5e9', fontWeight: 'bold', fontSize: '17px' }}>
+                  Đã có giáo trình
+                </div>
+              ) : isPersonalized && isGiftBook ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ textDecoration: 'line-through', color: '#94a3b8', fontWeight: 'normal', fontSize: '15px' }}>
                     {(newCourse?.bookPrice || 0).toLocaleString('vi-VN')}đ
