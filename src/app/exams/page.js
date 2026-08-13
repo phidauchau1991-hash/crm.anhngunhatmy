@@ -512,12 +512,14 @@ export default function ExamsPage() {
                   <thead>
                     <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
                       <th rowSpan="2" style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', minWidth: '150px' }}>Học viên</th>
-                      <th colSpan="3" style={{ padding: '0.5rem', textAlign: 'center', background: '#e0f2fe', borderRight: '1px solid #e2e8f0' }}>Điểm Quá Trình (Thang 10)</th>
+                      <th colSpan="5" style={{ padding: '0.5rem', textAlign: 'center', background: '#e0f2fe', borderRight: '1px solid #e2e8f0' }}>Điểm Quá Trình (Thang 10)</th>
                       <th colSpan="3" style={{ padding: '0.5rem', textAlign: 'center', background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Bài Thi Kỹ Năng</th>
                       <th colSpan="3" style={{ padding: '0.5rem', textAlign: 'center', background: '#ede9fe', borderRight: '1px solid #e2e8f0' }}>Từ khóa Nhận xét (Cho AI)</th>
                       <th rowSpan="2" style={{ padding: '1rem', textAlign: 'center', background: '#dcfce7' }}>Kết quả & Báo cáo</th>
                     </tr>
                     <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', fontSize: '0.875rem' }}>
+                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Điểm danh</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>BTVN</th>
                       <th style={{ padding: '0.5rem', textAlign: 'center' }}>Hoạt động</th>
                       <th style={{ padding: '0.5rem', textAlign: 'center' }}>Phát âm</th>
                       <th style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Giao tiếp</th>
@@ -538,6 +540,12 @@ export default function ExamsPage() {
                           <td style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>{student.name}</td>
                           
                           {/* Process Scores */}
+                          <td style={{ padding: '0.5rem' }}>
+                            <input type="number" min="0" max="10" step="0.5" value={r.attendanceScore} onChange={e => handleResultChange(student.id, 'attendanceScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                          </td>
+                          <td style={{ padding: '0.5rem' }}>
+                            <input type="number" min="0" max="10" step="0.5" value={r.hwScore} onChange={e => handleResultChange(student.id, 'hwScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                          </td>
                           <td style={{ padding: '0.5rem' }}>
                             <input type="number" min="0" max="10" step="0.5" value={r.activityScore} onChange={e => handleResultChange(student.id, 'activityScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
                           </td>
