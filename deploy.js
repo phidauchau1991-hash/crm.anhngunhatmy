@@ -41,7 +41,7 @@ async function deploy() {
       rm -rf /tmp/deploy_temp.git
       git clone --bare /root/deploy.bundle /tmp/deploy_temp.git
       cd /tmp/deploy_temp.git
-      git push /var/repo/nhat-my-crm.git main:master
+      git push -f /var/repo/nhat-my-crm.git main:master
     `;
     
     const result = await ssh.execCommand(command);
