@@ -546,13 +546,14 @@ export default function StudentsPage() {
         setEReceiptData({
             studentName,
             studentCode,
-            tuitionPaid,
+            tuition: tuitionPaid,
             bookName,
             bookCost,
-            totalPaid,
-            date: new Date().toISOString(),
+            total: totalPaid,
+            date: new Date().toLocaleDateString('vi-VN'),
+            time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
             cashier: 'Admin',
-            method: paymentForm.paymentMethod
+            paymentMethod: paymentForm.paymentMethod
         });
         setPaymentForm({
           collectAmount: '',
