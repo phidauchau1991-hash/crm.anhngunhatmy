@@ -1438,7 +1438,7 @@ export default function StudentsPage() {
                                   <strong>Tổng công nợ cần đóng:</strong> {totalDebt.toLocaleString('vi-VN')}đ
                                 </p>
                                 <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                                  Ví học viên hiện tại: <strong>{(editStudentData.student.walletBalance || 0).toLocaleString()}đ</strong>
+                                  Ví học viên hiện tại: <strong>{(editStudentData?.student?.walletBalance || 0).toLocaleString()}đ</strong>
                                 </p>
                               </div>
 
@@ -2445,19 +2445,19 @@ export default function StudentsPage() {
               <div style={{ margin: '1rem 0', borderTop: '2px solid #eee', paddingTop: '1rem', fontSize: '1.05rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                   <span>Học phí khóa học:</span>
-                  <span style={{ fontWeight: 'bold' }}>{eReceiptData.tuition.toLocaleString('vi-VN')}đ</span>
+                  <span style={{ fontWeight: 'bold' }}>{Number(eReceiptData.tuition || eReceiptData.tuitionPaid || 0).toLocaleString('vi-VN')}đ</span>
                 </div>
-                {eReceiptData.bookCost > 0 && (
+                {Number(eReceiptData.bookCost || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                     <span style={{ paddingRight: '1rem' }}>Giáo trình / Vật tư:<br/><small style={{color: '#666'}}>({eReceiptData.bookName})</small></span>
-                    <span style={{ fontWeight: 'bold' }}>{eReceiptData.bookCost.toLocaleString('vi-VN')}đ</span>
+                    <span style={{ fontWeight: 'bold' }}>{Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ</span>
                   </div>
                 )}
               </div>
               
               <div style={{ marginTop: '1rem', borderTop: '2px dashed #ccc', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.3rem', color: 'var(--color-primary-dark)' }}>
                 <span>TỔNG THU:</span>
-                <span>{eReceiptData.total.toLocaleString('vi-VN')}đ</span>
+                <span>{Number(eReceiptData.total || eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
               </div>
               
               <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.9rem', color: '#666' }}>
