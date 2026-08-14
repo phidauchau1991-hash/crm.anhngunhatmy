@@ -501,6 +501,41 @@ export default function StudentsPage() {
     }
   };
 
+  const copyReceiptImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2 });
+      canvas.toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          alert('Đã copy hình ảnh phiếu thu vào Clipboard!');
+        } catch (err) {
+          console.error(err);
+          alert('Trình duyệt không hỗ trợ copy ảnh trực tiếp (Yêu cầu HTTPS). Vui lòng dùng nút Tải Ảnh.');
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi khi tạo ảnh phiếu thu');
+    }
+  };
+
+  const downloadReceiptImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2 });
+      const link = document.createElement('a');
+      link.download = `PhieuThu_${eReceiptData.studentName.replace(/\s+/g, '_')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi khi tải ảnh');
+    }
+  };
+
   const handleCollectTuitionSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
