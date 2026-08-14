@@ -529,9 +529,31 @@ export default function StudentsPage() {
         setMessage({ type: 'success', text: `Ghi nhận thu tiền học phí & giáo trình thành công!` });
         fetchStudents();
         fetchConfigsAndClasses();
-        setTimeout(() => {
-          setIsEditModalOpen(false);
-        }, 1500);
+        const studentName = editStudentData?.student?.fullName || 'Học viên';
+        const studentCode = editStudentData?.student?.code || '';
+        const totalPaid = parseNumber(paymentForm.collectAmount);
+        let bookCost = 0;
+        let bookName = '';
+        
+        if (paymentForm.includeItem) {
+            bookCost = parseNumber(paymentForm.itemPrice) * paymentForm.itemQuantity;
+            const selectedItem = inventoryItems.find(i => i.id === paymentForm.itemId);
+            if (selectedItem) bookName = `${selectedItem.name} (x${paymentForm.itemQuantity})`;
+        }
+        
+        const tuitionPaid = Math.max(0, totalPaid - bookCost);
+        
+        setEReceiptData({
+            studentName,
+            studentCode,
+            tuitionPaid,
+            bookName,
+            bookCost,
+            totalPaid,
+            date: new Date().toISOString(),
+            cashier: 'Admin',
+            method: paymentForm.paymentMethod
+        });
         setPaymentForm({
           collectAmount: '',
           paymentMethod: 'Chuyển khoản',
@@ -1556,8 +1578,6 @@ export default function StudentsPage() {
                       )}
                     </div>
                   </div>
-                ) : (
-                    
                     {/* TAB 1: Thông tin cơ bản */}
                   <form onSubmit={(e) => handleEditSubmit(e, 'basic')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
                       <div className="form-section">
