@@ -504,7 +504,7 @@ export default function StudentsPage() {
   const copyReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2 });
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
       canvas.toBlob(async (blob) => {
         try {
           await navigator.clipboard.write([
@@ -525,7 +525,7 @@ export default function StudentsPage() {
   const downloadReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2 });
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
       const link = document.createElement('a');
       link.download = `PhieuThu_${eReceiptData.studentName.replace(/\s+/g, '_')}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -564,32 +564,38 @@ export default function StudentsPage() {
         setMessage({ type: 'success', text: `Ghi nhận thu tiền học phí & giáo trình thành công!` });
         fetchStudents();
         fetchConfigsAndClasses();
-        const studentName = editStudentData?.student?.fullName || 'Học viên';
-        const studentCode = editStudentData?.student?.code || '';
+        
+        const studentName = editStudentData?.student?.name || 'Học viên';
+        const totalCourseFee = editStudentData?.orders?.reduce((sum, o) => sum + (o.feeToPay || 0), 0) || 0;
+        const oldDebt = editStudentData?.orders?.reduce((sum, o) => sum + ((o.feeToPay || 0) - (o.amountPaid || 0)), 0) || 0;
         const totalPaid = parseNumber(paymentForm.collectAmount);
+        
         let bookCost = 0;
         let bookName = '';
-        
         if (paymentForm.includeItem) {
-            bookCost = parseNumber(paymentForm.itemPrice) * paymentForm.itemQuantity;
-            const selectedItem = inventoryItems.find(i => i.id === paymentForm.itemId);
-            if (selectedItem) bookName = `${selectedItem.name} (x${paymentForm.itemQuantity})`;
+          bookCost = parseNumber(paymentForm.itemPrice) * (parseInt(paymentForm.itemQuantity, 10) || 1);
+          const selectedItem = inventoryItems.find(i => i.id === paymentForm.itemId);
+          if (selectedItem) bookName = `${selectedItem.name} (x${paymentForm.itemQuantity || 1})`;
         }
         
         const tuitionPaid = Math.max(0, totalPaid - bookCost);
+        const remainingDebt = Math.max(0, oldDebt - tuitionPaid);
         
         setEReceiptData({
-            studentName,
-            studentCode,
-            tuition: tuitionPaid,
-            bookName,
-            bookCost,
-            total: totalPaid,
-            date: new Date().toLocaleDateString('vi-VN'),
-            time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            cashier: 'Admin',
-            paymentMethod: paymentForm.paymentMethod
+          studentName,
+          courseFee: totalCourseFee > 0 ? totalCourseFee : oldDebt,
+          oldDebt,
+          tuitionPaid,
+          remainingDebt,
+          bookName,
+          bookCost,
+          totalPaid,
+          date: new Date().toLocaleDateString('vi-VN'),
+          time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          cashier: 'Admin',
+          paymentMethod: paymentForm.paymentMethod,
         });
+        
         setPaymentForm({
           collectAmount: '',
           paymentMethod: 'Chuyển khoản',
@@ -2463,51 +2469,91 @@ export default function StudentsPage() {
 
       {eReceiptData && (
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '420px', padding: '1.5rem', background: '#f8f9fa' }}>
+          <div className="modal-content" style={{ maxWidth: '440px', padding: '1.25rem', background: '#f1f5f9', borderRadius: '16px' }}>
             
-            <div ref={receiptRef} style={{ background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', textAlign: 'left', fontFamily: 'monospace', color: '#333' }}>
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px dashed #ccc', paddingBottom: '1rem' }}>
-                <h2 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)', fontSize: '1.5rem', fontWeight: '800' }}>NHẬT MỸ ENGLISH</h2>
-                <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>PHIẾU THU ĐIỆN TỬ</p>
-              </div>
+            <div ref={receiptRef} style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.08)', position: 'relative' }}>
+              {/* Dải line nhận diện thương hiệu Xanh & Vàng */}
+              <div style={{ height: '6px', background: 'linear-gradient(90deg, #0D88C4 0%, #0D88C4 60%, #FFCA29 60%, #FFCA29 100%)' }}></div>
               
-              <div style={{ marginBottom: '1rem', fontSize: '1.05rem', lineHeight: '1.6' }}>
-                <p style={{ margin: '0.25rem 0' }}><strong>Học viên:</strong> {eReceiptData.studentName}</p>
-                <p style={{ margin: '0.25rem 0' }}><strong>Ngày lập:</strong> {eReceiptData.date} {eReceiptData.time}</p>
-                <p style={{ margin: '0.25rem 0' }}><strong>Hình thức:</strong> {eReceiptData.paymentMethod}</p>
-              </div>
-              
-              <div style={{ margin: '1rem 0', borderTop: '2px solid #eee', paddingTop: '1rem', fontSize: '1.05rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <span>Học phí khóa học:</span>
-                  <span style={{ fontWeight: 'bold' }}>{Number(eReceiptData.tuition || eReceiptData.tuitionPaid || 0).toLocaleString('vi-VN')}đ</span>
+              <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                {/* Header: Logo bên trái, Tiêu đề ở giữa */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
+                  <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
+                  <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
+                    <h2 style={{ margin: '0 0 0.35rem 0', color: '#085E8A', fontSize: '1.25rem', fontWeight: '900', letterSpacing: '0.5px' }}>ANH NGỮ NHẬT MỸ</h2>
+                    <div style={{ display: 'inline-block', background: '#FFCA29', color: '#085E8A', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
+                      PHIẾU THU ĐIỆN TỬ
+                    </div>
+                  </div>
                 </div>
+                
+                {/* Thông tin học viên */}
+                <div style={{ margin: '1rem 0', borderTop: '2px dashed #E2E8F0', borderBottom: '2px dashed #E2E8F0', padding: '0.85rem 0', fontSize: '0.95rem', lineHeight: '1.7' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>Học viên:</span>
+                    <strong style={{ color: '#085E8A', fontSize: '1.05rem' }}>{eReceiptData.studentName.toUpperCase()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>Ngày lập:</span>
+                    <span>{eReceiptData.date} {eReceiptData.time}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>Hình thức:</span>
+                    <span style={{ fontWeight: '600' }}>{eReceiptData.paymentMethod}</span>
+                  </div>
+                </div>
+                
+                {/* Khối chi tiết Học phí */}
+                <div style={{ margin: '0.75rem 0', fontSize: '0.95rem', lineHeight: '1.8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#475569' }}>Học phí khóa học:</span>
+                    <span>{Number(eReceiptData.courseFee || 0).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#475569' }}>Học phí đóng đợt này:</span>
+                    <span style={{ fontWeight: 'bold', color: '#0D88C4' }}>+ {Number(eReceiptData.tuitionPaid || 0).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#475569' }}>Học phí còn lại:</span>
+                    <span style={{ fontWeight: 'bold', color: Number(eReceiptData.remainingDebt || 0) > 0 ? '#E11D48' : '#10B981' }}>
+                      {Number(eReceiptData.remainingDebt || 0).toLocaleString('vi-VN')}đ {Number(eReceiptData.remainingDebt || 0) === 0 ? '(Đã hoàn tất)' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Khối Giáo trình / Vật tư (Tách riêng nếu có) */}
                 {Number(eReceiptData.bookCost || 0) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                    <span style={{ paddingRight: '1rem' }}>Giáo trình / Vật tư:<br/><small style={{color: '#666'}}>({eReceiptData.bookName})</small></span>
-                    <span style={{ fontWeight: 'bold' }}>{Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ</span>
+                  <div style={{ margin: '0.75rem 0 0.5rem 0', borderTop: '1px dashed #CBD5E1', paddingTop: '0.65rem', fontSize: '0.95rem', lineHeight: '1.8' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#475569', paddingRight: '0.5rem' }}>
+                        Giáo trình:<br/><small style={{ color: '#64748B' }}>({eReceiptData.bookName})</small>
+                      </span>
+                      <span style={{ fontWeight: 'bold', color: '#0D88C4' }}>+ {Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ</span>
+                    </div>
                   </div>
                 )}
-              </div>
-              
-              <div style={{ marginTop: '1rem', borderTop: '2px dashed #ccc', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.3rem', color: 'var(--color-primary-dark)' }}>
-                <span>TỔNG THU:</span>
-                <span>{Number(eReceiptData.total || eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
-              </div>
-              
-              <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.9rem', color: '#666' }}>
-                <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh đã tin tưởng và đồng hành cùng Nhật Mỹ!</p>
+                
+                {/* Khung Tổng thu đợt này với điểm nhấn Vàng & Xanh */}
+                <div style={{ marginTop: '1rem', background: '#FFFBEB', border: '2px solid #FFCA29', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: '800', fontSize: '1rem', color: '#085E8A' }}>TỔNG THU ĐỢT NÀY:</span>
+                  <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#0D88C4' }}>{Number(eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
+                </div>
+                
+                {/* Footer */}
+                <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
+                  <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh & Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
+                </div>
               </div>
             </div>
             
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button className="btn btn-secondary" onClick={() => { setEReceiptData(null); setIsEditModalOpen(false); }}>
                 <i className="fa-solid fa-times"></i> Đóng
               </button>
-              <button className="btn btn-success" onClick={downloadReceiptImage}>
+              <button className="btn btn-success" onClick={downloadReceiptImage} style={{ background: '#0D88C4', borderColor: '#0D88C4' }}>
                 <i className="fa-solid fa-download"></i> Tải Ảnh
               </button>
-              <button className="btn btn-primary" onClick={copyReceiptImage}>
+              <button className="btn btn-primary" onClick={copyReceiptImage} style={{ background: '#085E8A', borderColor: '#085E8A' }}>
                 <i className="fa-solid fa-copy"></i> Copy Zalo
               </button>
             </div>
