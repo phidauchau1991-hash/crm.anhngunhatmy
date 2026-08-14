@@ -37,14 +37,11 @@ async function deploy() {
       '/root/deploy.bundle'
     );
     
-    console.log('4. Kích hoạt quy trình cập nhật tự động (CI/CD) trên máy chủ...');
-    
-    // We clone the bundle into a temp repo and push it to trigger the post-receive hook
     const command = `
       rm -rf /tmp/deploy_temp.git
       git clone --bare /root/deploy.bundle /tmp/deploy_temp.git
       cd /tmp/deploy_temp.git
-      git push /var/repo/nhat-my-crm.git main:main
+      git push /var/repo/nhat-my-crm.git main:master
     `;
     
     const result = await ssh.execCommand(command);
