@@ -165,11 +165,14 @@ export async function PUT(request, { params }) {
         return NextResponse.json({ success: false, error: 'Số tiền thu đợt này phải lớn hơn 0' }, { status: 400 });
       }
 
+      const totalItemCost = (includeItem && itemId) ? (itemPriceVal * itemQtyVal) : 0;
+      const tuitionPayment = Math.max(0, collectAmount - totalItemCost);
+
       const updatedOrders = [];
 
       await prisma.$transaction(async (tx) => {
-        // 1. Thu tiền học phí theo thứ tự FIFO nếu collectAmount > 0
-        if (collectAmount > 0) {
+        // 1. Thu tiền học phí theo thứ tự FIFO
+        if (tuitionPayment > 0) {
           const unpaidOrders = await tx.orderFinance.findMany({
             where: {
               studentId: id,
@@ -178,7 +181,7 @@ export async function PUT(request, { params }) {
             orderBy: { createdAt: 'asc' },
           });
 
-          let remainingPayment = collectAmount;
+          let remainingPayment = tuitionPayment;
           for (const order of unpaidOrders) {
             if (remainingPayment <= 0) break;
 
@@ -237,7 +240,6 @@ export async function PUT(request, { params }) {
           });
 
           // Nếu có thu tiền giáo trình, tự động tạo hóa đơn tài chính
-          const totalItemCost = itemPriceVal * itemQtyVal;
           if (totalItemCost > 0) {
             const currentEnrollment = student.enrollments[0];
             const classCode = currentEnrollment?.classCode || 'THU_GIAO_TRINH';

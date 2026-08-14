@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
@@ -21,8 +20,6 @@ export default function StudentsPage() {
   // Trạng thái modal Thêm Học Viên
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [eReceiptData, setEReceiptData] = useState(null);
-  const receiptRef = useRef(null);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Trạng thái modal Chỉnh sửa / Đại tu học viên
@@ -1395,10 +1392,19 @@ export default function StudentsPage() {
                   </div>
                 </div>
 
-{/* UI: Các phần quản trị */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+                {/* Tabs */}
+                <div className="modal-tabs">
+                  <button className={`tab-btn ${editTab === 'basic' ? 'active' : ''}`} onClick={() => setEditTab('basic')}>1. Chỉnh sửa thông tin</button>
+                  <button className={`tab-btn ${editTab === 'payment' ? 'active' : ''}`} onClick={() => setEditTab('payment')}>2. Thanh toán / Thu tiền</button>
+                  <button className={`tab-btn ${editTab === 'statusChange' ? 'active' : ''}`} onClick={() => setEditTab('statusChange')}>3. Đang học / Tạm nghỉ / Nghỉ luôn</button>
+                  <button className={`tab-btn ${editTab === 'transfer' ? 'active' : ''}`} onClick={() => setEditTab('transfer')}>4. Xếp lớp / Chuyển lớp</button>
+                  <button className={`tab-btn ${editTab === 'reserve' ? 'active' : ''}`} onClick={() => setEditTab('reserve')}>5. Bảo lưu</button>
+                  <button className={`tab-btn ${editTab === 'dropout' ? 'active' : ''}`} onClick={() => setEditTab('dropout')}>6. Nghỉ luôn</button>
+                  <button className={`tab-btn ${editTab === 'gift' ? 'active' : ''}`} onClick={() => setEditTab('gift')}>7. Cấp phát vật tư</button>
+                </div>
 
-                  <div className="modal-form" style={{ border: "1px solid var(--color-border)", padding: "1.5rem", borderRadius: "12px", background: "var(--color-bg)", position: "relative" }}>
+                {editTab === 'payment' ? (
+                  <div className="modal-form">
                     {/* TAB: Thanh toán / Thu tiền */}
                     <div className="form-section">
                       <h3>Luồng Nghiệp vụ: Thu tiền Học phí</h3>
@@ -1557,9 +1563,10 @@ export default function StudentsPage() {
                     </div>
                   </div>
                 ) : (
+                  <form onSubmit={handleEditSubmit} className="modal-form">
                     
                     {/* TAB 1: Thông tin cơ bản */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'basic')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'basic' && (
                       <div className="form-section">
                         <h3>Chỉnh sửa Hồ sơ Học viên</h3>
                         <div className="form-grid">
@@ -1605,15 +1612,10 @@ export default function StudentsPage() {
                           </div>
                         </div>
                       </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                      <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        <i className="fa-solid fa-save"></i> Lưu Thông tin
-                      </button>
-                    </div>
-                  </form>
+                    )}
 
                     {/* TAB 3: Đang học / Tạm nghỉ / Nghỉ luôn */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'statusChange')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'statusChange' && (
                       <div className="form-section">
                         <h3>Luồng Trạng thái: Vận hành Học viên</h3>
                         <div className="form-group">
@@ -1667,15 +1669,10 @@ export default function StudentsPage() {
                           </div>
                         )}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                      <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        <i className="fa-solid fa-save"></i> Lưu Trạng thái
-                      </button>
-                    </div>
-                  </form>
+                    )}
 
                     {/* TAB 3: Chuyển lớp */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'transfer')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'transfer' && (
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Xếp lớp / Chuyển lớp học</h3>
                         
@@ -1791,15 +1788,10 @@ export default function StudentsPage() {
                           </div>
                         )}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                      <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        <i className="fa-solid fa-save"></i> Lưu Chuyển lớp
-                      </button>
-                    </div>
-                  </form>
+                    )}
 
                     {/* TAB 4: Bảo lưu */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'reserve')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'reserve' && (
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Bảo lưu Học phí</h3>
                         <div className="form-grid-2">
@@ -1814,15 +1806,10 @@ export default function StudentsPage() {
                         </div>
                         <p className="field-note"><i className="fa-solid fa-triangle-exclamation"></i> Bảo lưu sẽ tự động chuyển trạng thái học viên thành "Bảo lưu" và rút tên khỏi sỹ số lớp học.</p>
                       </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                      <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        <i className="fa-solid fa-save"></i> Lưu Bảo lưu
-                      </button>
-                    </div>
-                  </form>
+                    )}
 
                     {/* TAB 5: Nghỉ luôn */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'dropout')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'dropout' && (
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Thôi học (Nghỉ luôn)</h3>
                         <div className="form-group">
@@ -1849,14 +1836,9 @@ export default function StudentsPage() {
                           />
                         </div>
                       </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                      <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        <i className="fa-solid fa-save"></i> Lưu Nghỉ luôn
-                      </button>
-                    </div>
-                  </form>
+                    )}
                     {/* TAB 7: Cấp phát vật tư / Bán bổ sung / Mua lại */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'gift')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                    {editTab === 'gift' && (
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Cấp phát Vật tư / Bán bổ sung / Đổi trả</h3>
                         
@@ -1994,9 +1976,16 @@ export default function StudentsPage() {
                           <i className="fa-solid fa-circle-info"></i> Hệ thống tự động tạo Phiếu Xuất Kho, trừ tồn kho và ghi nhận hóa đơn tài chính (nếu có thu tiền).
                         </p>
                       </div>
-                  </form>
+                    )}
 
+                    {editTab !== 'gift' && (
+                      <div className="modal-actions">
+                        <button type="button" className="btn btn-secondary" onClick={() => setIsEditModalOpen(false)}>Đóng</button>
+                        <button type="submit" className="btn btn-primary" disabled={submitting}>Xác nhận Nghiệp vụ</button>
                       </div>
+                    )}
+                  </form>
+                )}
               </>
             )}
           </div>
@@ -2404,60 +2393,6 @@ export default function StudentsPage() {
           font-size: 0.9rem;
         }
       `}</style>
-
-      {eReceiptData && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '420px', padding: '1.5rem', background: '#f8f9fa' }}>
-            
-            <div ref={receiptRef} style={{ background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', textAlign: 'left', fontFamily: 'monospace', color: '#333' }}>
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px dashed #ccc', paddingBottom: '1rem' }}>
-                <h2 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)', fontSize: '1.5rem', fontWeight: '800' }}>NHẬT MỸ ENGLISH</h2>
-                <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>PHIẾU THU ĐIỆN TỬ</p>
-              </div>
-              
-              <div style={{ marginBottom: '1rem', fontSize: '1.05rem', lineHeight: '1.6' }}>
-                <p style={{ margin: '0.25rem 0' }}><strong>Học viên:</strong> {eReceiptData.studentName}</p>
-                <p style={{ margin: '0.25rem 0' }}><strong>Ngày lập:</strong> {eReceiptData.date} {eReceiptData.time}</p>
-                <p style={{ margin: '0.25rem 0' }}><strong>Hình thức:</strong> {eReceiptData.paymentMethod}</p>
-              </div>
-              
-              <div style={{ margin: '1rem 0', borderTop: '2px solid #eee', paddingTop: '1rem', fontSize: '1.05rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <span>Học phí khóa học:</span>
-                  <span style={{ fontWeight: 'bold' }}>{eReceiptData.tuition.toLocaleString('vi-VN')}đ</span>
-                </div>
-                {eReceiptData.bookCost > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                    <span style={{ paddingRight: '1rem' }}>Giáo trình / Vật tư:<br/><small style={{color: '#666'}}>({eReceiptData.bookName})</small></span>
-                    <span style={{ fontWeight: 'bold' }}>{eReceiptData.bookCost.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                )}
-              </div>
-              
-              <div style={{ marginTop: '1rem', borderTop: '2px dashed #ccc', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.3rem', color: 'var(--color-primary-dark)' }}>
-                <span>TỔNG THU:</span>
-                <span>{eReceiptData.total.toLocaleString('vi-VN')}đ</span>
-              </div>
-              
-              <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.9rem', color: '#666' }}>
-                <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh đã tin tưởng và đồng hành cùng Nhật Mỹ!</p>
-              </div>
-            </div>
-            
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button className="btn btn-secondary" onClick={() => { setEReceiptData(null); setIsEditModalOpen(false); }}>
-                <i className="fa-solid fa-times"></i> Đóng
-              </button>
-              <button className="btn btn-success" onClick={downloadReceiptImage}>
-                <i className="fa-solid fa-download"></i> Tải Ảnh
-              </button>
-              <button className="btn btn-primary" onClick={copyReceiptImage}>
-                <i className="fa-solid fa-copy"></i> Copy Zalo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
