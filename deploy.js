@@ -22,7 +22,7 @@ async function deploy() {
     if (fs.existsSync('deploy.bundle')) {
         fs.unlinkSync('deploy.bundle');
     }
-    execSync('git bundle create deploy.bundle master');
+    execSync('git bundle create deploy.bundle main');
     
     console.log('2. Đang kết nối đến máy chủ VPS...');
     await ssh.connect({
@@ -44,7 +44,7 @@ async function deploy() {
       rm -rf /tmp/deploy_temp.git
       git clone --bare /root/deploy.bundle /tmp/deploy_temp.git
       cd /tmp/deploy_temp.git
-      git push /var/repo/nhat-my-crm.git master:master
+      git push /var/repo/nhat-my-crm.git main:main
     `;
     
     const result = await ssh.execCommand(command);
