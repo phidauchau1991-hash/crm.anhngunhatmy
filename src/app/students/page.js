@@ -2506,8 +2506,8 @@ export default function StudentsPage() {
                 {/* Khối chi tiết Học phí */}
                 <div style={{ margin: '0.75rem 0', fontSize: '0.95rem', lineHeight: '1.8' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí khóa học:</span>
-                    <span>{Number(eReceiptData.courseFee || 0).toLocaleString('vi-VN')}đ</span>
+                    <span style={{ color: '#475569' }}>Học phí chưa hoàn thành:</span>
+                    <span>{Number(eReceiptData.oldDebt || 0).toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#475569' }}>Học phí đóng đợt này:</span>
