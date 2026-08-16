@@ -6,18 +6,6 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
-    if (action === 'delete237') {
-      const summary = await prisma.attendanceSummary.findUnique({ where: { id: 237 } });
-      if (!summary) return NextResponse.json({ error: '237 not found' });
-      
-      const count = await prisma.attendance.deleteMany({
-        where: { classCode: 'CN1_S1_MsMy_7CN_Ca4', date: summary.date }
-      });
-      await prisma.attendanceSummary.delete({ where: { id: 237 } });
-
-      return NextResponse.json({ success: true, deletedAttendance: count.count });
-    }
-
     if (action === 'fixS3') {
       const classInfo = await prisma.class.findUnique({
         where: { code: 'CN1_S3_MsMy_7CN_Ca1' },
@@ -50,11 +38,6 @@ export async function GET(request) {
       for (const d of attendanceData) {
          try { await prisma.attendance.create({ data: d }); } catch (e) {}
       }
-
-      await prisma.class.update({
-        where: { code: 'CN1_S3_MsMy_7CN_Ca1' },
-        data: { status: 'Đã kết thúc' }
-      });
 
       return NextResponse.json({ success: true });
     }
