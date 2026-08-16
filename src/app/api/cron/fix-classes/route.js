@@ -25,17 +25,17 @@ export async function GET(request) {
       });
 
       // Insert missing dates: 2026-08-09 and 2026-08-15 (Saturday/Sunday)
-      // Wait, I will just pick 2026-08-09 and 2026-08-15 explicitly to be safe
       const d1 = new Date('2026-08-09T00:00:00.000Z');
       const d2 = new Date('2026-08-15T00:00:00.000Z');
 
-      await prisma.attendanceSummary.createMany({
-        data: [
+      const dataS = [
           { classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d1, teacherId: classInfo.teacherId, classNotes: 'Đã hoàn thành' },
           { classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d2, teacherId: classInfo.teacherId, classNotes: 'Đã hoàn thành' }
-        ],
-        skipDuplicates: true
-      });
+      ];
+
+      for (const d of dataS) {
+         try { await prisma.attendanceSummary.create({ data: d }); } catch (e) {}
+      }
 
       const attendanceData = [];
       for (const enr of classInfo.enrollments) {
@@ -47,10 +47,9 @@ export async function GET(request) {
         });
       }
 
-      await prisma.attendance.createMany({
-        data: attendanceData,
-        skipDuplicates: true
-      });
+      for (const d of attendanceData) {
+         try { await prisma.attendance.create({ data: d }); } catch (e) {}
+      }
 
       await prisma.class.update({
         where: { code: 'CN1_S3_MsMy_7CN_Ca1' },
