@@ -6,28 +6,58 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
-    if (action === 'check') {
-      const s1Dates = await prisma.attendanceSummary.findMany({
-        where: { classCode: 'CN1_S1_MsMy_7CN_Ca4' },
-        orderBy: { date: 'asc' }
+    if (action === 'delete237') {
+      const summary = await prisma.attendanceSummary.findUnique({ where: { id: 237 } });
+      if (!summary) return NextResponse.json({ error: '237 not found' });
+      
+      const count = await prisma.attendance.deleteMany({
+        where: { classCode: 'CN1_S1_MsMy_7CN_Ca4', date: summary.date }
       });
-  
-      return NextResponse.json({ s1: s1Dates });
+      await prisma.attendanceSummary.delete({ where: { id: 237 } });
+
+      return NextResponse.json({ success: true, deletedAttendance: count.count });
     }
 
-    if (action === 'delete') {
-      const id = parseInt(searchParams.get('id'));
-      const dateStr = searchParams.get('date');
-      if (!id || !dateStr) return NextResponse.json({ error: 'Missing id or date' });
-
-      await prisma.attendanceSummary.delete({
-        where: { id: id }
-      });
-      await prisma.attendance.deleteMany({
-        where: { classCode: 'CN1_S1_MsMy_7CN_Ca4', date: new Date(dateStr) }
+    if (action === 'fixS3') {
+      const classInfo = await prisma.class.findUnique({
+        where: { code: 'CN1_S3_MsMy_7CN_Ca1' },
+        include: { enrollments: true }
       });
 
-      return NextResponse.json({ success: true, message: `Deleted ${id} for S1` });
+      // Insert missing dates: 2026-08-09 and 2026-08-15 (Saturday/Sunday)
+      // Wait, I will just pick 2026-08-09 and 2026-08-15 explicitly to be safe
+      const d1 = new Date('2026-08-09T00:00:00.000Z');
+      const d2 = new Date('2026-08-15T00:00:00.000Z');
+
+      await prisma.attendanceSummary.createMany({
+        data: [
+          { classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d1, teacherId: classInfo.teacherId, classNotes: 'Đã hoàn thành' },
+          { classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d2, teacherId: classInfo.teacherId, classNotes: 'Đã hoàn thành' }
+        ],
+        skipDuplicates: true
+      });
+
+      const attendanceData = [];
+      for (const enr of classInfo.enrollments) {
+        attendanceData.push({
+          studentId: enr.studentId, classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d1, status: 'Có mặt', teacherNotes: 'BT đầy đủ'
+        });
+        attendanceData.push({
+          studentId: enr.studentId, classCode: 'CN1_S3_MsMy_7CN_Ca1', date: d2, status: 'Có mặt', teacherNotes: 'BT đầy đủ'
+        });
+      }
+
+      await prisma.attendance.createMany({
+        data: attendanceData,
+        skipDuplicates: true
+      });
+
+      await prisma.class.update({
+        where: { code: 'CN1_S3_MsMy_7CN_Ca1' },
+        data: { status: 'Đã kết thúc' }
+      });
+
+      return NextResponse.json({ success: true });
     }
     
     return NextResponse.json({ error: 'Invalid action' });
