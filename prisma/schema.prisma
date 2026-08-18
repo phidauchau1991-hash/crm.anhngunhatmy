@@ -1,4 +1,4 @@
-// This is your Prisma schema file,
+﻿// This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -10,7 +10,7 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid()) // Mã nhân viên / User ID
+  id          String   @id @default(uuid()) // MÃ£ nhÃ¢n viÃªn / User ID
   username    String   @unique              // e.g. gv.huong
   password    String                        // Hashed password
   fullName    String
@@ -22,42 +22,42 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Quan hệ
+  // Quan há»‡
   classes     Class[]             @relation("ClassTeacher")
   attendances AttendanceSummary[] @relation("AttendanceTeacher")
 }
 
 model CourseConfig {
   id            Int      @id @default(autoincrement())
-  program       String   // e.g. THIẾU NHI, THIẾU NIÊN (Độ tuổi)
-  capDo         String   @default("") // e.g. STARTERS, MOVERS, KET, PET (Cấp độ)
-  level         String   @unique // e.g. S1, S2, KET 1, Lớp 9 (Mã khóa học)
-  price         Float    // Học phí
-  totalSessions Int      // Số buổi học
-  bookName      String?  // Giáo trình đi kèm
-  bookPrice     Float?   // Giá giáo trình
+  program       String   // e.g. THIáº¾U NHI, THIáº¾U NIÃŠN (Äá»™ tuá»•i)
+  capDo         String   @default("") // e.g. STARTERS, MOVERS, KET, PET (Cáº¥p Ä‘á»™)
+  level         String   @unique // e.g. S1, S2, KET 1, Lá»›p 9 (MÃ£ khÃ³a há»c)
+  price         Float    // Há»c phÃ­
+  totalSessions Int      // Sá»‘ buá»•i há»c
+  bookName      String?  // GiÃ¡o trÃ¬nh Ä‘i kÃ¨m
+  bookPrice     Float?   // GiÃ¡ giÃ¡o trÃ¬nh
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
 model Class {
   code            String       @id // e.g., CN1_S1 Ms My_35_01
-  level           String       // Liên kết tới CourseConfig level
+  level           String       // LiÃªn káº¿t tá»›i CourseConfig level
   teacherName     String?
-  teacherId       String?      // Liên kết tới User (Giáo viên chính)
+  teacherId       String?      // LiÃªn káº¿t tá»›i User (GiÃ¡o viÃªn chÃ­nh)
   teacher         User?        @relation("ClassTeacher", fields: [teacherId], references: [id])
   startDate       DateTime
   schedule        String       // e.g. "35", "24"
   expectedEndDate DateTime
-  careStaff       String?      // CSKH phụ trách lớp (Sprint 5)
-  branchId        String       @default("CN1_BinhDuong") // Chi nhánh quản lý lớp
+  careStaff       String?      // CSKH phá»¥ trÃ¡ch lá»›p (Sprint 5)
+  branchId        String       @default("CN1_BinhDuong") // Chi nhÃ¡nh quáº£n lÃ½ lá»›p
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   enrollments     Enrollment[]
   orders          OrderFinance[]
   attendances     Attendance[]
   attendanceSummaries AttendanceSummary[]
-  examResults     ExamResult[] // Kết quả thi
+  examResults     ExamResult[] // Káº¿t quáº£ thi
 }
 
 model Student {
@@ -67,30 +67,30 @@ model Student {
   dob                 DateTime?
   email               String?
   address             String?
-  nationalId          String?      // Số định danh / CCCD
-  specialPolicy       String?      // Tên chính sách cũ (giữ tương thích)
-  specialPolicyType   String?      // Loại ưu đãi: Không giảm, Miễn giảm nội bộ, Khó khăn, Học bổng, Khác
-  specialPolicyValue  Float?       @default(0) // Mức giảm cố định VND
+  nationalId          String?      // Sá»‘ Ä‘á»‹nh danh / CCCD
+  specialPolicy       String?      // TÃªn chÃ­nh sÃ¡ch cÅ© (giá»¯ tÆ°Æ¡ng thÃ­ch)
+  specialPolicyType   String?      // Loáº¡i Æ°u Ä‘Ã£i: KhÃ´ng giáº£m, Miá»…n giáº£m ná»™i bá»™, KhÃ³ khÄƒn, Há»c bá»•ng, KhÃ¡c
+  specialPolicyValue  Float?       @default(0) // Má»©c giáº£m cá»‘ Ä‘á»‹nh VND
   referralCode        String?      // Ma_Gioi_Thieu
-  saleStaff           String?      // Nhân viên Sale/Tư vấn phụ trách học viên (Sprint 5)
+  saleStaff           String?      // NhÃ¢n viÃªn Sale/TÆ° váº¥n phá»¥ trÃ¡ch há»c viÃªn (Sprint 5)
   
-  // Trạng thái & Quản trị học viên nâng cao (MỚI BỔ SUNG)
-  status              String       @default("Đang học") // Đang học, Tạm nghỉ, Bảo lưu, Nghỉ luôn
-  callbackDate        DateTime?    // Ngày hẹn liên hệ lại (Tạm nghỉ)
-  walletBalance       Float?       @default(0)          // Ví học viên (Chuyển lớp dư tiền)
-  reservationAmount   Float?       @default(0)          // Số tiền bảo lưu
-  reservationDeadline DateTime?    // Hạn chót bảo lưu
-  dropoutReason       String?      // Lý do nghỉ luôn
-  branchId            String       @default("CN1_BinhDuong") // Chi nhánh quản lý học viên
+  // Tráº¡ng thÃ¡i & Quáº£n trá»‹ há»c viÃªn nÃ¢ng cao (Má»šI Bá»” SUNG)
+  status              String       @default("Äang há»c") // Äang há»c, Táº¡m nghá»‰, Báº£o lÆ°u, Nghá»‰ luÃ´n
+  callbackDate        DateTime?    // NgÃ y háº¹n liÃªn há»‡ láº¡i (Táº¡m nghá»‰)
+  walletBalance       Float?       @default(0)          // VÃ­ há»c viÃªn (Chuyá»ƒn lá»›p dÆ° tiá»n)
+  reservationAmount   Float?       @default(0)          // Sá»‘ tiá»n báº£o lÆ°u
+  reservationDeadline DateTime?    // Háº¡n chÃ³t báº£o lÆ°u
+  dropoutReason       String?      // LÃ½ do nghá»‰ luÃ´n
+  branchId            String       @default("CN1_BinhDuong") // Chi nhÃ¡nh quáº£n lÃ½ há»c viÃªn
   
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   enrollments         Enrollment[]
   certificates        Certificate[]
   orders              OrderFinance[]
-  attendances         Attendance[] // Liên kết tới bảng Điểm danh
-  inventoryLogs       InventoryLog[] // Liên kết tới bảng Quản lý Kho (Cấp phát vật tư)
-  examResults         ExamResult[] // Liên kết tới bảng Kết quả thi (Sprint 4)
+  attendances         Attendance[] // LiÃªn káº¿t tá»›i báº£ng Äiá»ƒm danh
+  inventoryLogs       InventoryLog[] // LiÃªn káº¿t tá»›i báº£ng Quáº£n lÃ½ Kho (Cáº¥p phÃ¡t váº­t tÆ°)
+  examResults         ExamResult[] // LiÃªn káº¿t tá»›i báº£ng Káº¿t quáº£ thi (Sprint 4)
 }
 
 model Enrollment {
@@ -100,9 +100,9 @@ model Enrollment {
   classCode        String
   class            Class     @relation(fields: [classCode], references: [code], onDelete: Cascade)
   
-  status           String    @default("Đang học") // Đang học, Đã chuyển, Bảo lưu, Nghỉ học
+  status           String    @default("Äang há»c") // Äang há»c, ÄÃ£ chuyá»ƒn, Báº£o lÆ°u, Nghá»‰ há»c
 
-  // Điểm số theo kỹ năng
+  // Äiá»ƒm sá»‘ theo ká»¹ nÄƒng
   midTermListening Float?
   midTermSpeaking  Float?
   midTermReading   Float?
@@ -122,29 +122,29 @@ model Certificate {
   id        Int       @id @default(autoincrement())
   studentId String
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  examName  String    // Kỳ thi đánh giá năng lực
+  examName  String    // Ká»³ thi Ä‘Ã¡nh giÃ¡ nÄƒng lá»±c
   examDate  DateTime?
-  score     String?   // Điểm số / Kết quả đạt được
+  score     String?   // Äiá»ƒm sá»‘ / Káº¿t quáº£ Ä‘áº¡t Ä‘Æ°á»£c
   notes     String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
 model OrderFinance {
-  id              String    @id // Order_ID tự sinh
+  id              String    @id // Order_ID tá»± sinh
   studentId       String
   student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   classCode       String
   class           Class     @relation(fields: [classCode], references: [code], onDelete: Cascade)
-  promoType       String?   // Loại miễn giảm (mùa vụ, tháng...)
-  promoDiscount   Float?    // Giá trị giảm giá
-  feeToPay        Float     // HP_Thu (Số học phí cần hoàn thành)
-  amountPaid      Float     // HP_dong (Số tiền đóng tại thời điểm đó)
-  paymentStatus   String    // Đã đóng / Chưa đóng / Bảo lưu
-  paymentDeadline DateTime? // Hạn chót thanh toán
-  giftName        String?   // Tên tặng phẩm được tặng kèm
-  paymentPolicy   String    @default("Đóng trước") // Đóng trước (Thu trước học) / Đóng sau (Thu sau học)
-  branchId        String    @default("CN1_BinhDuong") // Chi nhánh ghi nhận doanh thu
+  promoType       String?   // Loáº¡i miá»…n giáº£m (mÃ¹a vá»¥, thÃ¡ng...)
+  promoDiscount   Float?    // GiÃ¡ trá»‹ giáº£m giÃ¡
+  feeToPay        Float     // HP_Thu (Sá»‘ há»c phÃ­ cáº§n hoÃ n thÃ nh)
+  amountPaid      Float     // HP_dong (Sá»‘ tiá»n Ä‘Ã³ng táº¡i thá»i Ä‘iá»ƒm Ä‘Ã³)
+  paymentStatus   String    // ÄÃ£ Ä‘Ã³ng / ChÆ°a Ä‘Ã³ng / Báº£o lÆ°u
+  paymentDeadline DateTime? // Háº¡n chÃ³t thanh toÃ¡n
+  giftName        String?   // TÃªn táº·ng pháº©m Ä‘Æ°á»£c táº·ng kÃ¨m
+  paymentPolicy   String    @default("ÄÃ³ng trÆ°á»›c") // ÄÃ³ng trÆ°á»›c (Thu trÆ°á»›c há»c) / ÄÃ³ng sau (Thu sau há»c)
+  branchId        String    @default("CN1_BinhDuong") // Chi nhÃ¡nh ghi nháº­n doanh thu
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   paymentLogs     PaymentLog[]
@@ -157,30 +157,30 @@ model Lead {
   dob           DateTime?
   email         String?
   address       String?
-  painPoints    String?      // Vấn đề gặp phải
-  goals         String?      // Mục tiêu mong muốn
-  status        String       // Trạng thái chăm sóc (Mới, Đang tư vấn, Học thử, Đã chốt, Trượt)
-  trialClassCode String?     // Lớp học thử (nếu status = Học thử)
-  trialStartDate DateTime?   // Ngày bắt đầu học thử (nếu status = Học thử)
-  lastContacted DateTime?    // Ngày cập nhật chăm sóc gần nhất
-  followUpDate  DateTime?    // Ngày hẹn liên lạc lại
-  followUpNote  String?      // Nội dung/Lý do hẹn gọi lại
-  salesRep      String?      // Nhân viên Sale phụ trách
-  notes         String?      // Ghi chú thêm
-  branchId      String       @default("CN1_BinhDuong") // Chi nhánh quản lý Lead
+  painPoints    String?      // Váº¥n Ä‘á» gáº·p pháº£i
+  goals         String?      // Má»¥c tiÃªu mong muá»‘n
+  status        String       // Tráº¡ng thÃ¡i chÄƒm sÃ³c (Má»›i, Äang tÆ° váº¥n, Há»c thá»­, ÄÃ£ chá»‘t, TrÆ°á»£t)
+  trialClassCode String?     // Lá»›p há»c thá»­ (náº¿u status = Há»c thá»­)
+  trialStartDate DateTime?   // NgÃ y báº¯t Ä‘áº§u há»c thá»­ (náº¿u status = Há»c thá»­)
+  lastContacted DateTime?    // NgÃ y cáº­p nháº­t chÄƒm sÃ³c gáº§n nháº¥t
+  followUpDate  DateTime?    // NgÃ y háº¹n liÃªn láº¡c láº¡i
+  followUpNote  String?      // Ná»™i dung/LÃ½ do háº¹n gá»i láº¡i
+  salesRep      String?      // NhÃ¢n viÃªn Sale phá»¥ trÃ¡ch
+  notes         String?      // Ghi chÃº thÃªm
+  branchId      String       @default("CN1_BinhDuong") // Chi nhÃ¡nh quáº£n lÃ½ Lead
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
-  attendances   Attendance[] // Liên kết tới bảng Điểm danh học thử
+  attendances   Attendance[] // LiÃªn káº¿t tá»›i báº£ng Äiá»ƒm danh há»c thá»­
 }
 
 model Inventory {
   id           String         @id // ID_Vat_Tu (e.g., TP_01, GT_01)
   name         String
-  category     String         // Tặng phẩm, Giáo trình, Vật phẩm
-  threshold    Int            @default(5) // Mức cảnh báo tồn tối thiểu
+  category     String         // Táº·ng pháº©m, GiÃ¡o trÃ¬nh, Váº­t pháº©m
+  threshold    Int            @default(5) // Má»©c cáº£nh bÃ¡o tá»“n tá»‘i thiá»ƒu
   alertSent    Boolean        @default(false)
   currentStock Int            @default(0)
-  branchId     String         @default("CN1_BinhDuong") // Chi nhánh chứa kho
+  branchId     String         @default("CN1_BinhDuong") // Chi nhÃ¡nh chá»©a kho
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   logs         InventoryLog[]
@@ -188,33 +188,33 @@ model Inventory {
 
 model InventoryLog {
   id          Int       @id @default(autoincrement())
-  receiptCode String?   // Mã phiếu (VD: PX-001, PN-002) - dùng để gom nhóm giao dịch
+  receiptCode String?   // MÃ£ phiáº¿u (VD: PX-001, PN-002) - dÃ¹ng Ä‘á»ƒ gom nhÃ³m giao dá»‹ch
   type        String    // XUAT_TANG, XUAT_MUON, NHAP_TRA, NHAP_MOI, KIEM_KE
   inventoryId String
   inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  quantity    Int       // Số lượng nhập (+) hoặc xuất (-)
+  quantity    Int       // Sá»‘ lÆ°á»£ng nháº­p (+) hoáº·c xuáº¥t (-)
   
-  // Thông tin đối tượng
+  // ThÃ´ng tin Ä‘á»‘i tÆ°á»£ng
   targetType  String?   // STUDENT, TEACHER, STAFF, SYSTEM, SUPPLIER
-  targetName  String?   // Tên người nhận/trả/nhà cung cấp
-  studentId   String?   // Link tới bảng Student nếu là học viên (targetType = STUDENT)
+  targetName  String?   // TÃªn ngÆ°á»i nháº­n/tráº£/nhÃ  cung cáº¥p
+  studentId   String?   // Link tá»›i báº£ng Student náº¿u lÃ  há»c viÃªn (targetType = STUDENT)
   student     Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
   
-  notes       String?   // Ghi chú chi tiết
+  notes       String?   // Ghi chÃº chi tiáº¿t
   createdAt   DateTime  @default(now())
 }
 
 model Holiday {
   id        Int      @id @default(autoincrement())
-  name      String   // Lý do nghỉ
-  startDate DateTime // Ngày bắt đầu nghỉ
-  endDate   DateTime // Ngày kết thúc nghỉ
+  name      String   // LÃ½ do nghá»‰
+  startDate DateTime // NgÃ y báº¯t Ä‘áº§u nghá»‰
+  endDate   DateTime // NgÃ y káº¿t thÃºc nghá»‰
   scope     String   // GLOBAL, SHIFT, CLASS
-  targetId  String?  // Mã ca học hoặc Mã lớp nếu scope không phải GLOBAL
+  targetId  String?  // MÃ£ ca há»c hoáº·c MÃ£ lá»›p náº¿u scope khÃ´ng pháº£i GLOBAL
   createdAt DateTime @default(now())
 }
 
-// Bảng Điểm Danh (Hỗ trợ cả Học viên chính thức & Lead học thử)
+// Báº£ng Äiá»ƒm Danh (Há»— trá»£ cáº£ Há»c viÃªn chÃ­nh thá»©c & Lead há»c thá»­)
 model Attendance {
   id               Int      @id @default(autoincrement())
   studentId        String?
@@ -223,47 +223,47 @@ model Attendance {
   lead             Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
   classCode        String
   class            Class    @relation(fields: [classCode], references: [code], onDelete: Cascade)
-  date             DateTime // Ngày điểm danh (lưu dưới dạng YYYY-MM-DD 00:00:00)
-  status           String   // Có mặt, Vắng có phép, Vắng không phép
-  checkInTime      String?  // Ghi nhận thời gian thực tế vào ca (e.g. "+15 phút", "Đúng giờ")
-  teacherNotes     String?  // Lời phê / nhận xét của giáo viên buổi học đó
+  date             DateTime // NgÃ y Ä‘iá»ƒm danh (lÆ°u dÆ°á»›i dáº¡ng YYYY-MM-DD 00:00:00)
+  status           String   // CÃ³ máº·t, Váº¯ng cÃ³ phÃ©p, Váº¯ng khÃ´ng phÃ©p
+  checkInTime      String?  // Ghi nháº­n thá»i gian thá»±c táº¿ vÃ o ca (e.g. "+15 phÃºt", "ÄÃºng giá»")
+  teacherNotes     String?  // Lá»i phÃª / nháº­n xÃ©t cá»§a giÃ¡o viÃªn buá»•i há»c Ä‘Ã³
   
-  // Vi phạm bài tập (Sprint 1 - Điểm danh nâng cao)
-  missingWb        Boolean  @default(false) // Chưa hoàn thành Workbook
-  missingVideo     Boolean  @default(false) // Chưa nộp Video
-  copyError        Boolean  @default(false) // Lỗi Copy / Vi phạm khác
-  adjustmentNotes  String?                  // Cần điều chỉnh: chi tiết lỗi cụ thể (multiline)
+  // Vi pháº¡m bÃ i táº­p (Sprint 1 - Äiá»ƒm danh nÃ¢ng cao)
+  missingWb        Boolean  @default(false) // ChÆ°a hoÃ n thÃ nh Workbook
+  missingVideo     Boolean  @default(false) // ChÆ°a ná»™p Video
+  copyError        Boolean  @default(false) // Lá»—i Copy / Vi pháº¡m khÃ¡c
+  adjustmentNotes  String?                  // Cáº§n Ä‘iá»u chá»‰nh: chi tiáº¿t lá»—i cá»¥ thá»ƒ (multiline)
   
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  @@unique([studentId, classCode, date]) // Ràng buộc: Mỗi học viên chỉ có 1 trạng thái điểm danh/lớp/ngày
-  @@unique([leadId, classCode, date])    // Ràng buộc: Mỗi Lead học thử chỉ có 1 trạng thái điểm danh/lớp/ngày
+  @@unique([studentId, classCode, date]) // RÃ ng buá»™c: Má»—i há»c viÃªn chá»‰ cÃ³ 1 tráº¡ng thÃ¡i Ä‘iá»ƒm danh/lá»›p/ngÃ y
+  @@unique([leadId, classCode, date])    // RÃ ng buá»™c: Má»—i Lead há»c thá»­ chá»‰ cÃ³ 1 tráº¡ng thÃ¡i Ä‘iá»ƒm danh/lá»›p/ngÃ y
 }
 
-// Bảng Nhật Ký & Nhận Xét Chung Của Lớp Theo Buổi Học
+// Báº£ng Nháº­t KÃ½ & Nháº­n XÃ©t Chung Cá»§a Lá»›p Theo Buá»•i Há»c
 model AttendanceSummary {
   id                   Int      @id @default(autoincrement())
   classCode            String
   class                Class    @relation(fields: [classCode], references: [code], onDelete: Cascade)
-  date                 DateTime // Ngày điểm danh (lưu dưới dạng YYYY-MM-DD 00:00:00)
-  classNotes           String?  // Nhật ký & Nhận xét chung của lớp
+  date                 DateTime // NgÃ y Ä‘iá»ƒm danh (lÆ°u dÆ°á»›i dáº¡ng YYYY-MM-DD 00:00:00)
+  classNotes           String?  // Nháº­t kÃ½ & Nháº­n xÃ©t chung cá»§a lá»›p
   
-  // Nội dung bài học (Sprint 1)
-  vocabularyTopic      String?  // Từ vựng / Hoạt động
-  grammarTopic         String?  // Cấu trúc ngữ pháp
-  readingTopic         String?  // Bài đọc / Câu chuyện
+  // Ná»™i dung bÃ i há»c (Sprint 1)
+  vocabularyTopic      String?  // Tá»« vá»±ng / Hoáº¡t Ä‘á»™ng
+  grammarTopic         String?  // Cáº¥u trÃºc ngá»¯ phÃ¡p
+  readingTopic         String?  // BÃ i Ä‘á»c / CÃ¢u chuyá»‡n
   
-  // Bài tập về nhà (Sprint 1)
-  hwWbPages            String?  // Trang Workbook cần làm
-  hwCopyLines          String?  // Số dòng cần Copy
-  hwVideoDeadline      String?  // Hạn chót nộp Video (text: "Trước CN 20/07")
-  hwOther              String?  // Yêu cầu khác
+  // BÃ i táº­p vá» nhÃ  (Sprint 1)
+  hwWbPages            String?  // Trang Workbook cáº§n lÃ m
+  hwCopyLines          String?  // Sá»‘ dÃ²ng cáº§n Copy
+  hwVideoDeadline      String?  // Háº¡n chÃ³t ná»™p Video (text: "TrÆ°á»›c CN 20/07")
+  hwOther              String?  // YÃªu cáº§u khÃ¡c
   
-  // Dạy thay & Tính lương (Sprint 7)
-  teacherId            String?  // User ID của giáo viên thực tế đã dạy hôm nay
+  // Dáº¡y thay & TÃ­nh lÆ°Æ¡ng (Sprint 7)
+  teacherId            String?  // User ID cá»§a giÃ¡o viÃªn thá»±c táº¿ Ä‘Ã£ dáº¡y hÃ´m nay
   teacher              User?    @relation("AttendanceTeacher", fields: [teacherId], references: [id])
-  isSubstitute         Boolean  @default(false) // Cờ đánh dấu dạy thay
+  isSubstitute         Boolean  @default(false) // Cá» Ä‘Ã¡nh dáº¥u dáº¡y thay
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -271,52 +271,52 @@ model AttendanceSummary {
   @@unique([classCode, date])
 }
 
-// Bảng Cài đặt Ngưỡng Cảnh Báo (Sprint 2)
+// Báº£ng CÃ i Ä‘áº·t NgÆ°á»¡ng Cáº£nh BÃ¡o (Sprint 2)
 model AlertConfig {
   id                    Int      @id @default(autoincrement())
-  // Ngưỡng cảnh báo điểm danh
-  consecutiveAbsences   Int      @default(2)  // Số buổi nghỉ liên tiếp → cảnh báo
-  totalAbsencesLimit    Int      @default(5)  // Tổng buổi vắng → cảnh báo
-  // Ngưỡng cảnh báo vi phạm bài tập
-  missingWbLimit        Int      @default(2)  // Số lần thiếu WB → cảnh báo
-  missingVideoLimit     Int      @default(2)  // Số lần thiếu Video → cảnh báo
-  copyErrorLimit        Int      @default(2)  // Số lần lỗi Copy → cảnh báo
+  // NgÆ°á»¡ng cáº£nh bÃ¡o Ä‘iá»ƒm danh
+  consecutiveAbsences   Int      @default(2)  // Sá»‘ buá»•i nghá»‰ liÃªn tiáº¿p â†’ cáº£nh bÃ¡o
+  totalAbsencesLimit    Int      @default(5)  // Tá»•ng buá»•i váº¯ng â†’ cáº£nh bÃ¡o
+  // NgÆ°á»¡ng cáº£nh bÃ¡o vi pháº¡m bÃ i táº­p
+  missingWbLimit        Int      @default(2)  // Sá»‘ láº§n thiáº¿u WB â†’ cáº£nh bÃ¡o
+  missingVideoLimit     Int      @default(2)  // Sá»‘ láº§n thiáº¿u Video â†’ cáº£nh bÃ¡o
+  copyErrorLimit        Int      @default(2)  // Sá»‘ láº§n lá»—i Copy â†’ cáº£nh bÃ¡o
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
 
 // ============================================
-// SPRINT 4: ĐÁNH GIÁ & BÁO CÁO CUỐI KHÓA
+// SPRINT 4: ÄÃNH GIÃ & BÃO CÃO CUá»I KHÃ“A
 // ============================================
 
-// Bảng Cấu hình Đề thi 
+// Báº£ng Cáº¥u hÃ¬nh Äá» thi 
 model ExamConfig {
   id              Int      @id @default(autoincrement())
-  level           String   // Ví dụ: M2, S3 (Liên kết tới CourseConfig level)
-  examType        String   // Loại kỳ thi (VD: "Giữa khóa", "Cuối khóa")
+  level           String   // VÃ­ dá»¥: M2, S3 (LiÃªn káº¿t tá»›i CourseConfig level)
+  examType        String   // Loáº¡i ká»³ thi (VD: "Giá»¯a khÃ³a", "Cuá»‘i khÃ³a")
   
-  // Trọng số và cấu hình điểm
-  processWeight   Float    @default(10) // Trọng số đánh giá quá trình (%)
-  examWeight      Float    @default(90) // Trọng số bài thi (%)
+  // Trá»ng sá»‘ vÃ  cáº¥u hÃ¬nh Ä‘iá»ƒm
+  processWeight   Float    @default(10) // Trá»ng sá»‘ Ä‘Ã¡nh giÃ¡ quÃ¡ trÃ¬nh (%)
+  examWeight      Float    @default(90) // Trá»ng sá»‘ bÃ i thi (%)
   
-  speakingWeight  Float    @default(30) // Kỹ năng Nói (%)
-  speakingMax     Float    @default(40) // Điểm tối đa Nói
+  speakingWeight  Float    @default(30) // Ká»¹ nÄƒng NÃ³i (%)
+  speakingMax     Float    @default(40) // Äiá»ƒm tá»‘i Ä‘a NÃ³i
   
-  listeningWeight Float    @default(20) // Kỹ năng Nghe (%)
-  listeningMax    Float    @default(26) // Điểm tối đa Nghe
+  listeningWeight Float    @default(20) // Ká»¹ nÄƒng Nghe (%)
+  listeningMax    Float    @default(26) // Äiá»ƒm tá»‘i Ä‘a Nghe
   
-  rwWeight        Float    @default(40) // Kỹ năng Đọc & Viết (%)
-  rwMax           Float    @default(36) // Điểm tối đa Đọc & Viết
+  rwWeight        Float    @default(40) // Ká»¹ nÄƒng Äá»c & Viáº¿t (%)
+  rwMax           Float    @default(36) // Äiá»ƒm tá»‘i Ä‘a Äá»c & Viáº¿t
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
-  results         ExamResult[] // Các bài thi thuộc cấu hình này
+  results         ExamResult[] // CÃ¡c bÃ i thi thuá»™c cáº¥u hÃ¬nh nÃ y
   
   @@unique([level, examType])
 }
 
-// Bảng Kết quả Thi & Nhận xét của Học viên
+// Báº£ng Káº¿t quáº£ Thi & Nháº­n xÃ©t cá»§a Há»c viÃªn
 model ExamResult {
   id              Int      @id @default(autoincrement())
   studentId       String
@@ -327,30 +327,30 @@ model ExamResult {
   config          ExamConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
   examDate        DateTime
   
-  // Điểm Quá trình (10%)
-  attendanceScore Float?   // Tự động tính từ tỷ lệ vắng
-  hwScore         Float?   // Tự động tính từ tỷ lệ thiếu WB/Video
-  activityScore   Float?   // GV chấm
-  pronunciationScore Float? // GV chấm
-  communicationScore Float? // GV chấm
-  processTotal    Float?   // Điểm trung bình quá trình
+  // Äiá»ƒm QuÃ¡ trÃ¬nh (10%)
+  attendanceScore Float?   // Tá»± Ä‘á»™ng tÃ­nh tá»« tá»· lá»‡ váº¯ng
+  hwScore         Float?   // Tá»± Ä‘á»™ng tÃ­nh tá»« tá»· lá»‡ thiáº¿u WB/Video
+  activityScore   Float?   // GV cháº¥m
+  pronunciationScore Float? // GV cháº¥m
+  communicationScore Float? // GV cháº¥m
+  processTotal    Float?   // Äiá»ƒm trung bÃ¬nh quÃ¡ trÃ¬nh
   
-  // Điểm Bài thi (90%)
-  speakingScore   Float?   // Số câu đúng / Điểm đạt được
+  // Äiá»ƒm BÃ i thi (90%)
+  speakingScore   Float?   // Sá»‘ cÃ¢u Ä‘Ãºng / Äiá»ƒm Ä‘áº¡t Ä‘Æ°á»£c
   listeningScore  Float?
   rwScore         Float?
   
-  // Tổng kết
-  totalScore      Float?   // Tổng điểm cuối cùng (100%)
-  grade           String?  // Xếp loại (A, B, C...)
+  // Tá»•ng káº¿t
+  totalScore      Float?   // Tá»•ng Ä‘iá»ƒm cuá»‘i cÃ¹ng (100%)
+  grade           String?  // Xáº¿p loáº¡i (A, B, C...)
   
-  // Nhận xét (AI sinh)
+  // Nháº­n xÃ©t (AI sinh)
   commentSpeaking String?
   commentListening String?
   commentRW       String?
-  commentDev      String?  // Định hướng phát triển
+  commentDev      String?  // Äá»‹nh hÆ°á»›ng phÃ¡t triá»ƒn
   
-  // Từ khóa (Giáo viên nhập)
+  // Tá»« khÃ³a (GiÃ¡o viÃªn nháº­p)
   keywordSpeaking String?
   keywordListening String?
   keywordRW       String?
@@ -361,13 +361,13 @@ model ExamResult {
   @@unique([studentId, classCode, configId])
 }
 
-// Bảng Cấu hình Trí Tuệ Nhân Tạo (AI) Đa Mô Hình
+// Báº£ng Cáº¥u hÃ¬nh TrÃ­ Tuá»‡ NhÃ¢n Táº¡o (AI) Äa MÃ´ HÃ¬nh
 model AiConfig {
   id              Int      @id @default(autoincrement())
   provider        String   @default("gemini") // "gemini", "deepseek", "chatgpt", "claude"
-  apiKey          String?  // Mã API Key của nhà cung cấp
-  modelName       String?  // Ví dụ: deepseek-chat, gpt-4o, claude-3-opus
-  isActive        Boolean  @default(true) // Có đang sử dụng không
+  apiKey          String?  // MÃ£ API Key cá»§a nhÃ  cung cáº¥p
+  modelName       String?  // VÃ­ dá»¥: deepseek-chat, gpt-4o, claude-3-opus
+  isActive        Boolean  @default(true) // CÃ³ Ä‘ang sá»­ dá»¥ng khÃ´ng
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
@@ -382,6 +382,7 @@ model PaymentLog {
   paymentMethod String
   notes         String?
   createdAt     DateTime     @default(now())
-  createdBy     String?      // T�n nh�n vi�n thu (T�y ch?n)
+  createdBy     String?      // Tên nhân viên thu (Tùy ch?n)
 }
+
 
