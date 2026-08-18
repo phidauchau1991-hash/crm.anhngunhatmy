@@ -22,6 +22,8 @@ export default function FinancePage() {
   // Modals state
   const [showManualModal, setShowManualModal] = useState(false);
   const [showCollectModal, setShowCollectModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyOrder, setHistoryOrder] = useState(null);
 
   // AI State
   const [showAiModal, setShowAiModal] = useState(false);
@@ -200,6 +202,11 @@ export default function FinancePage() {
     setAiMessage('');
     setAiTone('encouraging');
     setShowAiModal(true);
+  };
+
+  const openHistoryModal = (order) => {
+    setHistoryOrder(order);
+    setShowHistoryModal(true);
   };
 
   const handleGenerateAiMessage = async () => {
@@ -516,6 +523,14 @@ export default function FinancePage() {
                       ) : (
                         <span style={{ fontSize: '0.8rem', color: '#64748b' }}><i className="fa-regular fa-circle-check text-success"></i> Đã hoàn thành</span>
                       )}
+                      
+                      {order.paymentLogs && order.paymentLogs.length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <button className="btn btn-sm btn-outline" onClick={() => openHistoryModal(order)} style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}>
+                            <i className="fa-solid fa-clock-rotate-left"></i> Lịch sử
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -731,7 +746,51 @@ export default function FinancePage() {
         </div>
       )}
 
-      <style>{`
+      {/* MODAL: PAYMENT HISTORY */}
+      {showHistoryModal && historyOrder && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-panel animated-scale" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2><i className="fa-solid fa-clock-rotate-left"></i> Lịch Sử Thu Tiền</h2>
+              <button className="close-btn" onClick={() => setShowHistoryModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(13, 136, 196, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: '0 0 0.5rem 0' }}><strong>Học viên:</strong> {historyOrder.student?.name} ({historyOrder.studentId})</p>
+                <p style={{ margin: '0 0 0.5rem 0' }}><strong>Lớp học:</strong> {historyOrder.classCode}</p>
+                <p style={{ margin: '0' }}><strong>Tổng đã thu:</strong> {historyOrder.amountPaid.toLocaleString('vi-VN')}đ / {historyOrder.feeToPay.toLocaleString('vi-VN')}đ</p>
+              </div>
+
+              <table className="data-table" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Ngày thu</th>
+                    <th>Số tiền</th>
+                    <th>Phương thức</th>
+                    <th>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyOrder.paymentLogs && historyOrder.paymentLogs.length > 0 ? (
+                    historyOrder.paymentLogs.map((log, index) => (
+                      <tr key={index}>
+                        <td>{new Date(log.createdAt).toLocaleString('vi-VN')}</td>
+                        <td style={{ fontWeight: 'bold', color: 'var(--color-success)', textAlign: 'right' }}>+{log.amount.toLocaleString('vi-VN')}đ</td>
+                        <td style={{ textAlign: 'center' }}>{log.paymentMethod}</td>
+                        <td>{log.notes}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="4" style={{ textAlign: 'center', color: '#64748b' }}>Chưa có lịch sử thanh toán chi tiết.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
         .page-container {
           display: flex;
           flex-direction: column;
@@ -797,3 +856,5 @@ export default function FinancePage() {
     </div>
   );
 }
+
+

@@ -12,6 +12,7 @@ export async function GET(request, { params }) {
       where: { id },
       include: {
         enrollments: {
+          where: { status: 'Đang học' },
           include: {
             class: true,
           },
@@ -142,7 +143,9 @@ export async function PUT(request, { params }) {
     const student = await prisma.student.findUnique({
       where: { id },
       include: {
-        enrollments: true,
+        enrollments: {
+          where: { status: 'Đang học' }
+        },
         orders: true,
       },
     });
@@ -202,6 +205,17 @@ export async function PUT(request, { params }) {
                 promoType: order.promoType ? `${order.promoType}${noteSuffix}` : `Thu học phí${noteSuffix}`,
               },
             });
+
+            // Lịch sử thanh toán
+            await tx.paymentLog.create({
+              data: {
+                orderId: order.id,
+                amount: payForThisOrder,
+                paymentMethod: paymentMethod || 'Tiền mặt',
+                notes: notes || 'Thu học phí'
+              }
+            });
+
             updatedOrders.push(updated);
             remainingPayment -= payForThisOrder;
           }
@@ -315,8 +329,9 @@ export async function PUT(request, { params }) {
 
         // Nếu học viên Tạm nghỉ hoặc Nghỉ luôn, rút tên khỏi lớp học active để dọn sạch danh sách điểm danh
         if (status === 'Tạm nghỉ' || status === 'Nghỉ luôn') {
-          await tx.enrollment.deleteMany({
-            where: { studentId: id },
+          await tx.enrollment.updateMany({
+            where: { studentId: id, status: 'Đang học' },
+            data: { status: status === 'Tạm nghỉ' ? 'Bảo lưu' : 'Nghỉ học' }
           });
         }
       });
@@ -499,9 +514,10 @@ export async function PUT(request, { params }) {
 
       // C. Thực hiện cập nhật Database
       await prisma.$transaction(async (tx) => {
-        // 1. Cập nhật xếp lớp (Xóa enrollment cũ, tạo enrollment mới)
-        await tx.enrollment.deleteMany({
-          where: { studentId: id },
+        // 1. Cập nhật xếp lớp (Bảo toàn enrollment cũ, tạo enrollment mới)
+        await tx.enrollment.updateMany({
+          where: { studentId: id, status: 'Đang học' },
+          data: { status: 'Đã chuyển' }
         });
 
         await tx.enrollment.create({
@@ -560,17 +576,27 @@ export async function PUT(request, { params }) {
     // LUỒNG 4: Bảo lưu khóa học (Status = Bảo lưu + Nhập số tiền + Hạn bảo lưu)
     if (action === 'reserve') {
       const { reservationAmount, reservationDeadline } = body;
+      const amount = parseFloat(reservationAmount) || 0;
 
-      const updated = await prisma.student.update({
-        where: { id },
-        data: {
-          status: 'Bảo lưu',
-          reservationAmount: parseFloat(reservationAmount) || 0,
-          reservationDeadline: reservationDeadline ? new Date(reservationDeadline) : null,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.student.update({
+          where: { id },
+          data: {
+            status: 'Bảo lưu',
+            reservationAmount: amount,
+            reservationDeadline: reservationDeadline ? new Date(reservationDeadline) : null,
+            walletBalance: { increment: amount } // Tự động cộng vào ví học viên
+          },
+        });
+
+        // Rút tên khỏi sĩ số lớp học (Bảo toàn danh sách nhưng không đếm vào sĩ số)
+        await tx.enrollment.updateMany({
+          where: { studentId: id, status: 'Đang học' },
+          data: { status: 'Bảo lưu' }
+        });
       });
 
-      return NextResponse.json({ success: true, data: updated });
+      return NextResponse.json({ success: true, message: 'Bảo lưu thành công và tự động rút khỏi lớp' });
     }
 
     // LUỒNG 5: Nghỉ luôn (Status = Nghỉ luôn + Bắt buộc lý do)
@@ -591,8 +617,9 @@ export async function PUT(request, { params }) {
           },
         });
 
-        await tx.enrollment.deleteMany({
-          where: { studentId: id },
+        await tx.enrollment.updateMany({
+          where: { studentId: id, status: 'Đang học' },
+          data: { status: 'Nghỉ học' }
         });
       });
 

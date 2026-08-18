@@ -54,7 +54,8 @@ export async function GET(request) {
             phone: true,
             status: true
           }
-        }
+        },
+        paymentLogs: true
       },
       orderBy: { createdAt: 'desc' }
     });

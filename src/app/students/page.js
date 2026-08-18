@@ -1864,6 +1864,35 @@ export default function StudentsPage() {
                   <form onSubmit={(e) => handleEditSubmit(e, 'reserve')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Bảo lưu Học phí</h3>
+                        
+                        {/* Hiển thị tính toán tự động nếu có lớp hiện tại */}
+                        {selectedStudent?.currentClass && (
+                          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(13, 136, 196, 0.05)', borderRadius: '8px', fontSize: '0.9rem' }}>
+                            <p style={{ margin: '0 0 0.5rem 0' }}><strong>Chi phí lớp hiện tại ({selectedStudent.currentClass.classCode}):</strong></p>
+                            <ul style={{ margin: 0, paddingLeft: '1.5rem', color: 'var(--color-text-light)' }}>
+                              <li>Học phí thực đóng: <strong>{(selectedStudent.currentClass.amountPaid || 0).toLocaleString()}đ</strong></li>
+                              <li>Số buổi đã điểm danh: <strong>{selectedStudent.currentClass.attendedSessions} / {selectedStudent.currentClass.totalSessions}</strong></li>
+                              <li>Chi phí đã học: <strong>{Math.round(((selectedStudent.currentClass.feeToPay || 0) / (selectedStudent.currentClass.totalSessions || 32)) * (selectedStudent.currentClass.attendedSessions || 0)).toLocaleString()}đ</strong></li>
+                            </ul>
+                            <div style={{ marginTop: '0.8rem' }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-sm btn-outline"
+                                onClick={() => {
+                                  const c = selectedStudent.currentClass;
+                                  const costPerSession = (c.feeToPay || 0) / (c.totalSessions || 32);
+                                  const costUsed = costPerSession * (c.attendedSessions || 0);
+                                  const diff = (c.amountPaid || 0) - costUsed;
+                                  const autoAmount = diff > 0 ? Math.round(diff) : 0;
+                                  setEditForm({...editForm, reservationAmount: autoAmount.toLocaleString()});
+                                }}
+                              >
+                                <i className="fa-solid fa-calculator"></i> Tự động điền số dư đề xuất
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="form-grid-2">
                           <div className="form-group">
                             <label>Số tiền bảo lưu (VND)</label>
@@ -1874,7 +1903,7 @@ export default function StudentsPage() {
                             <input type="date" name="reservationDeadline" value={editForm.reservationDeadline ? editForm.reservationDeadline.substring(0,10) : ''} onChange={handleEditInputChange} required />
                           </div>
                         </div>
-                        <p className="field-note"><i className="fa-solid fa-triangle-exclamation"></i> Bảo lưu sẽ tự động chuyển trạng thái học viên thành "Bảo lưu" và rút tên khỏi sỹ số lớp học.</p>
+                        <p className="field-note"><i className="fa-solid fa-triangle-exclamation"></i> Bảo lưu sẽ tự động chuyển trạng thái học viên thành "Bảo lưu", cộng tiền vào Ví và rút tên khỏi sỹ số lớp học.</p>
                       </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                       <button type="submit" className="btn btn-primary" disabled={submitting}>

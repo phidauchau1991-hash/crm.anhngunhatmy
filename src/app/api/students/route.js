@@ -74,6 +74,7 @@ export async function GET(request) {
       where,
       include: {
         enrollments: {
+          where: { status: 'Đang học' },
           include: {
             class: true,
           },

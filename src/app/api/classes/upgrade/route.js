@@ -52,7 +52,7 @@ export async function POST(request) {
     const now = new Date();
     const yearMonthPrefix = `${String(now.getFullYear()).substring(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const activeStudents = oldClass.enrollments;
+    const activeStudents = oldClass.enrollments.filter(e => e.status === 'Đang học');
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Tạo lớp mới
@@ -73,16 +73,18 @@ export async function POST(request) {
       // 2. Chuyển sỹ số toàn bộ học viên từ lớp cũ sang lớp mới và tạo hóa đơn khóa mới
       let movedCount = 0;
       for (const en of activeStudents) {
-        // Xóa enrollment lớp cũ để giải phóng sỹ số lớp cũ
-        await tx.enrollment.deleteMany({
-          where: { studentId: en.studentId, classCode: oldClassCode }
+        // Đổi trạng thái enrollment lớp cũ thay vì xóa để bảo toàn lịch sử
+        await tx.enrollment.updateMany({
+          where: { studentId: en.studentId, classCode: oldClassCode },
+          data: { status: 'Đã chuyển' }
         });
 
         // Tạo enrollment lớp mới
         await tx.enrollment.create({
           data: {
             studentId: en.studentId,
-            classCode: newClassCode
+            classCode: newClassCode,
+            status: 'Đang học'
           }
         });
 

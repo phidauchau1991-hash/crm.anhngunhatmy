@@ -97,7 +97,7 @@ export async function POST(request) {
 
       // 4. Nếu có thu tiền mua vật tư/giáo trình từ học viên, tự động ghi nhận Hóa đơn Thu tiền vào Hệ thống Tài chính
       if (collectedAmt > 0 && studentId) {
-        const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: true } });
+        const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: { where: { status: 'Đang học' } } } });
         const classCode = student?.enrollments[0]?.classCode || 'XUAT_KHO';
         const now = new Date();
         const year = String(now.getFullYear()).substring(2);

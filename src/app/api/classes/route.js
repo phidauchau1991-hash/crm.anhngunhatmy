@@ -29,11 +29,13 @@ export async function GET(request) {
       };
     }
 
-    // Lấy lớp học kèm sỹ số học viên hiện tại
+    // Lấy lớp học kèm sỹ số học viên hiện tại (chỉ đếm học viên đang học)
     const classes = await prisma.class.findMany({
       where: filter,
       include: {
-        enrollments: true,
+        enrollments: {
+          where: { status: 'Đang học' }
+        },
       },
       orderBy: {
         code: 'asc',
