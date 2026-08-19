@@ -1866,20 +1866,20 @@ export default function StudentsPage() {
                         <h3>Luồng Nghiệp vụ: Bảo lưu Học phí</h3>
                         
                         {/* Hiển thị tính toán tự động nếu có lớp hiện tại */}
-                        {selectedStudent?.currentClass && (
+                        {editStudentData?.currentClass && (
                           <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(13, 136, 196, 0.05)', borderRadius: '8px', fontSize: '0.9rem' }}>
-                            <p style={{ margin: '0 0 0.5rem 0' }}><strong>Chi phí lớp hiện tại ({selectedStudent.currentClass.classCode}):</strong></p>
+                            <p style={{ margin: '0 0 0.5rem 0' }}><strong>Chi phí lớp hiện tại ({editStudentData.currentClass.classCode}):</strong></p>
                             <ul style={{ margin: 0, paddingLeft: '1.5rem', color: 'var(--color-text-light)' }}>
-                              <li>Học phí thực đóng: <strong>{(selectedStudent.currentClass.amountPaid || 0).toLocaleString()}đ</strong></li>
-                              <li>Số buổi đã điểm danh: <strong>{selectedStudent.currentClass.attendedSessions} / {selectedStudent.currentClass.totalSessions}</strong></li>
-                              <li>Chi phí đã học: <strong>{Math.round(((selectedStudent.currentClass.feeToPay || 0) / (selectedStudent.currentClass.totalSessions || 32)) * (selectedStudent.currentClass.attendedSessions || 0)).toLocaleString()}đ</strong></li>
+                              <li>Học phí thực đóng: <strong>{(editStudentData.currentClass.amountPaid || 0).toLocaleString()}đ</strong></li>
+                              <li>Số buổi đã điểm danh: <strong>{editStudentData.currentClass.attendedSessions} / {editStudentData.currentClass.totalSessions}</strong></li>
+                              <li>Chi phí đã học: <strong>{Math.round(((editStudentData.currentClass.feeToPay || 0) / (editStudentData.currentClass.totalSessions || 32)) * (editStudentData.currentClass.attendedSessions || 0)).toLocaleString()}đ</strong></li>
                             </ul>
                             <div style={{ marginTop: '0.8rem' }}>
                               <button 
                                 type="button" 
                                 className="btn btn-sm btn-outline"
                                 onClick={() => {
-                                  const c = selectedStudent.currentClass;
+                                  const c = editStudentData.currentClass;
                                   const costPerSession = (c.feeToPay || 0) / (c.totalSessions || 32);
                                   const costUsed = costPerSession * (c.attendedSessions || 0);
                                   const diff = (c.amountPaid || 0) - costUsed;
