@@ -40,22 +40,10 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
         position: 'absolute',
         top: '-9999px',
         left: '-9999px',
+        textAlign: 'left',
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
       }}
     >
-      {/* Nền chìm Watermark */}
-      <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        opacity: 0.05,
-        pointerEvents: 'none',
-        zIndex: 0
-      }}>
-        <img src="/logo.png" alt="Watermark" style={{ width: '400px', height: 'auto' }} crossOrigin="anonymous" />
-      </div>
-
       {/* Header Band */}
       <div style={{ height: '8px', width: '100%', backgroundColor: '#0d88c4' }}></div>
 

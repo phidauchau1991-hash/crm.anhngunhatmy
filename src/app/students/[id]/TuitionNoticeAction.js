@@ -24,6 +24,7 @@ export default function TuitionNoticeAction({ student }) {
   const [giftsText, setGiftsText] = useState('Áo thun, Balo');
   const [giftValue, setGiftValue] = useState(150000);
   const [dueDate, setDueDate] = useState('');
+  const [transferContent, setTransferContent] = useState('');
   
   useEffect(() => {
     if (isModalOpen && classes.length === 0) {
@@ -41,6 +42,12 @@ export default function TuitionNoticeAction({ student }) {
       // Try to remove the middle number (like _35)
       clean = clean.replace(/_\d+(_Ca\d+)$/, '$1');
       setDisplayClassName(`${clean} - ${targetClass.schedule || ''}`);
+      
+      // Auto-generate transfer content
+      const nameNoAccent = student.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+      const firstName = nameNoAccent.split(' ').pop().toUpperCase();
+      const shortClass = clean.split('_')[0]; // e.g. S3
+      setTransferContent(`${firstName} HP KHOA ${shortClass.toUpperCase()}`);
       
       // Try to extract Teacher Name from code (e.g., MsMy)
       const parts = targetClass.code.split('_');
@@ -76,10 +83,7 @@ export default function TuitionNoticeAction({ student }) {
 
   const getQrUrl = () => {
     if (!targetClassCode) return '';
-    const nameNoAccent = student.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
-    const firstName = nameNoAccent.split(' ').pop().toUpperCase();
-    const addInfo = `${firstName} HP KHOA ${targetClassCode.toUpperCase()}`;
-    return `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(addInfo)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
+    return `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
   };
 
   const templateData = {
@@ -99,7 +103,7 @@ export default function TuitionNoticeAction({ student }) {
     giftValue: Number(giftValue),
     dueDate,
     finalAmount,
-    transferContent: `${student.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").split(' ').pop().toUpperCase()} HP khoa ${targetClassCode}`,
+    transferContent,
     qrUrl: getQrUrl()
   };
 
@@ -276,6 +280,16 @@ export default function TuitionNoticeAction({ student }) {
                     style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Nội dung chuyển khoản</label>
+                <input 
+                  type="text" 
+                  value={transferContent} 
+                  onChange={e => setTransferContent(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                />
               </div>
 
               <div>
