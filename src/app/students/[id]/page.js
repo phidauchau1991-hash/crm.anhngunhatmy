@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { encryptStudentId } from "@/lib/token";
 import CopyLinkButton from "./CopyLinkButton";
 import ReviewActionClient from "./ReviewActionClient";
+import TuitionNoticeAction from "./TuitionNoticeAction";
 export const revalidate = 0;
 
 export default async function StudentDetailPage({ params }) {
@@ -154,6 +155,7 @@ export default async function StudentDetailPage({ params }) {
               <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>Sổ liên lạc điện tử: </span>
               <CopyLinkButton token={encryptedToken} />
               <ReviewActionClient studentId={student.id} studentName={student.name} classCode={student.enrollments?.[0]?.classCode || ''} />
+              <TuitionNoticeAction student={student} />
             </div>
           </div>
 
