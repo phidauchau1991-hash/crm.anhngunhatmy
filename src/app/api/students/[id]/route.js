@@ -31,26 +31,26 @@ export async function GET(request, { params }) {
 
     if (currentEnrollment) {
       const classInfo = currentEnrollment.class;
-      const config = await prisma.courseConfig.findUnique({
+      const config = classInfo ? await prisma.courseConfig.findUnique({
         where: { level: classInfo.level },
-      });
+      }) : null;
 
       // Đếm số buổi đã học (điểm danh "Có mặt")
-      const attendedSessions = await prisma.attendance.count({
+      const attendedSessions = classInfo ? await prisma.attendance.count({
         where: {
           studentId: id,
           classCode: classInfo.code,
           status: 'Có mặt',
         },
-      });
+      }) : 0;
 
       // Tổng số tiền đã đóng cho lớp này
-      const order = student.orders.find(o => o.classCode === classInfo.code);
+      const order = student.orders.find(o => o.classCode === (classInfo?.code || currentEnrollment.classCode));
 
       classDetails = {
-        classCode: classInfo.code,
-        level: classInfo.level,
-        teacherName: classInfo.teacherName,
+        classCode: classInfo?.code || currentEnrollment.classCode,
+        level: classInfo?.level || 'N/A',
+        teacherName: classInfo?.teacherName || 'N/A',
         totalSessions: config?.totalSessions || 32,
         price: config?.price || 0,
         attendedSessions,

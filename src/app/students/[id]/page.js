@@ -89,7 +89,7 @@ export default async function StudentDetailPage({ params }) {
       date: enroll.createdAt,
       type: 'enrollment',
       title: `Nhập học lớp ${enroll.classCode}`,
-      desc: `Giáo viên phụ trách: ${enroll.class.teacherName || 'N/A'}. Bắt đầu học từ ${new Date(enroll.class.startDate).toLocaleDateString('vi-VN')}.`,
+      desc: `Giáo viên phụ trách: ${enroll.class?.teacherName || 'N/A'}. Bắt đầu học từ ${enroll.class?.startDate ? new Date(enroll.class.startDate).toLocaleDateString('vi-VN') : 'N/A'}.`,
       icon: 'fa-solid fa-school-flag',
       color: 'bg-primary'
     });
