@@ -14,12 +14,15 @@ export default function TuitionNoticeAction({ student }) {
 
   // Form State
   const [targetClassCode, setTargetClassCode] = useState('');
+  const [displayClassName, setDisplayClassName] = useState('');
+  const [displayTeacherName, setDisplayTeacherName] = useState('');
+  
   const [totalWeeks, setTotalWeeks] = useState(18);
   const [missedWeeks, setMissedWeeks] = useState(0);
   const [bookFee, setBookFee] = useState(250000);
-  const [adjustmentAmount, setAdjustmentAmount] = useState(0);
-  const [adjustmentReason, setAdjustmentReason] = useState('');
+  
   const [giftsText, setGiftsText] = useState('Áo thun, Balo');
+  const [giftValue, setGiftValue] = useState(150000);
   const [dueDate, setDueDate] = useState('');
   
   useEffect(() => {
@@ -29,18 +32,44 @@ export default function TuitionNoticeAction({ student }) {
     }
   }, [isModalOpen]);
 
+  // Handle class selection
+  useEffect(() => {
+    const targetClass = classes.find(c => c.code === targetClassCode);
+    if (targetClass) {
+      // Clean up class name: remove CN1_ and _XX (numbers)
+      let clean = targetClass.code.replace(/^CN1_/, '');
+      // Try to remove the middle number (like _35)
+      clean = clean.replace(/_\d+(_Ca\d+)$/, '$1');
+      setDisplayClassName(`${clean} - ${targetClass.schedule || ''}`);
+      
+      // Try to extract Teacher Name from code (e.g., MsMy)
+      const parts = targetClass.code.split('_');
+      const teacherPart = parts.find(p => p.startsWith('Ms') || p.startsWith('Mr'));
+      if (teacherPart) {
+        setDisplayTeacherName(teacherPart.replace(/([A-Z])/g, ' $1').trim());
+      } else {
+        setDisplayTeacherName(targetClass.teacherName || '');
+      }
+    }
+  }, [targetClassCode, classes]);
+
   // Derived state
   const targetClass = classes.find(c => c.code === targetClassCode) || null;
   const config = configs.find(c => c.level === targetClass?.level) || null;
 
   const totalFee = config?.price || 0;
   const feePerWeek = totalWeeks > 0 ? totalFee / totalWeeks : 0;
-  const missedFee = Math.round(feePerWeek * missedWeeks);
+  
+  // Thuật toán làm tròn thông minh của User: Làm tròn LÊN tiền nghỉ học (nearest 10,000)
+  const exactMissedFee = feePerWeek * missedWeeks;
+  const roundedMissedFee = Math.ceil(exactMissedFee / 10000) * 10000;
   
   const remainingWeeks = Math.max(0, totalWeeks - missedWeeks);
-  const remainingFee = Math.max(0, totalFee - missedFee);
   
-  const finalAmount = remainingFee + Number(bookFee) + Number(adjustmentAmount);
+  // Tiền còn lại = Tổng - Tiền nghỉ đã làm tròn (Luôn ra số đẹp)
+  const remainingFee = Math.max(0, totalFee - roundedMissedFee);
+  
+  const finalAmount = remainingFee + Number(bookFee);
 
   // Parse gifts
   const giftsArray = giftsText.split(',').map(s => s.trim()).filter(Boolean);
@@ -56,19 +85,18 @@ export default function TuitionNoticeAction({ student }) {
   const templateData = {
     studentName: student.name,
     shortName: student.name.split(' ').pop(),
-    className: targetClass ? `${targetClass.code} - ${targetClass.schedule || ''}` : '',
-    classCode: targetClassCode,
-    teacherName: targetClass?.teacherName || '',
+    className: displayClassName,
+    classCode: displayClassName.split(' ')[0], // just the code part
+    teacherName: displayTeacherName,
     totalWeeks,
     totalFee,
     missedWeeks,
-    missedFee,
+    missedFee: roundedMissedFee,
     remainingWeeks,
     remainingFee,
     bookFee: Number(bookFee),
-    adjustmentAmount: Number(adjustmentAmount),
-    adjustmentReason,
     gifts: giftsArray,
+    giftValue: Number(giftValue),
     dueDate,
     finalAmount,
     transferContent: `${student.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").split(' ').pop().toUpperCase()} HP khoa ${targetClassCode}`,
@@ -81,11 +109,6 @@ export default function TuitionNoticeAction({ student }) {
       return;
     }
     
-    if (Number(adjustmentAmount) !== 0 && !adjustmentReason.trim()) {
-      alert('Vui lòng nhập lý do điều chỉnh khi có nhập số tiền điều chỉnh.');
-      return;
-    }
-
     if (!templateRef.current) return;
     
     setIsGenerating(true);
@@ -112,18 +135,13 @@ export default function TuitionNoticeAction({ student }) {
   };
 
   const handleDownloadImage = (preGeneratedCanvas) => {
-    if (preGeneratedCanvas) {
+    if (preGeneratedCanvas && preGeneratedCanvas.toDataURL) {
         downloadCanvas(preGeneratedCanvas);
         return;
     }
     
     if (!targetClassCode) {
       alert('Vui lòng chọn lớp học');
-      return;
-    }
-    
-    if (Number(adjustmentAmount) !== 0 && !adjustmentReason.trim()) {
-      alert('Vui lòng nhập lý do điều chỉnh khi có nhập số tiền điều chỉnh.');
       return;
     }
 
@@ -141,7 +159,7 @@ export default function TuitionNoticeAction({ student }) {
 
   const downloadCanvas = (canvas) => {
     const link = document.createElement('a');
-    link.download = `ThuBao_${student.name.replace(/\\s+/g, '_')}_${targetClassCode}.png`;
+    link.download = `ThuBao_${student.name.replace(/\s+/g, '_')}_${targetClassCode}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
@@ -163,7 +181,7 @@ export default function TuitionNoticeAction({ student }) {
 
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '600px', width: '90%' }}>
+          <div className="modal-content" style={{ maxWidth: '650px', width: '90%' }}>
             <div className="modal-header">
               <h2><i className="fa-solid fa-envelope-open-text"></i> Cấu hình Thư Báo Học Phí</h2>
               <button className="close-btn" onClick={() => setIsModalOpen(false)}>
@@ -171,7 +189,7 @@ export default function TuitionNoticeAction({ student }) {
               </button>
             </div>
             
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '70vh', overflowY: 'auto' }}>
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Lớp học dự kiến</label>
                 <select 
@@ -188,6 +206,27 @@ export default function TuitionNoticeAction({ student }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tên lớp hiển thị (Rút gọn)</label>
+                  <input 
+                    type="text" 
+                    value={displayClassName} 
+                    onChange={e => setDisplayClassName(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tên GV hiển thị</label>
+                  <input 
+                    type="text" 
+                    value={displayTeacherName} 
+                    onChange={e => setDisplayTeacherName(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
                   <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tổng số tuần (của khóa)</label>
                   <input 
                     type="number" 
@@ -197,7 +236,7 @@ export default function TuitionNoticeAction({ student }) {
                   />
                 </div>
                 <div>
-                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Số tuần không tham gia</label>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Số tuần vào trễ (để trừ ra)</label>
                   <input 
                     type="number" 
                     value={missedWeeks} 
@@ -217,39 +256,26 @@ export default function TuitionNoticeAction({ student }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#fff3cd', padding: '1rem', borderRadius: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '8px' }}>
                 <div>
-                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tiền điều chỉnh/Làm tròn (đ)</label>
-                  <input 
-                    type="number" 
-                    value={adjustmentAmount} 
-                    onChange={e => setAdjustmentAmount(e.target.value)}
-                    placeholder="Ví dụ: -50000"
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                  <small style={{ color: '#666' }}>Nhập số âm để giảm trừ (vd: -50000)</small>
-                </div>
-                <div>
-                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Lý do điều chỉnh</label>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Quà tặng kèm (Cách nhau dấu phẩy)</label>
                   <input 
                     type="text" 
-                    value={adjustmentReason} 
-                    onChange={e => setAdjustmentReason(e.target.value)}
-                    placeholder="Bắt buộc nếu có nhập số tiền"
+                    value={giftsText} 
+                    onChange={e => setGiftsText(e.target.value)}
+                    placeholder="Áo thun, Balo..."
                     style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Quà tặng kèm theo (Phân cách bởi dấu phẩy)</label>
-                <input 
-                  type="text" 
-                  value={giftsText} 
-                  onChange={e => setGiftsText(e.target.value)}
-                  placeholder="Áo thun, Túi xách..."
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tổng Giá trị quà tặng (đ)</label>
+                  <input 
+                    type="number" 
+                    value={giftValue} 
+                    onChange={e => setGiftValue(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
               </div>
 
               <div>
@@ -258,28 +284,30 @@ export default function TuitionNoticeAction({ student }) {
                   type="text" 
                   value={dueDate} 
                   onChange={e => setDueDate(e.target.value)}
-                  placeholder="VD: 20-07-2026"
+                  placeholder="VD: 20-08-2026"
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>
 
               <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px dashed #cbd5e1', marginTop: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>Học phí {remainingWeeks} tuần:</span>
+                  <span>Học phí khóa {totalWeeks} tuần:</span>
+                  <strong>{totalFee.toLocaleString('vi-VN')} đ</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#64748b' }}>
+                  <span>Trừ tiền nghỉ {missedWeeks} tuần (Đã làm tròn LÊN):</span>
+                  <strong>-{roundedMissedFee.toLocaleString('vi-VN')} đ</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>Học phí {remainingWeeks} tuần còn lại:</span>
                   <strong>{remainingFee.toLocaleString('vi-VN')} đ</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <span>Tiền giáo trình:</span>
                   <strong>{Number(bookFee).toLocaleString('vi-VN')} đ</strong>
                 </div>
-                {Number(adjustmentAmount) !== 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#b91c1c' }}>
-                    <span>Điều chỉnh:</span>
-                    <strong>{Number(adjustmentAmount).toLocaleString('vi-VN')} đ</strong>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                  <span style={{ fontWeight: 'bold' }}>TỔNG CỘNG:</span>
+                  <span style={{ fontWeight: 'bold' }}>KHÁCH CẦN ĐÓNG:</span>
                   <strong style={{ color: 'red', fontSize: '1.2rem' }}>{finalAmount.toLocaleString('vi-VN')} đ</strong>
                 </div>
               </div>
