@@ -352,6 +352,8 @@ export const CommentsReportTemplate = ({ student, result }) => {
 };
 
 // Component Wrapper để chứa các hàm xuất ảnh
+import html2canvas from 'html2canvas';
+
 export const ExportImageWrapper = ({ children, targetId, filename }) => {
   const [isExporting, setIsExporting] = React.useState(false);
 
@@ -361,12 +363,14 @@ export const ExportImageWrapper = ({ children, targetId, filename }) => {
     
     setIsExporting(true);
     try {
-      // Ẩn nội dung để render ngầm nét hơn nếu cần, nhưng dùng dom-to-image thì cứ render thẳng
-      const dataUrl = await htmlToImage.toPng(element, { 
-        quality: 1, 
-        pixelRatio: 2, // Tạo ảnh nét gấp đôi để gửi Zalo không mờ
-        backgroundColor: '#ffffff' 
+      // Sử dụng html2canvas thay vì html-to-image để tránh lỗi tràn bộ nhớ (paralyzed button)
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
       });
+      const dataUrl = canvas.toDataURL('image/png');
       downloadImage(dataUrl, filename);
     } catch (error) {
       console.error('Lỗi xuất ảnh:', error);

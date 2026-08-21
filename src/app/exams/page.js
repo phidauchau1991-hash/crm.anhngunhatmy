@@ -508,120 +508,124 @@ export default function ExamsPage() {
           {students.length > 0 && activeConfig && (
             <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1500px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                      <th rowSpan="2" style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', minWidth: '150px' }}>Học viên</th>
-                      <th colSpan="5" style={{ padding: '0.5rem', textAlign: 'center', background: '#e0f2fe', borderRight: '1px solid #e2e8f0' }}>Điểm Quá Trình (Thang 10)</th>
-                      <th colSpan="3" style={{ padding: '0.5rem', textAlign: 'center', background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Bài Thi Kỹ Năng</th>
-                      <th colSpan="3" style={{ padding: '0.5rem', textAlign: 'center', background: '#ede9fe', borderRight: '1px solid #e2e8f0' }}>Từ khóa Nhận xét (Cho AI)</th>
-                      <th rowSpan="2" style={{ padding: '1rem', textAlign: 'center', background: '#dcfce7' }}>Kết quả & Báo cáo</th>
-                    </tr>
-                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', fontSize: '0.875rem' }}>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Điểm danh</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>BTVN</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Hoạt động</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Phát âm</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Giao tiếp</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>NÓI (Max {activeConfig.speakingMax})</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>NGHE (Max {activeConfig.listeningMax})</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>ĐỌC VIẾT (Max {activeConfig.rwMax})</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Từ khóa NÓI</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Từ khóa NGHE</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>Từ khóa R&W</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map(student => {
-                      const r = results.find(res => res.studentId === student.id);
-                      if (!r) return null;
-                      return (
-                        <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0', '&:hover': { background: '#f8fafc' } }}>
-                          <td style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>{student.name}</td>
-                          
-                          {/* Process Scores */}
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max="10" step="0.5" value={r.attendanceScore} onChange={e => handleResultChange(student.id, 'attendanceScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max="10" step="0.5" value={r.hwScore} onChange={e => handleResultChange(student.id, 'hwScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max="10" step="0.5" value={r.activityScore} onChange={e => handleResultChange(student.id, 'activityScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max="10" step="0.5" value={r.pronunciationScore} onChange={e => handleResultChange(student.id, 'pronunciationScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem', borderRight: '1px solid #e2e8f0' }}>
-                            <input type="number" min="0" max="10" step="0.5" value={r.communicationScore} onChange={e => handleResultChange(student.id, 'communicationScore', e.target.value)} style={{ width: '60px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
-                          </td>
-
-                          {/* Exam Scores */}
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max={activeConfig.speakingMax} step="0.5" value={r.speakingScore} onChange={e => handleResultChange(student.id, 'speakingScore', e.target.value)} style={{ width: '70px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center', background: '#fef3c7' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="number" min="0" max={activeConfig.listeningMax} step="0.5" value={r.listeningScore} onChange={e => handleResultChange(student.id, 'listeningScore', e.target.value)} style={{ width: '70px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center', background: '#fef3c7' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem', borderRight: '1px solid #e2e8f0' }}>
-                            <input type="number" min="0" max={activeConfig.rwMax} step="0.5" value={r.rwScore} onChange={e => handleResultChange(student.id, 'rwScore', e.target.value)} style={{ width: '70px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center', background: '#fef3c7' }} />
-                          </td>
-
-                          {/* AI Keywords */}
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="text" placeholder="VD: to, rõ ràng" value={aiKeywords[student.id]?.speaking || ''} onChange={e => handleKeywordChange(student.id, 'speaking', e.target.value)} style={{ width: '120px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem' }}>
-                            <input type="text" placeholder="VD: tiến bộ, nắm bắt tốt" value={aiKeywords[student.id]?.listening || ''} onChange={e => handleKeywordChange(student.id, 'listening', e.target.value)} style={{ width: '120px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-                          </td>
-                          <td style={{ padding: '0.5rem', borderRight: '1px solid #e2e8f0' }}>
-                            <input type="text" placeholder="VD: ngữ pháp khá, cẩn thận hơn" value={aiKeywords[student.id]?.rw || ''} onChange={e => handleKeywordChange(student.id, 'rw', e.target.value)} style={{ width: '120px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-                          </td>
-
-                          {/* Nút Song ngữ */}
-                          <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.72rem', fontWeight: '600', color: bilingualMode ? '#2563eb' : '#94a3b8' }}>
-                              <input type="checkbox" checked={bilingualMode} onChange={e => setBilingualMode(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: '#2563eb' }} />
-                              VI-EN
-                            </label>
-                          </td>
-
-                          {/* Action */}
-                          <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                              <button 
-                                onClick={() => handleGenerateAi(student)}
-                                disabled={isGeneratingAi[student.id]}
-                                style={{ background: 'var(--color-secondary)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: isGeneratingAi[student.id] ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
-                                title="Sinh Nhận xét từ khóa bằng AI"
-                              >
-                                {isGeneratingAi[student.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-wand-magic-sparkles"></i> AI Viết</>}
-                              </button>
-                              
-                              <button 
-                                onClick={() => setPreviewModalData({ student, ...r })}
-                                style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.5rem 0.75rem', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }} 
-                                title="Xem trước và Sửa nhận xét"
-                              >
-                                <i className="fa-solid fa-eye"></i> Xem/Sửa
-                              </button>
-                              
-                              {/* Export Images */}
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <ExportImageWrapper targetId={`score-report-${student.id}`} filename={`Bang_Diem_${student.name.replace(/\s/g, '_')}.png`}>
-                                  <ScoreReportTemplate student={student} config={activeConfig} result={r} />
-                                </ExportImageWrapper>
-                                <ExportImageWrapper targetId={`comment-report-${student.id}`} filename={`Nhan_Xet_${student.name.replace(/\s/g, '_')}.png`}>
-                                  <CommentsReportTemplate student={student} result={r} />
-                                </ExportImageWrapper>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0', fontSize: '0.9rem' }}>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%' }}>Học viên</th>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '22%' }}>Điểm Quá Trình (Thang 10)</th>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#fef3c7' }}>NÓI (Speaking)</th>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#e0f2fe' }}>NGHE (Listening)</th>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#ede9fe' }}>ĐỌC VIẾT (R&W)</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', width: '18%', background: '#dcfce7' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.map(student => {
+                        const r = results.find(res => res.studentId === student.id);
+                        if (!r) return null;
+                        return (
+                          <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0', '&:hover': { background: '#f8fafc' } }}>
+                            <td style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>{student.name}</td>
+                            
+                            {/* Process Scores Stacked */}
+                            <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{color: '#64748b'}}>Đ.danh:</span>
+                                  <input type="number" min="0" max="10" step="0.5" value={r.attendanceScore} onChange={e => handleResultChange(student.id, 'attendanceScore', e.target.value)} style={{ width: '45px', padding: '0.3rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{color: '#64748b'}}>BTVN:</span>
+                                  <input type="number" min="0" max="10" step="0.5" value={r.hwScore} onChange={e => handleResultChange(student.id, 'hwScore', e.target.value)} style={{ width: '45px', padding: '0.3rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{color: '#64748b'}}>H.động:</span>
+                                  <input type="number" min="0" max="10" step="0.5" value={r.activityScore} onChange={e => handleResultChange(student.id, 'activityScore', e.target.value)} style={{ width: '45px', padding: '0.3rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{color: '#64748b'}}>P.âm:</span>
+                                  <input type="number" min="0" max="10" step="0.5" value={r.pronunciationScore} onChange={e => handleResultChange(student.id, 'pronunciationScore', e.target.value)} style={{ width: '45px', padding: '0.3rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gridColumn: 'span 2' }}>
+                                  <span style={{color: '#64748b'}}>Giao tiếp:</span>
+                                  <input type="number" min="0" max="10" step="0.5" value={r.communicationScore} onChange={e => handleResultChange(student.id, 'communicationScore', e.target.value)} style={{ width: '45px', padding: '0.3rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} />
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+
+                            {/* Speaking */}
+                            <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0', background: '#fef3c7' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                                  <span style={{fontWeight: 'bold', color: '#b45309'}}>ĐIỂM (Max {activeConfig.speakingMax}):</span>
+                                  <input type="number" min="0" max={activeConfig.speakingMax} step="0.5" value={r.speakingScore} onChange={e => handleResultChange(student.id, 'speakingScore', e.target.value)} style={{ width: '55px', padding: '0.3rem', border: '1px solid #f59e0b', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', color: '#b45309' }} />
+                                </div>
+                                <input type="text" placeholder="Từ khóa nhận xét..." value={aiKeywords[student.id]?.speaking || ''} onChange={e => handleKeywordChange(student.id, 'speaking', e.target.value)} style={{ width: '100%', padding: '0.4rem', border: '1px solid #fcd34d', borderRadius: '4px', fontSize: '0.8rem' }} />
+                              </div>
+                            </td>
+
+                            {/* Listening */}
+                            <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0', background: '#e0f2fe' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                                  <span style={{fontWeight: 'bold', color: '#0369a1'}}>ĐIỂM (Max {activeConfig.listeningMax}):</span>
+                                  <input type="number" min="0" max={activeConfig.listeningMax} step="0.5" value={r.listeningScore} onChange={e => handleResultChange(student.id, 'listeningScore', e.target.value)} style={{ width: '55px', padding: '0.3rem', border: '1px solid #38bdf8', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', color: '#0369a1' }} />
+                                </div>
+                                <input type="text" placeholder="Từ khóa nhận xét..." value={aiKeywords[student.id]?.listening || ''} onChange={e => handleKeywordChange(student.id, 'listening', e.target.value)} style={{ width: '100%', padding: '0.4rem', border: '1px solid #7dd3fc', borderRadius: '4px', fontSize: '0.8rem' }} />
+                              </div>
+                            </td>
+
+                            {/* Reading & Writing */}
+                            <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0', background: '#ede9fe' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                                  <span style={{fontWeight: 'bold', color: '#6d28d9'}}>ĐIỂM (Max {activeConfig.rwMax}):</span>
+                                  <input type="number" min="0" max={activeConfig.rwMax} step="0.5" value={r.rwScore} onChange={e => handleResultChange(student.id, 'rwScore', e.target.value)} style={{ width: '55px', padding: '0.3rem', border: '1px solid #a78bfa', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', color: '#6d28d9' }} />
+                                </div>
+                                <input type="text" placeholder="Từ khóa nhận xét..." value={aiKeywords[student.id]?.rw || ''} onChange={e => handleKeywordChange(student.id, 'rw', e.target.value)} style={{ width: '100%', padding: '0.4rem', border: '1px solid #c4b5fd', borderRadius: '4px', fontSize: '0.8rem' }} />
+                              </div>
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ padding: '0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', color: bilingualMode ? '#2563eb' : '#94a3b8' }}>
+                                    <input type="checkbox" checked={bilingualMode} onChange={e => setBilingualMode(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: '#2563eb' }} />
+                                    VI-EN
+                                  </label>
+                                  <button 
+                                    onClick={() => handleGenerateAi(student)}
+                                    disabled={isGeneratingAi[student.id]}
+                                    style={{ flex: 1, background: 'var(--color-secondary)', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: isGeneratingAi[student.id] ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                                    title="Sinh Nhận xét bằng AI"
+                                  >
+                                    {isGeneratingAi[student.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-wand-magic-sparkles"></i> AI Viết</>}
+                                  </button>
+                                </div>
+                                
+                                <button 
+                                  onClick={() => setPreviewModalData({ student, ...r })}
+                                  style={{ width: '100%', background: '#10b981', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }} 
+                                >
+                                  <i className="fa-solid fa-eye"></i> Xem / Sửa
+                                </button>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                  <ExportImageWrapper targetId={`score-report-${student.id}`} filename={`Bang_Diem_${student.name.replace(/\s/g, '_')}.png`}>
+                                    <ScoreReportTemplate student={student} config={activeConfig} result={r} />
+                                  </ExportImageWrapper>
+                                  <ExportImageWrapper targetId={`comment-report-${student.id}`} filename={`Nhan_Xet_${student.name.replace(/\s/g, '_')}.png`}>
+                                    <CommentsReportTemplate student={student} result={r} />
+                                  </ExportImageWrapper>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
               </div>
 
               <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>

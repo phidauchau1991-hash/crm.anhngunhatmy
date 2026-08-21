@@ -54,7 +54,11 @@ export async function POST(request) {
 
     const activeStudents = oldClass.enrollments.filter(e => e.status === 'Đang học');
 
-    const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
+      // Dọn dẹp các điểm danh mồ côi (nếu mã lớp này vô tình bị trùng với 1 lớp đã xóa trong quá khứ)
+      await tx.attendance.deleteMany({ where: { classCode: newClassCode } });
+      await tx.attendanceSummary.deleteMany({ where: { classCode: newClassCode } });
+
       // 1. Tạo lớp mới
       const createdClass = await tx.class.create({
         data: {
@@ -109,8 +113,8 @@ export async function POST(request) {
            promoNote += ` [Nợ cũ: ${oldDebt.toLocaleString('vi-VN')}đ]`;
         }
 
-        // Tạo hóa đơn học phí cho khóa mới (M2)
-        const orderId = `ORD_UP_${yearMonthPrefix}_${en.studentId.split('_')[1]}`;
+        // Tạo hóa đơn học phí cho khóa mới (Sử dụng studentId đầy đủ để tránh trùng lặp thay vì split)
+        const orderId = `ORD_UP_${yearMonthPrefix}_${en.studentId}`;
         await tx.orderFinance.upsert({
           where: { id: orderId },
           update: { feeToPay: finalFeeToPay, classCode: newClassCode, promoType: promoNote },
