@@ -32,12 +32,12 @@ export async function GET(request) {
       where.AND = [
         ...(where.AND || []),
         {
-          OR: [
-            { enrollments: { some: { classCode: classCode } } },
-            { attendances: { some: { classCode: classCode } } },
-            { examResults: { some: { classCode: classCode } } },
-            { orders: { some: { classCode: classCode } } }
-          ]
+          enrollments: { 
+            some: { 
+              classCode: classCode,
+              status: { in: ['Đang học', 'Bảo lưu'] }
+            } 
+          }
         }
       ];
     }
@@ -175,7 +175,7 @@ export async function GET(request) {
     // Tính toán summary số lượng học viên theo trạng thái
     let summaryWhere = { ...branchFilter };
     if (search) summaryWhere.OR = where.OR;
-    if (classCode && classCode !== 'all') summaryWhere.enrollments = { some: { classCode: classCode } };
+    if (classCode && classCode !== 'all') summaryWhere.enrollments = { some: { classCode: classCode, status: { in: ['Đang học', 'Bảo lưu'] } } };
 
     const allMatchingStudents = await prisma.student.findMany({
       where: summaryWhere
@@ -342,6 +342,7 @@ export async function POST(request) {
         data: {
           studentId,
           classCode,
+          status: 'Đang học',
         },
       });
 

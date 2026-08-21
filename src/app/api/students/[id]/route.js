@@ -386,6 +386,7 @@ export async function PUT(request, { params }) {
             data: {
               studentId: id,
               classCode: newClassCode,
+              status: 'Đang học',
             },
           });
 
@@ -524,6 +525,7 @@ export async function PUT(request, { params }) {
           data: {
             studentId: id,
             classCode: newClassCode,
+            status: 'Đang học',
           },
         });
 
