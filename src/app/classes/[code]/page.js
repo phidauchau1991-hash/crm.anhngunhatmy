@@ -164,7 +164,9 @@ export default function ClassPortalPage() {
                 {students.map((student) => (
                   <tr key={student.id} className="table-row">
                     <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'white', fontWeight: 'bold' }}>
-                      {student.name} {student.isTrial && <span className="badge" style={{fontSize:'0.7rem', background:'#fef08a'}}>Học thử</span>}
+                      {student.name} 
+                      {student.isTrial && <span className="badge" style={{fontSize:'0.7rem', background:'#fef08a', marginLeft: '5px'}}>Học thử</span>}
+                      {student.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
                     </td>
                     <td className="text-center" style={{ fontWeight: 'bold', color: student.totalAbsent > 0 ? '#ef4444' : 'inherit' }}>
                       {student.totalAbsent}
@@ -196,6 +198,7 @@ export default function ClassPortalPage() {
                   <tr key={student.id} className="table-row">
                     <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'white', fontWeight: 'bold' }}>
                       {student.name}
+                      {student.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
                     </td>
                     <td className="text-center" style={{ fontWeight: 'bold', color: student.totalWb > 0 ? '#d97706' : 'inherit' }}>
                       {student.totalWb}
@@ -243,7 +246,10 @@ export default function ClassPortalPage() {
                 {grades?.map((g) => {
                   return (
                     <tr key={g.id} className="table-row">
-                      <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'white', fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{g.name}</td>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'white', fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>
+                        {g.name}
+                        {g.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
+                      </td>
                       <td className="text-center">{g.midTerm?.processTotal ?? '-'}</td>
                       <td className="text-center">{g.midTerm?.speakingScore ?? '-'}</td>
                       <td className="text-center">{g.midTerm?.listeningScore ?? '-'}</td>

@@ -16,9 +16,18 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy lớp học' }, { status: 404 });
     }
 
-    // 2. Fetch Enrolled Students
+    // 2. Fetch Enrolled Students (Only Active)
     const enrollments = await prisma.enrollment.findMany({
-      where: { classCode },
+      where: { classCode, status: 'Đang học' },
+      include: { student: true }
+    });
+    
+    // Fetch all historical enrollments to also include students who transferred but have no attendance yet
+    const historicalEnrollments = await prisma.enrollment.findMany({
+      where: { 
+        classCode, 
+        status: { not: 'Đang học' } 
+      },
       include: { student: true }
     });
     
@@ -44,7 +53,7 @@ export async function GET(request, { params }) {
 
     // 5. Find historical students who have attendance or exam records but are no longer enrolled
     const enrolledIds = new Set(enrollments.map(e => e.student.id));
-    const historicalIds = new Set();
+    const historicalIds = new Set(historicalEnrollments.map(e => e.student.id));
     
     attendances.forEach(a => {
       if (a.studentId && !enrolledIds.has(a.studentId)) {
