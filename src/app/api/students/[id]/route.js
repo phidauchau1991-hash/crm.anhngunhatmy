@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { encryptStudentId } from '@/lib/token';
 
+function roundDown5000(amount) {
+  return Math.floor(amount / 5000) * 5000;
+}
+
 // GET: Lấy thông tin chi tiết học sinh phục vụ việc chỉnh sửa / tính toán chuyển lớp
 export async function GET(request, { params }) {
   try {
@@ -378,7 +382,7 @@ export async function PUT(request, { params }) {
         const proRatedTuitionNew = costPerSessionNew * sessionsRemainingNew;
 
         const specialDiscount = student.specialPolicyValue || 0;
-        const feeToPay = Math.max(0, proRatedTuitionNew - specialDiscount);
+        const feeToPay = roundDown5000(Math.max(0, proRatedTuitionNew - specialDiscount));
 
         await prisma.$transaction(async (tx) => {
           // 1. Tạo enrollment
@@ -504,13 +508,15 @@ export async function PUT(request, { params }) {
 
       if (difference > 0) {
         // Học phí lớp mới cao hơn -> Học sinh phải đóng thêm (Phát sinh công nợ)
-        finalFeeToPay = difference;
+        finalFeeToPay = roundDown5000(difference);
         finalAmountPaid = 0;
       } else {
         // Lớp mới rẻ hơn hoặc tiền dư nhiều hơn -> Tiền dư chảy vào Ví học viên
         finalFeeToPay = 0;
         finalAmountPaid = 0;
-        newWalletBalance += Math.abs(difference);
+        // Có lợi cho khách: Làm tròn LÊN hàng 5000đ khi tính số dư được cộng vào ví
+        const roundedExcess = Math.ceil(Math.abs(difference) / 5000) * 5000;
+        newWalletBalance += roundedExcess;
       }
 
       // C. Thực hiện cập nhật Database

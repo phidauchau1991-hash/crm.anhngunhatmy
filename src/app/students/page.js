@@ -226,6 +226,8 @@ export default function StudentsPage() {
       const convertPhone = urlParams.get('convertPhone');
       const convertDob = urlParams.get('convertDob');
       const convertAddress = urlParams.get('convertAddress');
+      const convertLeadId = urlParams.get('convertLeadId');
+      const convertTrialClass = urlParams.get('convertTrialClass');
       const paramStudentStatus = urlParams.get('studentStatus');
       
       if (paramStudentStatus) {
@@ -239,6 +241,8 @@ export default function StudentsPage() {
           phone: convertPhone ? decodeURIComponent(convertPhone) : '',
           dob: convertDob ? decodeURIComponent(convertDob) : '',
           address: convertAddress ? decodeURIComponent(convertAddress) : '',
+          convertLeadId: convertLeadId || '',
+          classCode: convertTrialClass ? decodeURIComponent(convertTrialClass) : prev.classCode,
         }));
         setIsModalOpen(true);
         

@@ -3,6 +3,12 @@ import prisma from '@/lib/db';
 import { getDateRangeFromPreset } from '@/lib/dateHelpers';
 import { getBranchFilter } from '@/lib/rbac';
 
+// Làm tròn xuống hàng 5.000đ, luôn có lợi cho khách hàng
+// VD: 1.103.000 → 1.100.000, 1.358.250 → 1.355.000
+function roundDown5000(amount) {
+  return Math.floor(amount / 5000) * 5000;
+}
+
 // GET: Lấy danh sách học viên kèm theo Lớp học và Hóa đơn để tính toán trạng thái
 export async function GET(request) {
   try {
@@ -282,7 +288,8 @@ export async function POST(request) {
       promoReason,
       customFee,
       customReason,
-      paymentPolicy
+      paymentPolicy,
+      convertLeadId
     } = body;
 
     if (!name) {
@@ -378,13 +385,13 @@ export async function POST(request) {
           let totalDiscount = 0;
 
           if (parsedCustomFee > 0) {
-            feeToPay = parsedCustomFee;
+            feeToPay = roundDown5000(parsedCustomFee);
             finalPromoType = `Học phí thỏa thuận` + (customReason ? ` (Lý do: ${customReason})` : '');
-            totalDiscount = Math.max(0, courseConfig.price - parsedCustomFee);
+            totalDiscount = Math.max(0, courseConfig.price - feeToPay);
           } else {
             const discountFixed = policyVal; // Trừ thẳng mức giảm cố định của học viên
             const discountSeasonal = parseFloat(promoDiscount) || 0; // Trừ giảm thêm mùa vụ
-            feeToPay = Math.max(0, proRatedTuitionNew - discountFixed - discountSeasonal);
+            feeToPay = roundDown5000(Math.max(0, proRatedTuitionNew - discountFixed - discountSeasonal));
             finalPromoType = `Khấu trừ còn ${sessionsRemainingNew}/${totalSessionsNew} buổi` + (discountSeasonal > 0 
               ? ` + ${promoType || 'Ưu đãi mùa vụ'}${promoReason ? ` (Lý do: ${promoReason})` : ''}` 
               : '');
@@ -412,6 +419,27 @@ export async function POST(request) {
             },
           });
         }
+      }
+    }
+
+    // 3.5 Nếu chuyển từ Lead → Học viên, gộp dữ liệu điểm danh cũ (Lead) vào hồ sơ HV mới
+    if (convertLeadId) {
+      const leadIdInt = parseInt(convertLeadId);
+      if (!isNaN(leadIdInt)) {
+        const migrated = await prisma.attendance.updateMany({
+          where: { 
+            leadId: leadIdInt,
+            studentId: null  // Chỉ cập nhật những record chưa có studentId
+          },
+          data: { studentId }
+        });
+        console.log(`[Lead→HV] Gộp ${migrated.count} bản ghi điểm danh từ Lead #${leadIdInt} vào HV ${studentId}`);
+        
+        // Cập nhật trạng thái Lead thành "Đã chốt"
+        await prisma.lead.update({
+          where: { id: leadIdInt },
+          data: { status: 'Đã chốt' }
+        }).catch(() => {}); // Bỏ qua nếu Lead không tồn tại
       }
     }
 

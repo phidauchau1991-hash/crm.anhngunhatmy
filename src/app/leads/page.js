@@ -422,7 +422,7 @@ export default function LeadsPage() {
                         </button>
                         {lead.status === 'Đã chốt' && (
                           <Link 
-                            href={`/students?convertName=${encodeURIComponent(lead.name)}&convertPhone=${encodeURIComponent(lead.phone || '')}&convertDob=${encodeURIComponent(lead.dob ? lead.dob.substring(0,10) : '')}&convertAddress=${encodeURIComponent(lead.address || '')}`} 
+                            href={`/students?convertName=${encodeURIComponent(lead.name)}&convertPhone=${encodeURIComponent(lead.phone || '')}&convertDob=${encodeURIComponent(lead.dob ? lead.dob.substring(0,10) : '')}&convertAddress=${encodeURIComponent(lead.address || '')}&convertLeadId=${lead.id}&convertTrialClass=${encodeURIComponent(lead.trialClassCode || '')}`} 
                             className="action-btn view-btn"
                             style={{ display: 'inline-flex', padding: '0 0.5rem', width: 'auto', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold' }}
                             title="Chuyển thành Học Viên"
