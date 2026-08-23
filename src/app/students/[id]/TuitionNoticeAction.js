@@ -26,6 +26,9 @@ export default function TuitionNoticeAction({ student }) {
   const [dueDate, setDueDate] = useState('');
   const [transferContent, setTransferContent] = useState('');
   
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  
   useEffect(() => {
     if (isModalOpen && classes.length === 0) {
       fetch('/api/classes').then(r => r.json()).then(res => setClasses(res.data || []));
@@ -74,7 +77,16 @@ export default function TuitionNoticeAction({ student }) {
   const remainingWeeks = Math.max(0, totalWeeks - missedWeeks);
   
   // Tiền còn lại = Tổng - Tiền nghỉ đã làm tròn (Luôn ra số đẹp)
-  const remainingFee = Math.max(0, totalFee - roundedMissedFee);
+  let baseRemainingFee = Math.max(0, totalFee - roundedMissedFee);
+  
+  if (discountPercent > 0) {
+    baseRemainingFee = baseRemainingFee * (1 - discountPercent / 100);
+  }
+  if (discountAmount > 0) {
+    baseRemainingFee = Math.max(0, baseRemainingFee - discountAmount);
+  }
+  
+  const remainingFee = Math.floor(baseRemainingFee / 5000) * 5000; // Làm tròn xuống 5000 có lợi cho khách
   
   const finalAmount = remainingFee + Number(bookFee);
 
@@ -250,14 +262,34 @@ export default function TuitionNoticeAction({ student }) {
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tiền giáo trình (đ)</label>
-                <input 
-                  type="number" 
-                  value={bookFee} 
-                  onChange={e => setBookFee(Number(e.target.value))}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tiền giáo trình (đ)</label>
+                  <input 
+                    type="number" 
+                    value={bookFee} 
+                    onChange={e => setBookFee(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Giảm giá (%)</label>
+                  <input 
+                    type="number" 
+                    value={discountPercent} 
+                    onChange={e => setDiscountPercent(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Giảm tiền trực tiếp (đ)</label>
+                  <input 
+                    type="number" 
+                    value={discountAmount} 
+                    onChange={e => setDiscountAmount(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '8px' }}>
