@@ -93,6 +93,15 @@ export async function GET(request) {
       },
     });
 
+    // Tính toán BUỔI THỨ MẤY của lớp dựa vào số ngày đã điểm danh trước đó
+    const pastSessionsCount = await prisma.attendanceSummary.count({
+      where: {
+        classCode,
+        date: { lt: targetDate },
+      },
+    });
+    const classSessionNumber = pastSessionsCount + 1;
+
     // 3. Tính toán cộng dồn số buổi đi học/nghỉ của từng học sinh chính thức
     const studentData = await Promise.all(students.map(async (student) => {
       const totalPresent = await prisma.attendance.count({
@@ -191,6 +200,7 @@ export async function GET(request) {
       success: true,
       data: {
         records: finalData,
+        classSessionNumber,
         classNotes: summary?.classNotes || '',
         teacherId: summary?.teacherId || classInfo.teacherId, // Mặc định GV chính
         isSubstitute: summary?.isSubstitute || false,

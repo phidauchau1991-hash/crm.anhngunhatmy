@@ -16,5 +16,4 @@ function searchDir(dir, keyword) {
   }
 }
 
-searchDir('./src', 'vào trễ');
-searchDir('./src', 'Cấu hình Thư Báo');
+searchDir('./src', 'BÁO CÁO HỌC TẬP LỚP');

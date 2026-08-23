@@ -25,6 +25,7 @@ export default function AttendancePage() {
   const [sessionTeacherId, setSessionTeacherId] = useState('');
   const [userRole, setUserRole] = useState('');
   const [isSubstitute, setIsSubstitute] = useState(false);
+  const [classSessionNumber, setClassSessionNumber] = useState(1);
 
   // Nội dung bài học & Bài tập về nhà (Sprint 1)
   const [lessonContent, setLessonContent] = useState({
@@ -94,6 +95,7 @@ export default function AttendancePage() {
       const result = await res.json();
       if (result.success) {
         setAttendanceData(result.data.records || []);
+        setClassSessionNumber(result.data.classSessionNumber || 1);
         setClassNotes(result.data.classNotes || '');
         setIsHoliday(!!result.data.isHoliday);
         setHolidayName(result.data.holidayName || '');
@@ -296,7 +298,7 @@ export default function AttendancePage() {
     const dateObj = new Date(selectedDate + 'T12:00:00');
     const dateVN = dateObj.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
     const totalSessions = cls?.totalSessions || '?';
-    const sessionsDone = attendanceData[0] ? (attendanceData[0].totalPresent + attendanceData[0].totalAbsent + 1) : 1;
+    const sessionsDone = classSessionNumber;
     const absentList = attendanceData.filter(r => r.status === 'Vắng không phép' || r.status === 'Vắng có phép');
 
     let report = `📢 *BÁO CÁO HỌC TẬP LỚP ${selectedClass} \u2014 ${dateVN} (BUỔI ${sessionsDone}/${totalSessions})*`;
