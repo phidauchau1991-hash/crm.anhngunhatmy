@@ -253,7 +253,7 @@ export async function POST(request) {
       where: { classCode_date: { classCode, date: targetDate } },
       update: {
         classNotes: classNotes ?? undefined,
-        teacherId: teacherId ?? undefined,
+        teacherId: teacherId === "" ? null : (teacherId ?? undefined),
         isSubstitute: isSubstitute ?? undefined,
         vocabularyTopic: vocabularyTopic ?? undefined,
         grammarTopic: grammarTopic ?? undefined,
