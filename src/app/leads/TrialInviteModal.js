@@ -12,9 +12,11 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
   const [studentName, setStudentName] = useState(lead?.name || '');
   const [className, setClassName] = useState(lead?.trialClassCode || '');
   const [startDate, setStartDate] = useState('');
-  const [timeString, setTimeString] = useState('');
+  const [studyDays, setStudyDays] = useState('');
+  const [studyHours, setStudyHours] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [centerPrep, setCenterPrep] = useState('Bộ tài liệu học thử độc quyền, vở bút viết, nước uống và không gian lớp học tương tác vui nhộn.');
-  const [parentPrep, setParentPrep] = useState('Trang phục thoải mái, nụ cười tự tin và có mặt trước giờ học 10-15 phút để thầy cô đón và hướng dẫn con làm quen với lớp nhé!');
+  const [parentPrep, setParentPrep] = useState('Trang phục thoải mái, nụ cười tự tin và có mặt trước giờ học 05-10 phút để con làm quen với lớp nhé!');
   const [suggestedMessage, setSuggestedMessage] = useState('');
 
   useEffect(() => {
@@ -33,15 +35,17 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
       
       let guessedTime = '';
       if (lead.trialClassCode) {
-         if (lead.trialClassCode.includes('T7') || lead.trialClassCode.includes('CN')) {
+         if (lead.trialClassCode.includes('T7') || lead.trialClassCode.includes('CN') || lead.trialClassCode.includes('7CN')) {
              guessedTime = 'Thứ 7, Chủ Nhật';
-         } else if (lead.trialClassCode.includes('T2') || lead.trialClassCode.includes('T4')) {
+         } else if (lead.trialClassCode.includes('246') || lead.trialClassCode.includes('24')) {
              guessedTime = 'Thứ 2, Thứ 4, Thứ 6';
-         } else if (lead.trialClassCode.includes('T3') || lead.trialClassCode.includes('T5')) {
+         } else if (lead.trialClassCode.includes('35') || lead.trialClassCode.includes('357')) {
              guessedTime = 'Thứ 3, Thứ 5';
          }
       }
-      setTimeString(guessedTime);
+      setStudyDays(guessedTime);
+      setStudyHours('');
+      setEndDate('');
       
       setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời học thử của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch học của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
     }
@@ -50,8 +54,10 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
   const templateData = {
     studentName,
     className,
-    timeString,
+    studyDays,
+    studyHours,
     startDate,
+    endDate,
     centerPrep,
     parentPrep
   };
@@ -141,22 +147,45 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Thời Gian Học</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Học</label>
                 <input 
                   type="text" 
-                  value={timeString} 
-                  onChange={e => setTimeString(e.target.value)}
-                  placeholder="VD: 17:30 - 19:00 | Thứ 7, Chủ Nhật"
+                  value={studyDays} 
+                  onChange={e => setStudyDays(e.target.value)}
+                  placeholder="VD: Thứ 3, Thứ 5"
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>
+              <div>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Giờ Học</label>
+                <input 
+                  type="text" 
+                  value={studyHours} 
+                  onChange={e => setStudyHours(e.target.value)}
+                  placeholder="VD: 17:30 - 19:00"
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Bắt Đầu</label>
                 <input 
                   type="text" 
                   value={startDate} 
                   onChange={e => setStartDate(e.target.value)}
-                  placeholder="VD: 22/08/2026"
+                  placeholder="VD: 20/08/2026"
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Kết Thúc (Dự kiến)</label>
+                <input 
+                  type="text" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)}
+                  placeholder="VD: 22/08/2026 (2 buổi)"
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>

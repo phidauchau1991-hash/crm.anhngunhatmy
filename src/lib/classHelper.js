@@ -24,12 +24,12 @@ export function formatClassCode(classCode) {
   }
 
   let displaySchedule = schedule;
-  if (schedule === '7CN') displaySchedule = 'T7-CN';
-  else if (schedule === '35') displaySchedule = 'T3-5';
-  else if (schedule === '24') displaySchedule = 'T2-4';
-  else if (schedule === '46') displaySchedule = 'T4-6';
-  else if (schedule === '246') displaySchedule = 'T2-4-6';
-  else if (schedule === '357') displaySchedule = 'T3-5-7';
+  if (schedule === '7CN' || schedule.toLowerCase() === 't7cn') displaySchedule = 'T7CN';
+  else if (schedule === '35' || schedule.toLowerCase() === 't35') displaySchedule = '35';
+  else if (schedule === '24' || schedule.toLowerCase() === 't24') displaySchedule = '24';
+  else if (schedule === '46' || schedule.toLowerCase() === 't46') displaySchedule = '46';
+  else if (schedule === '246' || schedule.toLowerCase() === 't246') displaySchedule = '246';
+  else if (schedule === '357' || schedule.toLowerCase() === 't357') displaySchedule = '357';
 
   if (shift) {
     return `${level} - ${displaySchedule} - ${shift}`;

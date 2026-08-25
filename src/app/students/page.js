@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
+import ClassSelect from '../components/ClassSelect';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -1029,14 +1030,13 @@ export default function StudentsPage() {
 
         <div className="filter-group">
           <label htmlFor="filter-class"><i className="fa-solid fa-chalkboard-user"></i> Lớp học:</label>
-          <select id="filter-class" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
-            <option value="all">Tất cả lớp học</option>
-            {classes.map((cls) => (
-              <option key={cls.code} value={cls.code}>
-                {cls.code} {cls.teacherName ? `(${cls.teacherName})` : ''}
-              </option>
-            ))}
-          </select>
+          <ClassSelect 
+            id="filter-class" 
+            classes={classes}
+            value={classFilter} 
+            onChange={(e) => setClassFilter(e.target.value)} 
+            placeholder="Tất cả lớp học"
+          />
         </div>
 
         <div className="filter-group">
@@ -1276,12 +1276,14 @@ export default function StudentsPage() {
                   </div>
                   <div className="form-group" style={{ marginTop: '1rem' }}>
                     <label>4. Lớp học</label>
-                    <select name="classCode" value={formData.classCode} onChange={handleInputChange} disabled={!formData.level}>
-                      <option value="none">Chờ xếp lớp</option>
-                      {filteredClasses.map(cls => (
-                        <option key={cls.code} value={cls.code}>{cls.code}</option>
-                      ))}
-                    </select>
+                    <ClassSelect 
+                      name="classCode" 
+                      classes={filteredClasses}
+                      value={formData.classCode} 
+                      onChange={handleInputChange} 
+                      disabled={!formData.level}
+                      placeholder="Chờ xếp lớp"
+                    />
                     {selectedClassInfo && (
                       <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                         <i className="fa-solid fa-circle-info"></i> Lớp đã học {selectedClassInfo.sessionsTaught} buổi - Còn lại {selectedClassInfo.sessionsRemaining} buổi - Tổng {selectedClassInfo.totalSessions} buổi.
@@ -1760,12 +1762,13 @@ export default function StudentsPage() {
 
                         <div className="form-group">
                           <label>Chọn Lớp học muốn xếp / chuyển tới *</label>
-                          <select name="newClassCode" value={editForm.newClassCode} onChange={handleEditInputChange} required>
-                            <option value="">-- Chọn lớp học --</option>
-                            {classes.map(cls => (
-                              <option key={cls.code} value={cls.code}>{cls.code} (Cấp độ: {cls.level})</option>
-                            ))}
-                          </select>
+                          <ClassSelect 
+                            name="newClassCode" 
+                            classes={classes}
+                            value={editForm.newClassCode} 
+                            onChange={handleEditInputChange} 
+                            required
+                          />
                           {transferPreview?.selectedClassInfo && (
                             <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                               <i className="fa-solid fa-circle-info"></i> Lớp học mới đã học {transferPreview.selectedClassInfo.sessionsTaught} buổi - Còn lại {transferPreview.selectedClassInfo.sessionsRemaining} buổi - Tổng {transferPreview.selectedClassInfo.totalSessions} buổi.

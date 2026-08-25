@@ -79,12 +79,7 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
         <div style={{ marginBottom: '25px', paddingLeft: '20px', borderLeft: '4px solid #0d88c4' }}>
           <ul style={{ listStyleType: 'none', padding: 0, margin: 0, textAlign: 'left' }}>
             <li style={{ marginBottom: '4px' }}><strong>Kính gửi:</strong> Phụ huynh em <strong style={{ color: '#0d88c4', fontSize: '16px' }}>{studentName?.toUpperCase()}</strong></li>
-            <li style={{ marginBottom: '4px' }}><strong>Lớp:</strong> {className}</li>
-            {(data.noticeType === 'CLASS_TRANSFER' || data.noticeType === 'NEW_ENROLLMENT') && data.studyDays && (
-              <li style={{ marginBottom: '4px' }}>
-                <strong style={{ color: '#0d88c4' }}>Lịch học:</strong> <span style={{ fontWeight: 'bold' }}>{data.studyDays}</span> {data.studyHours ? <span style={{ fontStyle: 'italic', color: '#dc2626' }}>({data.studyHours})</span> : ''}
-              </li>
-            )}
+            <li style={{ marginBottom: '4px' }}><strong>Lớp:</strong> {data.noticeType === 'CLASS_TRANSFER' ? (data.oldClassName || 'cũ') : className}</li>
             <li><strong>GVCN:</strong> {teacherName}</li>
           </ul>
         </div>
@@ -117,6 +112,9 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
           <>
             <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
               <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
+                {(data.noticeType === 'CLASS_TRANSFER' || data.noticeType === 'NEW_ENROLLMENT') && data.studyDays && (
+                  <li style={{ marginBottom: '8px', color: '#0d88c4' }}><strong>Lịch học dự kiến: {data.studyDays} {data.studyHours ? `(${data.studyHours})` : ''}</strong></li>
+                )}
                 <li style={{ marginBottom: '8px' }}>Số tuần học toàn Khóa {classCode}: <strong>{totalWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(totalFee)}</strong></li>
                 {missedWeeks > 0 && (
                   <li style={{ marginBottom: '8px' }}>Số tuần <strong>{shortName}</strong> không tham gia: <strong>{missedWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(missedFee)}</strong></li>

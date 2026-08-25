@@ -581,23 +581,37 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
         </tbody>
       </table>
 
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: '#f0f9ff', padding: '20px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ margin: '0 0 10px 0', color: '#0369a1' }}>Hướng dẫn thanh toán</h3>
-          <p style={{ margin: '0 0 10px 0', fontSize: '16px', lineHeight: '1.6' }}>
-            Phụ huynh vui lòng quét mã QR bên cạnh hoặc chuyển khoản theo thông tin:
-          </p>
-          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '16px', lineHeight: '1.6' }}>
-            <li><b>Ngân hàng:</b> MB Bank (Ngân hàng Quân Đội)</li>
-            <li><b>Số tài khoản:</b> 6119916886</li>
-            <li><b>Chủ tài khoản:</b> CTY TNHH NGOAI NGU TRI THUC VIET</li>
-            <li><b>Nội dung:</b> {bankMemoName} dong hoc phi lop {newCourse?.level}</li>
+      {/* Payment details */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '20px' }}>
+        <div style={{ flex: 1, paddingRight: '30px' }}>
+          <p style={{ marginBottom: '15px', fontWeight: 'bold', color: '#0d88c4' }}>Thông tin chuyển khoản:</p>
+          <ul style={{ listStyleType: 'none', padding: 0, margin: 0, lineHeight: '2' }}>
+            <li>Ngân hàng: <strong>NH quân Đội - MB Bank</strong></li>
+            <li>Số TK: <strong style={{ fontSize: '18px', color: '#0d88c4' }}>61 1991 6886</strong></li>
+            <li>Người nhận: <strong>CÔNG TY TNHH NGOAI NGU TRI THUC VIET</strong></li>
+            <li>Nội dung: <strong style={{ backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>{bankMemoName} dong hoc phi lop {newCourse?.level}</strong></li>
           </ul>
+          <div style={{ marginTop: '20px', padding: '12px', background: '#f0fdf4', borderLeft: '4px solid #22c55e', borderRadius: '4px', fontSize: '13px', fontStyle: 'italic', color: '#166534' }}>
+            <i className="fa-solid fa-shield-check" style={{ marginRight: '5px' }}></i> 
+            Mã quét bên cạnh là mã thanh toán tự động, sẽ dẫn đến chính xác tài khoản công ty của Trung tâm Anh ngữ Nhật Mỹ, phụ huynh có thể hoàn toàn an tâm quét mã này.
+          </div>
         </div>
-        <div style={{ width: '130px', textAlign: 'center' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/qr.png" alt="QR Code" style={{ width: '120px', height: '120px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
-          <div style={{ fontSize: '12px', color: '#0369a1', marginTop: '5px', fontWeight: 'bold' }}>Quét mã thanh toán</div>
+        
+        <div style={{ width: '220px', textAlign: 'center' }}>
+          <div style={{ border: '2px solid #0d88c4', borderRadius: '12px', padding: '15px', background: '#fff', boxShadow: '0 4px 6px -1px rgba(13, 136, 196, 0.2)' }}>
+            <div style={{ fontWeight: 'bold', color: '#0d88c4', marginBottom: '10px', fontSize: '13px' }}>
+              QUÉT ĐỂ THANH TOÁN
+            </div>
+            <img 
+              src={`https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + newCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`} 
+              alt="QR Code" 
+              style={{ width: '100%', height: 'auto', display: 'block' }} 
+              crossOrigin="anonymous" 
+            />
+            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
+              <img src="https://img.vietqr.io/image/napas-logo.png" alt="NAPAS" style={{ height: '16px' }} crossOrigin="anonymous" onError={(e) => e.target.style.display='none'} />
+            </div>
+          </div>
         </div>
       </div>
 

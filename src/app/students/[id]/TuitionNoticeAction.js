@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import TuitionNoticeTemplate from '../../components/TuitionNoticeTemplate';
+import ClassSelect from '../../components/ClassSelect';
 
 export default function TuitionNoticeAction({ student }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,7 +48,8 @@ export default function TuitionNoticeAction({ student }) {
     if (targetClassCode && classes.length > 0) {
       const targetClass = classes.find(c => c.code === targetClassCode);
       if (targetClass) {
-        setDisplayClassName(`${targetClass.code} - ${targetClass.teacherName}`);
+        const { formatClassCode } = require('../../../lib/classHelper');
+        setDisplayClassName(formatClassCode(targetClass.code));
         
         // Find config matching the class level
         const config = configs.find(c => c.level === targetClass.level);
@@ -298,17 +300,12 @@ export default function TuitionNoticeAction({ student }) {
 
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{noticeType === 'CLASS_TRANSFER' ? 'Lớp chuyển đến (Lớp mới)' : 'Lớp học dự kiến'}</label>
-                <select 
+                <ClassSelect 
+                  classes={classes}
                   value={targetClassCode} 
                   onChange={(e) => setTargetClassCode(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                >
-                  <option value="">-- Chọn lớp --</option>
-                  {classes.map(c => {
-                    const { formatClassCode } = require('../../../lib/classHelper');
-                    return <option key={c.code} value={c.code}>{formatClassCode(c.code)} - {c.teacherName}</option>;
-                  })}
-                </select>
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

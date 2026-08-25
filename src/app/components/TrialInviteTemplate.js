@@ -31,16 +31,16 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
       }}
     >
       {/* Header Band */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', backgroundColor: '#0d88c4', color: 'white' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', backgroundColor: '#FFCA29', color: '#0d88c4' }}>
         <img 
           src="/logo.png" 
           alt="Logo" 
-          style={{ width: '120px', height: 'auto', background: 'white', padding: '5px', borderRadius: '8px' }} 
+          style={{ width: '120px', height: 'auto', display: 'block' }} 
           crossOrigin="anonymous"
         />
         <div style={{ textAlign: 'right' }}>
-          <h1 style={{ margin: 0, fontSize: '28px', textTransform: 'uppercase', letterSpacing: '1px' }}>TICKET TO ENGLISH</h1>
-          <p style={{ margin: 0, fontSize: '16px', opacity: 0.9 }}>Thư Mời Tham Gia Lớp Học Thử</p>
+          <h1 style={{ margin: 0, fontSize: '28px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '900' }}>TICKET TO ENGLISH</h1>
+          <p style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>Thư Mời Tham Gia Lớp Học Thử</p>
         </div>
       </div>
 
@@ -63,14 +63,19 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', backgroundColor: '#f0f9ff', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #0d88c4' }}>
-            <div style={{ flex: '1 1 45%' }}>
-              <p style={{ color: '#0d88c4', fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>Thời Gian Học</p>
-              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{timeString || 'Đang cập nhật'}</p>
+            <div style={{ flex: '1 1 30%' }}>
+              <p style={{ color: '#0d88c4', fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>Ngày Học</p>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{data.studyDays || 'Đang cập nhật'}</p>
             </div>
             
-            <div style={{ flex: '1 1 45%' }}>
-              <p style={{ color: '#0d88c4', fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>Ngày Bắt Đầu</p>
-              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{startDate}</p>
+            <div style={{ flex: '1 1 30%' }}>
+              <p style={{ color: '#0d88c4', fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>Giờ Học</p>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{data.studyHours || 'Đang cập nhật'}</p>
+            </div>
+
+            <div style={{ flex: '1 1 30%' }}>
+              <p style={{ color: '#0d88c4', fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>Ngày Bắt Đầu - Kết Thúc</p>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{startDate} {data.endDate ? `- ${data.endDate}` : ''}</p>
             </div>
           </div>
         </div>
