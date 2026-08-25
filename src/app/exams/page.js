@@ -755,15 +755,41 @@ export default function ExamsPage() {
                 Hủy bỏ
               </button>
               <button 
-                onClick={() => {
-                  setResults(results.map(res => res.studentId === previewModalData.student.id ? {
-                    ...res,
+                onClick={async () => {
+                  const updatedRes = {
+                    ...results.find(res => res.studentId === previewModalData.student.id),
                     commentSpeaking: previewModalData.commentSpeaking,
                     commentListening: previewModalData.commentListening,
                     commentRW: previewModalData.commentRW,
                     commentDev: previewModalData.commentDev,
-                  } : res));
+                  };
+                  
+                  // Update UI immediately
+                  setResults(results.map(res => res.studentId === previewModalData.student.id ? updatedRes : res));
                   setPreviewModalData(null);
+                  
+                  // Save to Database immediately
+                  try {
+                    await fetch('/api/exams/result', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        classCode: selectedClass,
+                        configId: selectedConfig,
+                        examDate: examDate,
+                        results: [{
+                          ...updatedRes,
+                          keywordSpeaking: aiKeywords[updatedRes.studentId]?.speaking || '',
+                          keywordListening: aiKeywords[updatedRes.studentId]?.listening || '',
+                          keywordRW: aiKeywords[updatedRes.studentId]?.rw || ''
+                        }]
+                      })
+                    });
+                    setMessage({ type: 'success', text: 'Đã lưu nhận xét thành công!' });
+                    setTimeout(() => setMessage(null), 3000);
+                  } catch(e) {
+                    console.error("Lỗi lưu nhận xét", e);
+                  }
                 }} 
                 style={{ padding: '10px 25px', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}
               >

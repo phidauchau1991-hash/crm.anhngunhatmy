@@ -16,14 +16,18 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Tên học viên là bắt buộc' }, { status: 400 });
     }
 
-    const shortName = studentName.trim().split(/\s+/).pop() || 'con';
+    const nameParts = studentName.trim().split(/\s+/);
+    const capitalizedParts = nameParts.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    const fullName = capitalizedParts.join(' ');
+    const firstName = capitalizedParts[capitalizedParts.length - 1] || 'Con';
+    const nickname = capitalizedParts.length >= 2 ? capitalizedParts.slice(-2).join(' ') : firstName;
 
-    const systemPrompt = `Bạn là một Giáo viên Anh ngữ chuyên nghiệp, tận tâm đang viết nhận xét kết quả cuối khóa cho học viên "${studentName}" (gọi thân mật bằng tên riêng là "${shortName}" hoặc "con").
+    const systemPrompt = `Bạn là một Giáo viên Anh ngữ chuyên nghiệp, tận tâm đang viết nhận xét kết quả cuối khóa cho học viên "${fullName}".
 QUY TẮC NGHIÊM NGẶT (RẤT QUAN TRỌNG):
 1. Mỗi phần (speaking, listening, rw, dev) CHỈ viết đúng 2 ý (bullet points), mỗi ý bắt đầu bằng dấu "- ".
 2. Độ dài tiêu chuẩn: Mỗi ý BẮT BUỘC phải dài từ 12 đến 15 từ. KHÔNG viết quá ngắn (dưới 10 từ), KHÔNG viết dài (trên 18 từ) để luôn đảm bảo toàn bộ phiếu nhận xét hiển thị vừa vặn trong 1 trang giấy A4.
-3. Sử dụng tên riêng: Thường xuyên dùng tên riêng "${shortName}" hoặc "${studentName}" trong các ý nhận xét thay vì nói trống không (ví dụ: "${shortName} có vốn từ vựng phong phú...", "${shortName} nghe tốt các đoạn thoại...").
-4. Nêu RÕ LỢI ÍCH: Ở mỗi ý nhận xét, BẮT BUỘC phải giải thích thêm LỢI ÍCH (mang lại điều tốt đẹp gì cho con) khi phát huy ưu điểm hoặc khắc phục nhược điểm đó (Ví dụ: "...giúp ${shortName} tự tin giao tiếp tự nhiên với người nước ngoài", "...giúp con phản xạ làm bài thi chính xác và nhanh hơn").
+3. Cách gọi tên: Để nhận xét tự nhiên và gần gũi, hãy đan xen luân phiên các danh xưng: "Con", "${firstName}", "${nickname}", "Bạn ${firstName}" thay vì chỉ lặp lại một cái tên (Ví dụ: "${firstName} có vốn từ vựng phong phú...", "Con nghe tốt các đoạn thoại..."). TUYỆT ĐỐI không gọi học viên bằng chữ in hoa toàn bộ.
+4. Nêu RÕ LỢI ÍCH: Ở mỗi ý nhận xét, BẮT BUỘC phải giải thích thêm LỢI ÍCH (mang lại điều tốt đẹp gì cho con) khi phát huy ưu điểm hoặc khắc phục nhược điểm đó (Ví dụ: "...giúp ${firstName} tự tin giao tiếp tự nhiên với người nước ngoài", "...giúp con phản xạ làm bài thi chính xác và nhanh hơn").
 5. Định hướng phát triển: Đưa ra giải pháp và lời khuyên thiết thực để phụ huynh đồng hành cùng con tại nhà giúp con nâng cao trình độ.${bilingual ? `
 6. BẮT BUỘC viết thêm phiên bản tiếng Anh cho TẤT CẢ các phần. Phiên bản tiếng Anh phải được viết dưới góc độ một giáo viên tiếng Anh chuyên nghiệp viết báo cáo tiến độ học tập chính thức cho học viên.
 7. Trả về kết quả DƯỚI DẠNG JSON với cấu trúc chính xác như sau, không có markdown (không dùng \`\`\`json):
