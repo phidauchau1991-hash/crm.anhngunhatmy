@@ -3,6 +3,7 @@ import React, { forwardRef } from 'react';
 
 const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
   const {
+    noticeType,
     studentName,
     shortName,
     className,
@@ -13,6 +14,10 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
     missedWeeks,
     missedFee,
     remainingWeeks,
+    originalRemainingFee,
+    discountReason,
+    discountPercent,
+    discountValue,
     remainingFee,
     bookFee,
     gifts,
@@ -20,7 +25,10 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
     dueDate,
     finalAmount,
     transferContent,
-    qrUrl
+    qrUrl,
+    orderTotalFee,
+    orderPaidAmount,
+    installmentAmount
   } = data;
 
   const formatCurrency = (amount) => {
@@ -80,23 +88,67 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
         </p>
 
         {/* Fee details */}
-        <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
-          <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
-            <li style={{ marginBottom: '8px' }}>Số tuần học toàn Khóa {classCode}: <strong>{totalWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(totalFee)}</strong></li>
-            {missedWeeks > 0 && (
-              <li style={{ marginBottom: '8px' }}>Số tuần <strong>{shortName}</strong> không tham gia: <strong>{missedWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(missedFee)}</strong></li>
-            )}
-            <li style={{ marginBottom: '8px' }}>Số tuần còn lại mà <strong>{shortName}</strong> tham gia: <strong>{remainingWeeks} tuần</strong> ~ HP: <strong style={{ color: '#dc2626' }}>{formatCurrency(remainingFee)}</strong></li>
-            <li>Giáo trình khóa {classCode}: <strong style={{ color: '#dc2626' }}>{formatCurrency(bookFee)}</strong></li>
-          </ul>
-        </div>
+        {(!noticeType || noticeType === 'NEW_ENROLLMENT') && (
+          <>
+            <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
+              <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
+                <li style={{ marginBottom: '8px' }}>Số tuần học toàn Khóa {classCode}: <strong>{totalWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(totalFee)}</strong></li>
+                {missedWeeks > 0 && (
+                  <li style={{ marginBottom: '8px' }}>Số tuần <strong>{shortName}</strong> không tham gia: <strong>{missedWeeks} tuần</strong> ~ HP: <strong>{formatCurrency(missedFee)}</strong></li>
+                )}
+                
+                {discountValue > 0 ? (
+                  <>
+                    <li style={{ marginBottom: '8px' }}>Học phí tiêu chuẩn cho <strong>{remainingWeeks} tuần</strong>: <strong>{formatCurrency(originalRemainingFee)}</strong></li>
+                    <li style={{ marginBottom: '8px', color: '#16a34a' }}>
+                      🎁 <strong>{discountReason} {discountPercent > 0 ? `(${discountPercent}%)` : ''}:</strong> <strong style={{ fontSize: '16px' }}>- {formatCurrency(discountValue)}</strong>
+                    </li>
+                    <li style={{ marginBottom: '8px' }}>Học phí sau hỗ trợ cho <strong>{remainingWeeks} tuần</strong>: <strong style={{ color: '#dc2626' }}>{formatCurrency(remainingFee)}</strong></li>
+                  </>
+                ) : (
+                  <li style={{ marginBottom: '8px' }}>Học phí <strong>{remainingWeeks} tuần</strong> mà <strong>{shortName}</strong> tham gia: <strong style={{ color: '#dc2626' }}>{formatCurrency(remainingFee)}</strong></li>
+                )}
+                
+                <li>Giáo trình khóa {classCode}: <strong style={{ color: '#dc2626' }}>{formatCurrency(bookFee)}</strong></li>
+              </ul>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', paddingLeft: '10px' }}>
-          <i className="fa-solid fa-arrow-right" style={{ color: '#0d88c4', marginRight: '10px' }}></i>
-          <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-            Học phí & giáo trình cần đóng cho {remainingWeeks} tuần: <span style={{ color: '#dc2626' }}>{formatCurrency(remainingFee)} + {formatCurrency(bookFee)} = {formatCurrency(remainingFee + bookFee)}</span>
-          </span>
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', paddingLeft: '10px' }}>
+              <i className="fa-solid fa-arrow-right" style={{ color: '#0d88c4', marginRight: '10px' }}></i>
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                {discountValue > 0 ? (
+                  <>
+                    Học phí sau hỗ trợ <span style={{ color: '#dc2626' }}>({formatCurrency(remainingFee)})</span> + Giáo trình <span style={{ color: '#dc2626' }}>({formatCurrency(bookFee)})</span> = <span style={{ color: '#dc2626' }}>{formatCurrency(remainingFee + bookFee)}</span>
+                  </>
+                ) : (
+                  <>
+                    Học phí & giáo trình cần đóng cho {remainingWeeks} tuần: <span style={{ color: '#dc2626' }}>{formatCurrency(remainingFee)} + {formatCurrency(bookFee)} = {formatCurrency(remainingFee + bookFee)}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          </>
+        )}
+
+        {noticeType === 'NEXT_INSTALLMENT' && (
+          <>
+            <div style={{ background: '#fff7ed', padding: '15px 20px', borderRadius: '8px', border: '1px solid #fdba74', marginBottom: '15px' }}>
+              <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
+                <li style={{ marginBottom: '8px' }}>Tổng học phí toàn Khóa {classCode}: <strong>{formatCurrency(orderTotalFee)}</strong></li>
+                <li style={{ marginBottom: '8px' }}>Đợt trước đã thanh toán: <strong style={{ color: '#16a34a' }}>{formatCurrency(orderPaidAmount)}</strong> ✅</li>
+                <li style={{ marginBottom: '8px' }}><strong>Số tiền thu đợt này:</strong> <strong style={{ color: '#ea580c', fontSize: '18px' }}>{formatCurrency(installmentAmount)}</strong> ⏳</li>
+                <li>Giáo trình / Tài liệu phát sinh: <strong style={{ color: '#dc2626' }}>{formatCurrency(bookFee)}</strong></li>
+              </ul>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', paddingLeft: '10px' }}>
+              <i className="fa-solid fa-arrow-right" style={{ color: '#ea580c', marginRight: '10px' }}></i>
+              <span style={{ fontWeight: 'bold', fontSize: '16px', fontStyle: 'italic', color: '#64748b' }}>
+                Nhờ Ba Mẹ thu xếp hoàn tất học phí để trung tâm tiếp tục duy trì giáo trình và lịch học xuyên suốt cho bé nhé ạ!
+              </span>
+            </div>
+          </>
+        )}
 
         {/* Gifts */}
         {gifts && gifts.length > 0 && (

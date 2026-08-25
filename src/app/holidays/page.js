@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import HolidayStudioModal from './HolidayStudioModal';
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState([]);
@@ -8,6 +9,10 @@ export default function HolidaysPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Studio State
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
+  const [selectedStudioHoliday, setSelectedStudioHoliday] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -18,6 +23,11 @@ export default function HolidaysPage() {
     targetId: '',
   });
   const [holidayToDelete, setHolidayToDelete] = useState(null);
+
+  const openStudio = (holiday) => {
+    setSelectedStudioHoliday(holiday);
+    setIsStudioOpen(true);
+  };
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -303,7 +313,15 @@ export default function HolidaysPage() {
                     <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
                       {h.scope === 'GLOBAL' ? 'Tất cả lớp' : h.targetId}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center', display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                      <button 
+                        onClick={() => openStudio(h)} 
+                        className="action-btn" 
+                        title="Studio Thông Báo"
+                        style={{ background: '#0d88c4', border: 'none', color: '#fff', cursor: 'pointer', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        <i className="fa-solid fa-palette"></i> Studio
+                      </button>
                       <button 
                         onClick={() => setHolidayToDelete(h)} 
                         className="action-btn delete-btn" 
@@ -346,6 +364,13 @@ export default function HolidaysPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL: HOLIDAY STUDIO */}
+      <HolidayStudioModal 
+        isOpen={isStudioOpen} 
+        onClose={() => setIsStudioOpen(false)} 
+        holiday={selectedStudioHoliday} 
+      />
 
       {/* Local CSS mimicking Tailwind properties with premium style overrides */}
       <style>{`

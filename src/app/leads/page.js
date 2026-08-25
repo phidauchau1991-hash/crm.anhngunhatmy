@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import TrialInviteModal from './TrialInviteModal';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
@@ -24,6 +25,10 @@ export default function LeadsPage() {
   const [showModal, setShowModal] = useState(false);
   const [currentLead, setCurrentLead] = useState(null);
   const [leadToDelete, setLeadToDelete] = useState(null);
+  
+  // Trial Invite Modal State
+  const [showTrialModal, setShowTrialModal] = useState(false);
+  const [trialLead, setTrialLead] = useState(null);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -412,6 +417,16 @@ export default function LeadsPage() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-buttons">
+                        {lead.status === 'Học thử' && (
+                          <button 
+                            className="action-btn" 
+                            style={{ color: '#0f766e', background: '#ccfbf1', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                            title="Thư mời học thử" 
+                            onClick={() => { setTrialLead(lead); setShowTrialModal(true); }}
+                          >
+                            🎫 Thư mời
+                          </button>
+                        )}
                         <button 
                           className="action-btn" 
                           style={{ color: '#0068ff', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
@@ -671,6 +686,12 @@ export default function LeadsPage() {
           <i className="fa-solid fa-circle-check" style={{ fontSize: '1.2rem' }}></i> {toastMessage}
         </div>
       )}
+
+      <TrialInviteModal 
+        isOpen={showTrialModal} 
+        onClose={() => { setShowTrialModal(false); setTrialLead(null); }} 
+        lead={trialLead} 
+      />
 
       <style>{`
         .page-container {

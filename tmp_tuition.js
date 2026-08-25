@@ -38,6 +38,17 @@ export default function TuitionNoticeAction({ student }) {
 
   // Handle class selection
   useEffect(() => {
+    const targetClass = classes.find(c => c.code === targetClassCode);
+    if (targetClass) {
+      // Clean up class name: remove CN1_ and _XX (numbers)
+      let clean = targetClass.code.replace(/^CN1_/, '');
+      // Try to remove the middle number (like _35)
+      clean = clean.replace(/_\d+(_Ca\d+)$/, '$1');
+      setDisplayClassName(`${clean} - ${targetClass.schedule || ''}`);
+      
+      // Auto-generate transfer content
+      const nameNoAccent = student.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+  useEffect(() => {
     if (targetClassCode && classes.length > 0) {
       const targetClass = classes.find(c => c.code === targetClassCode);
       if (targetClass) {
