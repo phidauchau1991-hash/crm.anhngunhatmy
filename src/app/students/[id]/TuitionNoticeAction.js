@@ -31,6 +31,7 @@ export default function TuitionNoticeAction({ student }) {
   const [discountReason, setDiscountReason] = useState('');
   const [noticeType, setNoticeType] = useState('NEW_ENROLLMENT');
   const [installmentAmount, setInstallmentAmount] = useState(0);  
+  const [oldClassName, setOldClassName] = useState('');
   useEffect(() => {
     if (isModalOpen && classes.length === 0) {
       fetch('/api/classes').then(r => r.json()).then(res => setClasses(res.data || []));
@@ -110,7 +111,8 @@ export default function TuitionNoticeAction({ student }) {
   // Làm tròn xuống 5000 có lợi cho khách
   finalRemainingFee = Math.floor(finalRemainingFee / 5000) * 5000;
   
-  const finalAmount = noticeType === 'NEW_ENROLLMENT' ? (finalRemainingFee + Number(bookFee)) : (Number(installmentAmount) + Number(bookFee));
+  const isNewOrTransfer = noticeType === 'NEW_ENROLLMENT' || noticeType === 'CLASS_TRANSFER';
+  const finalAmount = isNewOrTransfer ? (finalRemainingFee + Number(bookFee)) : (Number(installmentAmount) + Number(bookFee));
 
   // Parse gifts
   const giftsArray = giftsText.split(',').map(s => s.trim()).filter(Boolean);
@@ -135,6 +137,7 @@ export default function TuitionNoticeAction({ student }) {
     originalRemainingFee: exactRemainingFee,
     discountReason: discountReason || 'Mức hỗ trợ từ Trung tâm',
     discountPercent,
+    oldClassName,
     discountValue: calculatedDiscount,
     remainingFee: finalRemainingFee,
     bookFee: Number(bookFee),
@@ -246,11 +249,25 @@ export default function TuitionNoticeAction({ student }) {
                 >
                   <option value="NEW_ENROLLMENT">1. Ghi danh mới / Học thử / Bảo lưu</option>
                   <option value="NEXT_INSTALLMENT">2. Thông báo đóng học phí đợt tiếp theo (Nợ)</option>
+                  <option value="CLASS_TRANSFER">3. Thông báo chuyển lớp</option>
                 </select>
               </div>
 
+              {noticeType === 'CLASS_TRANSFER' && (
+                <div>
+                  <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tên lớp cũ (đang học)</label>
+                  <input 
+                    type="text" 
+                    value={oldClassName} 
+                    onChange={(e) => setOldClassName(e.target.value)}
+                    placeholder="VD: M3_Ms My - Ca 35"
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', marginBottom: '1rem' }}
+                  />
+                </div>
+              )}
+
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Lớp học dự kiến</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{noticeType === 'CLASS_TRANSFER' ? 'Lớp chuyển đến (Lớp mới)' : 'Lớp học dự kiến'}</label>
                 <select 
                   value={targetClassCode} 
                   onChange={(e) => setTargetClassCode(e.target.value)}
@@ -284,7 +301,7 @@ export default function TuitionNoticeAction({ student }) {
                 </div>
               </div>
 
-              {noticeType === 'NEW_ENROLLMENT' && (
+              {(noticeType === 'NEW_ENROLLMENT' || noticeType === 'CLASS_TRANSFER') && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
@@ -430,7 +447,7 @@ export default function TuitionNoticeAction({ student }) {
               </div>
 
               <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px dashed #cbd5e1', marginTop: '0.5rem' }}>
-                {noticeType === 'NEW_ENROLLMENT' && (
+                {(noticeType === 'NEW_ENROLLMENT' || noticeType === 'CLASS_TRANSFER') && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                       <span>Học phí khóa {totalWeeks} tuần:</span>

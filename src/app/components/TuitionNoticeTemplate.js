@@ -68,7 +68,10 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
           </div>
           <div style={{ flex: 1, textAlign: 'center', paddingRight: '150px' }}>
             <h1 style={{ margin: 0, fontSize: '26px', textTransform: 'uppercase', color: '#0d88c4', letterSpacing: '1px' }}>THƯ BÁO</h1>
-            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '18px', color: '#475569', marginTop: '4px' }}>V/v đóng học phí</p>
+            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '18px', color: '#475569', marginTop: '4px' }}>
+              {data.noticeType === 'NEXT_INSTALLMENT' ? 'V/v thanh toán học phí đợt tiếp theo' : 
+               data.noticeType === 'CLASS_TRANSFER' ? 'V/v chuyển lớp & học phí' : 'V/v đóng học phí'}
+            </p>
           </div>
         </div>
 
@@ -82,13 +85,30 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
         </div>
 
         {/* Intro */}
-        <p style={{ textAlign: 'justify', marginBottom: '25px' }}>
-          Anh ngữ Nhật Mỹ xin gửi lời chào, lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng và đồng hành cùng Trung tâm trong thời gian vừa qua để giúp các con yêu thích & học tốt tiếng Anh hơn mỗi ngày!
-          Sau thời gian học thử cùng những nhận xét chi tiết của Giáo viên, nay Trung tâm xin gửi đến ba mẹ thông tin học phí khóa <strong>{classCode}</strong> như sau:
-        </p>
+        <div style={{ textAlign: 'justify', marginBottom: '25px', lineHeight: '1.6', color: '#334155' }}>
+          {data.noticeType === 'NEXT_INSTALLMENT' ? (
+            <p style={{ margin: '0 0 0.5rem 0' }}>
+              Anh ngữ Nhật Mỹ xin gửi lời chào, lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng đồng hành cùng Trung tâm trong thời gian qua.
+              <br/>
+              Theo lộ trình đóng phí của khóa học <strong>{classCode}</strong>, Trung tâm xin gửi đến ba mẹ thông tin thanh toán học phí đợt tiếp theo như sau:
+            </p>
+          ) : data.noticeType === 'CLASS_TRANSFER' ? (
+            <p style={{ margin: '0 0 0.5rem 0' }}>
+              Anh ngữ Nhật Mỹ xin gửi lời chào và lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng đồng hành cùng Trung tâm. 
+              <br/>
+              Nhằm đảm bảo lộ trình và hiệu quả học tập tốt nhất cho con, Trung tâm xin thông báo về việc chuyển lớp của Học viên từ lớp <strong>{data.oldClassName || 'cũ'}</strong> sang lớp <strong>{classCode}</strong>. Dưới đây là thông tin chi tiết về học phí của lớp mới:
+            </p>
+          ) : (
+            <p style={{ margin: '0 0 0.5rem 0' }}>
+              Anh ngữ Nhật Mỹ xin gửi lời chào, lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng và đồng hành cùng Trung tâm trong thời gian vừa qua để giúp các con yêu thích & học tốt tiếng Anh hơn mỗi ngày!
+              <br/>
+              Sau thời gian học thử cùng những nhận xét chi tiết của Giáo viên, nay Trung tâm xin gửi đến ba mẹ thông tin học phí khóa <strong>{classCode}</strong> như sau:
+            </p>
+          )}
+        </div>
 
         {/* Fee details */}
-        {(!noticeType || noticeType === 'NEW_ENROLLMENT') && (
+        {(!noticeType || noticeType === 'NEW_ENROLLMENT' || noticeType === 'CLASS_TRANSFER') && (
           <>
             <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
               <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
