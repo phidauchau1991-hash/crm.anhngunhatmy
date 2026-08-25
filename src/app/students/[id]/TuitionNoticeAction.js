@@ -28,7 +28,9 @@ export default function TuitionNoticeAction({ student }) {
   
   const [discountPercent, setDiscountPercent] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
-  
+  const [discountReason, setDiscountReason] = useState('');
+  const [noticeType, setNoticeType] = useState('NEW_ENROLLMENT');
+  const [installmentAmount, setInstallmentAmount] = useState(0);  
   useEffect(() => {
     if (isModalOpen && classes.length === 0) {
       fetch('/api/classes').then(r => r.json()).then(res => setClasses(res.data || []));
