@@ -21,6 +21,9 @@ export default function TuitionNoticeAction({ student }) {
   const [missedWeeks, setMissedWeeks] = useState(0);
   const [bookFee, setBookFee] = useState(250000);
   
+  const [studyDays, setStudyDays] = useState('');
+  const [studyHours, setStudyHours] = useState('');
+  
   const [giftsText, setGiftsText] = useState('Áo thun, Balo');
   const [giftValue, setGiftValue] = useState(150000);
   const [dueDate, setDueDate] = useState('');
@@ -127,7 +130,9 @@ export default function TuitionNoticeAction({ student }) {
     studentName: student.name,
     shortName: student.name.split(' ').pop(),
     className: displayClassName,
-    classCode: displayClassName.split(' ')[0], // just the code part
+    classCode: displayClassName, // Used fully in template
+    studyDays,
+    studyHours,
     teacherName: displayTeacherName,
     totalWeeks,
     totalFee,
@@ -266,6 +271,31 @@ export default function TuitionNoticeAction({ student }) {
                 </div>
               )}
 
+              {(noticeType === 'CLASS_TRANSFER' || noticeType === 'NEW_ENROLLMENT') && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày học</label>
+                    <input 
+                      type="text" 
+                      value={studyDays} 
+                      onChange={(e) => setStudyDays(e.target.value)}
+                      placeholder="VD: Thứ 7 & Chủ Nhật"
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Giờ học</label>
+                    <input 
+                      type="text" 
+                      value={studyHours} 
+                      onChange={(e) => setStudyHours(e.target.value)}
+                      placeholder="VD: 17:30 - 19:00"
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{noticeType === 'CLASS_TRANSFER' ? 'Lớp chuyển đến (Lớp mới)' : 'Lớp học dự kiến'}</label>
                 <select 
@@ -274,9 +304,10 @@ export default function TuitionNoticeAction({ student }) {
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 >
                   <option value="">-- Chọn lớp --</option>
-                  {classes.map(c => (
-                    <option key={c.code} value={c.code}>{c.code} - {c.teacherName}</option>
-                  ))}
+                  {classes.map(c => {
+                    const { formatClassCode } = require('../../../lib/classHelper');
+                    return <option key={c.code} value={c.code}>{formatClassCode(c.code)} - {c.teacherName}</option>;
+                  })}
                 </select>
               </div>
 

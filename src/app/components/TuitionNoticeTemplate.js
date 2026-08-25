@@ -80,6 +80,11 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
           <ul style={{ listStyleType: 'none', padding: 0, margin: 0, textAlign: 'left' }}>
             <li style={{ marginBottom: '4px' }}><strong>Kính gửi:</strong> Phụ huynh em <strong style={{ color: '#0d88c4', fontSize: '16px' }}>{studentName?.toUpperCase()}</strong></li>
             <li style={{ marginBottom: '4px' }}><strong>Lớp:</strong> {className}</li>
+            {(data.noticeType === 'CLASS_TRANSFER' || data.noticeType === 'NEW_ENROLLMENT') && data.studyDays && (
+              <li style={{ marginBottom: '4px' }}>
+                <strong style={{ color: '#0d88c4' }}>Lịch học:</strong> <span style={{ fontWeight: 'bold' }}>{data.studyDays}</span> {data.studyHours ? <span style={{ fontStyle: 'italic', color: '#dc2626' }}>({data.studyHours})</span> : ''}
+              </li>
+            )}
             <li><strong>GVCN:</strong> {teacherName}</li>
           </ul>
         </div>
