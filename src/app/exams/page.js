@@ -289,7 +289,7 @@ export default function ExamsPage() {
     }
     setIsBatchExporting(true);
     try {
-      const htmlToImage = await import('html-to-image');
+      const html2canvas = (await import('html2canvas')).default;
       const JSZip = (await import('jszip')).default;
       const { saveAs } = await import('file-saver');
       const zip = new JSZip();
@@ -300,7 +300,13 @@ export default function ExamsPage() {
         const targetId = `batch-notice-${s.id}`;
         const elem = document.getElementById(targetId);
         if (elem) {
-          const dataUrl = await htmlToImage.toPng(elem, { quality: 0.95, backgroundColor: '#ffffff' });
+          const canvas = await html2canvas(elem, { 
+            scale: 2, 
+            useCORS: true, 
+            backgroundColor: '#ffffff',
+            logging: false
+          });
+          const dataUrl = canvas.toDataURL('image/png');
           const base64Data = dataUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
           zip.file(`Khoa_Moi_${s.name.replace(/\s+/g, '_')}.png`, base64Data, { base64: true });
           await new Promise(r => setTimeout(r, 200)); // small delay for UI rendering
@@ -706,11 +712,13 @@ export default function ExamsPage() {
                   <button onClick={() => {
                      const el = document.getElementById(`modal-comment-report-${previewModalData.student.id}`);
                      if(el) {
-                       htmlToImage.toPng(el, { quality: 1, backgroundColor: '#fff' }).then(dataUrl => {
-                         const link = document.createElement('a');
-                         link.download = `Nhan_Xet_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
-                         link.href = dataUrl;
-                         link.click();
+                       import('html2canvas').then(html2canvas => {
+                         html2canvas.default(el, { scale: 2, useCORS: true, backgroundColor: '#fff', logging: false }).then(canvas => {
+                           const link = document.createElement('a');
+                           link.download = `Nhan_Xet_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                           link.href = canvas.toDataURL('image/png');
+                           link.click();
+                         });
                        });
                      }
                   }} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
@@ -731,11 +739,13 @@ export default function ExamsPage() {
                   <button onClick={() => {
                      const el = document.getElementById(`modal-score-report-${previewModalData.student.id}`);
                      if(el) {
-                       htmlToImage.toPng(el, { quality: 1, backgroundColor: '#fff' }).then(dataUrl => {
-                         const link = document.createElement('a');
-                         link.download = `Bang_Diem_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
-                         link.href = dataUrl;
-                         link.click();
+                       import('html2canvas').then(html2canvas => {
+                         html2canvas.default(el, { scale: 2, useCORS: true, backgroundColor: '#fff', logging: false }).then(canvas => {
+                           const link = document.createElement('a');
+                           link.download = `Bang_Diem_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                           link.href = canvas.toDataURL('image/png');
+                           link.click();
+                         });
                        });
                      }
                   }} style={{ padding: '6px 12px', background: '#0D88C4', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
