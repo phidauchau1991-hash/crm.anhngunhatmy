@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import ClassSelect from '@/components/ClassSelect';
 
 export default function AttendancePage() {
   const router = useRouter();

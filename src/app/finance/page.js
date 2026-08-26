@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PayrollTab from './PayrollTab';
+import ClassSelect from '@/components/ClassSelect';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState('tuition'); // tuition, payroll
