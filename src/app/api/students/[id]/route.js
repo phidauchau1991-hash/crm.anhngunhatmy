@@ -521,12 +521,23 @@ export async function PUT(request, { params }) {
 
       // C. Thực hiện cập nhật Database
       await prisma.$transaction(async (tx) => {
-        // 1. Cập nhật xếp lớp (Bảo toàn enrollment cũ, tạo enrollment mới)
-        await tx.enrollment.updateMany({
-          where: { studentId: id, status: 'Đang học' },
-          data: { status: 'Đã chuyển' }
+        // 1. Cập nhật trạng thái lớp cũ
+        await tx.enrollment.update({
+          where: { id: currentEnrollment.id },
+          data: { status: 'Đã chuyển lớp' },
         });
 
+        // 1.5. Cập nhật hóa đơn cũ (Chốt công nợ vào hóa đơn cũ)
+        // Bằng cách set feeToPay = amountPaidOld, công nợ/tiền thừa của lớp cũ sẽ bằng 0
+        // và toàn bộ số dư/công nợ đó đã được cộng dồn vào finalFeeToPay của hóa đơn mới!
+        if (oldOrder) {
+          await tx.orderFinance.update({
+            where: { id: oldOrder.id },
+            data: { feeToPay: oldOrder.amountPaid }
+          });
+        }
+
+        // Tạo enrollment mới cho lớp mới
         await tx.enrollment.create({
           data: {
             studentId: id,
