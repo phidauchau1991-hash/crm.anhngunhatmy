@@ -75,6 +75,7 @@ export async function POST(request) {
         username: data.username,
         password: hashedPassword,
         fullName: data.fullName || data.username,
+        shortName: data.shortName || null,
         phone: data.phone,
         email: data.email,
         role: data.role,

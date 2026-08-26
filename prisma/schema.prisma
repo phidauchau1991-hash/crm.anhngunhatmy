@@ -14,6 +14,7 @@ model User {
   username    String   @unique              // e.g. gv.huong
   password    String                        // Hashed password
   fullName    String
+  shortName   String?                       // Tên hiển thị (Tên ngắn)
   phone       String?
   email       String?
   role        String   // DIRECTOR, ACCOUNTANT, ADVISOR, CSKH, TEACHER

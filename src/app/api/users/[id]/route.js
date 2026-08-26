@@ -32,6 +32,7 @@ export async function PUT(request, { params }) {
     
     let updateData = {
       fullName: data.fullName,
+      shortName: data.shortName || null,
       phone: data.phone,
       email: data.email,
       role: data.role,

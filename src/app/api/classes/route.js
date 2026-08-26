@@ -36,6 +36,12 @@ export async function GET(request) {
         enrollments: {
           where: { status: 'Đang học' }
         },
+        teacher: {
+          select: {
+            shortName: true,
+            fullName: true
+          }
+        }
       },
       orderBy: {
         code: 'asc',
@@ -59,11 +65,13 @@ export async function GET(request) {
       const sessionsTaught = uniqueDates.length;
       const sessionsRemaining = Math.max(0, totalSessions - sessionsTaught);
 
+      const finalTeacherName = cls.teacher ? (cls.teacher.shortName || cls.teacher.fullName) : cls.teacherName;
+
       return {
         code: cls.code,
         level: cls.level,
         capDo: config ? config.capDo : 'Khác',
-        teacherName: cls.teacherName || 'Chưa phân công',
+        teacherName: finalTeacherName || 'Chưa phân công',
         teacherId: cls.teacherId,
         startDate: new Date(cls.startDate).toLocaleDateString('vi-VN'),
         startDateIso: new Date(cls.startDate).toISOString().split('T')[0],
@@ -122,7 +130,15 @@ export async function POST(request) {
     const startDate = new Date(startDateStr);
     startDate.setHours(0, 0, 0, 0);
 
-    const gvAbbr = teacherName ? teacherName.replace(/\s+/g, '') : 'GV';
+    let finalTeacherName = teacherName;
+    if (teacherId) {
+      const teacherObj = await prisma.user.findUnique({ where: { id: teacherId } });
+      if (teacherObj) {
+        finalTeacherName = teacherObj.shortName || teacherObj.fullName;
+      }
+    }
+
+    const gvAbbr = finalTeacherName ? finalTeacherName.replace(/\s+/g, '') : 'GV';
     const classPrefix = `${branchPrefix}_${level}_${gvAbbr}_${schedule}_`;
 
     const latestClass = await prisma.class.findFirst({
@@ -181,7 +197,7 @@ export async function POST(request) {
       data: {
         code: classCode,
         level,
-        teacherName: teacherName || 'Chưa phân công',
+        teacherName: finalTeacherName || 'Chưa phân công',
         teacherId: teacherId || null,
         careStaff: careStaff || 'Chưa phân công',
         startDate,
@@ -267,13 +283,21 @@ export async function PUT(request) {
 
     const expectedEndDate = new Date(currentDate);
 
+    let finalTeacherName = teacherName;
+    if (teacherId) {
+      const teacherObj = await prisma.user.findUnique({ where: { id: teacherId } });
+      if (teacherObj) {
+        finalTeacherName = teacherObj.shortName || teacherObj.fullName;
+      }
+    }
+
     const updatedClass = await prisma.class.update({
       where: { code },
       data: {
         startDate,
         schedule,
         expectedEndDate,
-        teacherName: teacherName || cls.teacherName,
+        teacherName: finalTeacherName || cls.teacherName,
         teacherId: teacherId !== undefined ? teacherId : cls.teacherId,
         careStaff: careStaff !== undefined ? careStaff : cls.careStaff,
       },

@@ -84,6 +84,35 @@ const styles = {
 
 export const formatClassCodeForParent = (code) => {
   if (!code) return '';
+  const parts = code.split('_');
+  if (parts.length >= 4) {
+    const level = parts[1];
+    let teacher = parts[2];
+    
+    // Nếu tên giáo viên dính liền và không có tiền tố (e.g., PhanThiTrucMy), thử tách hoặc chỉ hiện phần đầu
+    // Tuy nhiên, tốt nhất là hiển thị y nguyên nhưng cách điệu hoặc dùng nickname.
+    // Nếu tên > 15 ký tự, có thể rút gọn.
+    if (teacher.length > 12 && !teacher.includes(' ')) {
+        // Rút gọn tên cúng cơm dài (PhanThiTrucMy -> Ms/Mr ...) 
+        // Nhưng vì không biết giới tính, có thể chỉ lấy tên cuối, hoặc ẩn.
+        // Tốt nhất là ẩn hẳn hoặc hiển thị "GV"
+        teacher = "";
+    } else {
+        // Tách chữ hoa (MsMy -> Ms My)
+        teacher = teacher.replace(/([A-Z])/g, ' $1').trim();
+    }
+
+    let schedule = parts[3];
+    if (schedule.toLowerCase() === '7cn' || schedule.toLowerCase() === 't7cn') schedule = 'T7CN';
+    if (schedule.toLowerCase() === '24' || schedule.toLowerCase() === 't24') schedule = '24';
+    if (schedule.toLowerCase() === '35' || schedule.toLowerCase() === 't35') schedule = '35';
+
+    if (teacher) {
+      return `${level} - ${schedule} - ${teacher}`;
+    }
+    return `${level} - ${schedule}`;
+  }
+  
   let formatted = code.replace(/^CN\d+_/i, '');
   formatted = formatted.replace(/(_Ca\d+|_\d+)$/i, '');
   return formatted;

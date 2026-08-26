@@ -15,6 +15,7 @@ export default function UsersPage() {
     username: '',
     password: '',
     fullName: '',
+    shortName: '',
     phone: '',
     role: 'TEACHER',
     branchId: 'CN1_BinhDuong',
@@ -50,6 +51,7 @@ export default function UsersPage() {
         username: user.username,
         password: '',
         fullName: user.fullName || '',
+        shortName: user.shortName || '',
         phone: user.phone || '',
         role: user.role,
         branchId: user.branchId || currentBranchId,
@@ -61,6 +63,7 @@ export default function UsersPage() {
         username: '',
         password: '',
         fullName: '',
+        shortName: '',
         phone: '',
         role: 'TEACHER',
         branchId: currentBranchId || 'CN1_BinhDuong',
@@ -224,12 +227,22 @@ export default function UsersPage() {
               </div>
 
               <div className="form-group">
-                <label>Họ và tên</label>
+                <label>Họ và tên đầy đủ</label>
                 <input 
                   type="text" 
                   value={formData.fullName} 
                   onChange={e => setFormData({...formData, fullName: e.target.value})} 
                   required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Tên hiển thị trên CRM (VD: Ms My)</label>
+                <input 
+                  type="text" 
+                  value={formData.shortName} 
+                  onChange={e => setFormData({...formData, shortName: e.target.value})} 
+                  placeholder="Để trống sẽ tự động lấy Họ và tên"
                 />
               </div>
 
