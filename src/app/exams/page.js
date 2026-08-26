@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
+import ClassSelect from '../components/ClassSelect';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
 
 export default function ExamsPage() {
@@ -488,10 +489,7 @@ export default function ExamsPage() {
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Chọn Lớp</label>
-              <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="input-field" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                <option value="">-- Chọn Lớp --</option>
-                {classes.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-              </select>
+              <ClassSelect value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="input-field" classes={classes} placeholder="-- Chọn Lớp --" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Chọn Cấu Hình Đề Thi</label>
@@ -819,12 +817,7 @@ export default function ExamsPage() {
             
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Lớp học áp dụng</label>
-              <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}>
-                <option value="">-- Chọn Lớp --</option>
-                {classes.map(c => (
-                  <option key={c.code} value={c.code}>{c.code} ({c.studentCount || 0} HV)</option>
-                ))}
-              </select>
+              <ClassSelect value={selectedClass} onChange={e => setSelectedClass(e.target.value)} classes={classes} placeholder="-- Chọn Lớp --" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>

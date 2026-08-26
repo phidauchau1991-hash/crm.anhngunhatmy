@@ -46,7 +46,7 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'completed'
+  const [statusFilter, setStatusFilter] = useState('active'); // 'all', 'active', 'completed'
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -461,6 +461,12 @@ export default function ClassesPage() {
     if (statusFilter === 'active') return cls.sessionsRemaining > 0;
     if (statusFilter === 'completed') return cls.sessionsRemaining <= 0;
     return true;
+  }).sort((a, b) => {
+    const aCompleted = a.sessionsRemaining <= 0;
+    const bCompleted = b.sessionsRemaining <= 0;
+    if (aCompleted && !bCompleted) return 1;
+    if (!aCompleted && bCompleted) return -1;
+    return 0;
   });
 
   return (

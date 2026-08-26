@@ -490,16 +490,7 @@ export default function AttendancePage() {
         <div className="select-fields">
           <div className="form-group-horizontal">
             <label htmlFor="class-select"><i className="fa-solid fa-school"></i> Lớp học:</label>
-            <select 
-              id="class-select" 
-              value={selectedClass} 
-              onChange={(e) => setSelectedClass(e.target.value)}
-            >
-              <option value="">-- Chọn lớp học cần điểm danh --</option>
-              {classes.map(cls => (
-                <option key={cls.code} value={cls.code}>{cls.code} ({cls.teacherName})</option>
-              ))}
-            </select>
+            <ClassSelect id="class-select" classes={classes} value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} placeholder="-- Chọn lớp học cần điểm danh --" />
           </div>
 
           <div className="form-group-horizontal">

@@ -49,13 +49,26 @@ export async function GET(request) {
       });
     }
 
+    // 2. Lấy log điểm danh của ngày cụ thể
+    const attendanceLogs = await prisma.attendance.findMany({
+      where: {
+        classCode,
+        date: targetDate,
+      },
+    });
+
     // 1. Lấy tất cả học sinh đang đăng ký học lớp này
-    const enrollments = await prisma.enrollment.findMany({
+    const allEnrollments = await prisma.enrollment.findMany({
       where: { classCode },
       include: {
         student: true,
       },
     });
+
+    // Lọc học sinh: Chỉ lấy những học sinh Đang học, hoặc đã có record điểm danh trong ngày này
+    const enrollments = allEnrollments.filter(e => 
+      e.status === 'Đang học' || attendanceLogs.some(log => log.studentId === e.studentId && !log.isTrial)
+    );
 
     const students = enrollments.map(e => e.student);
 
@@ -75,13 +88,7 @@ export async function GET(request) {
       return targetDate >= start;
     });
 
-    // 2. Lấy log điểm danh của ngày cụ thể
-    const attendanceLogs = await prisma.attendance.findMany({
-      where: {
-        classCode,
-        date: targetDate,
-      },
-    });
+
 
     // 2.1 Lấy nhật ký/nhận xét chung của lớp
     const summary = await prisma.attendanceSummary.findUnique({

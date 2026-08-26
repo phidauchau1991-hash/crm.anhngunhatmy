@@ -571,16 +571,7 @@ export default function FinancePage() {
 
               <div className="form-group">
                 <label>Chọn Lớp Học liên kết: *</label>
-                <select 
-                  value={manualForm.classCode} 
-                  onChange={e => setManualForm({...manualForm, classCode: e.target.value})}
-                  required
-                >
-                  <option value="">-- Chọn lớp học --</option>
-                  {classes.map(c => (
-                    <option key={c.code} value={c.code}>{c.code} ({c.teacherName || 'Chưa phân bổ'})</option>
-                  ))}
-                </select>
+                <ClassSelect value={manualForm.classCode} onChange={e => setManualForm({...manualForm, classCode: e.target.value})} required classes={classes} placeholder="-- Chọn lớp học --" />
               </div>
 
               <div className="form-grid-2">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import HolidayStudioModal from './HolidayStudioModal';
+import ClassSelect from '../components/ClassSelect';
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState([]);
@@ -218,18 +219,7 @@ export default function HolidaysPage() {
             {formData.scope === 'SHIFT' && (
               <div className="form-group">
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Chọn ca học (Lịch học tuần) *</label>
-                <select 
-                  name="targetId" 
-                  value={formData.targetId} 
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:border-blue-500 bg-white text-gray-900"
-                >
-                  <option value="24">Thứ 2 & 4 (24)</option>
-                  <option value="35">Thứ 3 & 5 (35)</option>
-                  <option value="7CN">Thứ 7 & Chủ Nhật (7CN)</option>
-                  <option value="246">Thứ 2, 4, 6 (246)</option>
-                  <option value="357">Thứ 3, 5, 7 (357)</option>
-                </select>
+                <ClassSelect name="targetId" value={formData.targetId} onChange={handleInputChange} classes={classes} className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:border-blue-500 bg-white text-gray-900" />
               </div>
             )}
 

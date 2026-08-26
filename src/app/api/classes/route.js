@@ -62,6 +62,7 @@ export async function GET(request) {
       return {
         code: cls.code,
         level: cls.level,
+        capDo: config ? config.capDo : 'Khác',
         teacherName: cls.teacherName || 'Chưa phân công',
         teacherId: cls.teacherId,
         startDate: new Date(cls.startDate).toLocaleDateString('vi-VN'),
