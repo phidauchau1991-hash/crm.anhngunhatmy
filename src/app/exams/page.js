@@ -301,6 +301,20 @@ export default function ExamsPage() {
         const targetId = `batch-notice-${s.id}`;
         const elem = document.getElementById(targetId);
         if (elem) {
+          // BƯỚC 1: Bắt buộc đợi tất cả hình ảnh (đặc biệt là VietQR) tải xong 100%
+          const images = Array.from(elem.getElementsByTagName('img'));
+          await Promise.all(images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+              img.onload = resolve;
+              img.onerror = resolve; // Vẫn tiếp tục nếu có ảnh lỗi, tránh treo hệ thống
+            });
+          }));
+
+          // Nghỉ thêm 200ms để trình duyệt kịp render nét ảnh QR lên màn hình trước khi chụp
+          await new Promise(r => setTimeout(r, 200));
+
+          // BƯỚC 2: Chụp ảnh bằng html2canvas
           const canvas = await html2canvas(elem, { 
             scale: 2, 
             useCORS: true, 
