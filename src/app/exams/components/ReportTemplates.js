@@ -497,7 +497,7 @@ export const ExamNoticeTemplate = ({ className, examDates, notes }) => {
 // ==========================================
 // ẢNH 4: THƯ THÔNG BÁO KHÓA MỚI & QR THANH TOÁN
 // ==========================================
-export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, discount, isGiftBook, hasBook, studentName, isPersonalized }) => {
+export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, discount, isGiftBook, hasBook, studentName, isPersonalized, qrDataUrl }) => {
   const displayClassCode = formatClassCodeForParent(className || "");
   const targetName = studentName ? studentName.toUpperCase() : `LỚP ${displayClassCode}`;
   const bankMemoName = studentName 
@@ -632,13 +632,13 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
               QUÉT ĐỂ THANH TOÁN
             </div>
             <img 
-              src={`https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + newCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`} 
+              src={qrDataUrl || `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + newCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`} 
               alt="QR Code" 
               style={{ width: '100%', height: 'auto', display: 'block' }} 
-              crossOrigin="anonymous" 
+              {...(qrDataUrl ? {} : { crossOrigin: "anonymous" })}
             />
             <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
-              <img src="https://img.vietqr.io/image/napas-logo.png" alt="NAPAS" style={{ height: '16px' }} crossOrigin="anonymous" onError={(e) => e.target.style.display='none'} />
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0d88c4' }}>NAPAS 247</span>
             </div>
           </div>
         </div>

@@ -293,39 +293,120 @@ export default function ExamsPage() {
       const html2canvas = (await import('html2canvas')).default;
       const JSZip = (await import('jszip')).default;
       const { saveAs } = await import('file-saver');
+      const { createRoot } = await import('react-dom/client');
       const zip = new JSZip();
 
       for (let i = 0; i < selectedStudents.length; i++) {
         const s = selectedStudents[i];
         setBatchProgress(`Đang nén ảnh ${i + 1}/${selectedStudents.length}: ${s.name}...`);
-        const targetId = `batch-notice-${s.id}`;
-        const elem = document.getElementById(targetId);
-        if (elem) {
-          // BƯỚC 1: Bắt buộc đợi tất cả hình ảnh (đặc biệt là VietQR) tải xong 100%
-          const images = Array.from(elem.getElementsByTagName('img'));
-          await Promise.all(images.map(img => {
-            if (img.complete) return Promise.resolve();
-            return new Promise(resolve => {
-              img.onload = resolve;
-              img.onerror = resolve; // Vẫn tiếp tục nếu có ảnh lỗi, tránh treo hệ thống
-            });
-          }));
+        
+        // Tạo container ẩn cho từng học viên để render tuần tự
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '794px';
+        document.body.appendChild(container);
+        
+        const root = createRoot(container);
+        const sn = studentNotices[s.id] || { discount: 0, isGiftBook: false, hasBook: false };
+        const activeCourse = courseConfigs.find(c => c.level === noticeForm.newCourseLevel);
 
-          // Nghỉ thêm 200ms để trình duyệt kịp render nét ảnh QR lên màn hình trước khi chụp
-          await new Promise(r => setTimeout(r, 200));
+        // Pre-fetch the QR image with retry logic to guarantee it loads
+        const bankMemoName = s.name ? s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toUpperCase() : "";
+        const basePrice = activeCourse?.price || 0;
+        const bookPrice = (sn.isGiftBook || sn.hasBook) ? 0 : (activeCourse?.bookPrice || 0);
+        const discountVal = sn.discount || 0;
+        const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
+        const qrUrl = `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + activeCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
 
-          // BƯỚC 2: Chụp ảnh bằng html2canvas
-          const canvas = await html2canvas(elem, { 
-            scale: 2, 
-            useCORS: true, 
-            backgroundColor: '#ffffff',
-            logging: false
-          });
-          const dataUrl = canvas.toDataURL('image/png');
-          const base64Data = dataUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
-          zip.file(`Khoa_Moi_${s.name.replace(/\s+/g, '_')}.png`, base64Data, { base64: true });
-          await new Promise(r => setTimeout(r, 200)); // small delay for UI rendering
+        let qrDataUrl = '';
+        let qrSuccess = false;
+        let qrAttempts = 0;
+        
+        while (!qrSuccess && qrAttempts < 10) {
+            qrAttempts++;
+            try {
+                // Thêm timestamp để ép VietQR bỏ qua cache, tránh trả về lỗi 429 cũ
+                const res = await fetch(qrUrl + `&t=${Date.now()}`); 
+                if (res.status === 429) {
+                    console.warn(`VietQR Rate limit (429) cho ${s.name}, đợi lâu hơn...`);
+                    await new Promise(r => setTimeout(r, 2000 + qrAttempts * 1000)); // Tăng dần thời gian đợi
+                    continue;
+                }
+                if (!res.ok) throw new Error(`Fetch QR failed with status: ${res.status}`);
+                
+                const blob = await res.blob();
+                qrDataUrl = await new Promise(r => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => r(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+                qrSuccess = true; // Thành công
+            } catch(e) {
+                console.warn(`Lỗi fetch QR cho ${s.name} (lần ${qrAttempts}), đang thử lại...`, e);
+                await new Promise(r => setTimeout(r, 1500)); // Nghỉ 1.5s trước khi thử lại
+            }
         }
+
+        // Bắt buộc phải có QR code mới cho phép render, tránh lỗi mất ảnh QR
+        if (!qrSuccess) {
+            alert(`Lỗi hệ thống tạo QR (VietQR) cho học viên ${s.name}. Quá trình tải hàng loạt bị hủy để tránh lỗi ảnh. Vui lòng thử lại sau ít phút!`);
+            setIsBatchExporting(false);
+            setBatchProgress('');
+            root.unmount();
+            document.body.removeChild(container);
+            return;
+        }
+
+        await new Promise(resolve => {
+          root.render(
+            <PromotionNoticeTemplate 
+              className={classes.find(c => c.code === selectedClass)?.code}
+              newCourse={activeCourse}
+              startDate={noticeForm.startDate}
+              endDate={noticeForm.endDate}
+              discount={sn.discount || 0}
+              isGiftBook={sn.isGiftBook || false}
+              hasBook={sn.hasBook || false}
+              studentName={s.name}
+              isPersonalized={true}
+              qrDataUrl={qrDataUrl}
+            />
+          );
+          setTimeout(resolve, 400); // Đợi React mount và render
+        });
+
+        // BƯỚC 1: Bắt buộc đợi tất cả hình ảnh phụ (như logo) tải xong
+        const images = Array.from(container.getElementsByTagName('img'));
+        await Promise.all(images.map(img => {
+          if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+          return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve; // Bỏ qua nếu lỗi các ảnh phụ
+          });
+        }));
+
+        // Nghỉ thêm 200ms để trình duyệt kịp vẽ lên màn hình trước khi chụp
+        await new Promise(r => setTimeout(r, 200));
+
+        // BƯỚC 2: Chụp ảnh bằng html2canvas
+        const canvas = await html2canvas(container.firstChild, { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#ffffff',
+          logging: false
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const base64Data = dataUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
+        zip.file(`Khoa_Moi_${s.name.replace(/\s+/g, '_')}.png`, base64Data, { base64: true });
+        
+        // Dọn dẹp DOM
+        root.unmount();
+        document.body.removeChild(container);
+
+        // Đợi thêm 2000ms để tránh bị VietQR rate limit (Too Many Requests) khi gọi api liên tục
+        await new Promise(r => setTimeout(r, 2000));
       }
 
       setBatchProgress(`Đang tải file ZIP xuống...`);
@@ -1064,31 +1145,6 @@ export default function ExamsPage() {
         </div>
       )}
 
-      {/* Hidden Container for Batch Notice Export */}
-      {activeTab === 'notices' && noticeType === 'promotion' && noticeMode === 'personalized' && (
-        <div style={{ position: 'absolute', left: '-9999px', top: '0', width: '794px', overflow: 'hidden', zIndex: -1 }}>
-          {students.map(s => {
-            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false, hasBook: false };
-            const activeCourse = courseConfigs.find(c => c.level === noticeForm.newCourseLevel);
-            if (!activeCourse || !sn.selected) return null;
-            return (
-              <div key={s.id} id={`batch-notice-${s.id}`}>
-                <PromotionNoticeTemplate 
-                  className={classes.find(c => c.code === selectedClass)?.code}
-                  newCourse={activeCourse}
-                  startDate={noticeForm.startDate}
-                  endDate={noticeForm.endDate}
-                  discount={sn.discount || 0}
-                  isGiftBook={sn.isGiftBook || false}
-                  hasBook={sn.hasBook || false}
-                  studentName={s.name}
-                  isPersonalized={true}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
