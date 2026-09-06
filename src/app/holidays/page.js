@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import HolidayStudioModal from './HolidayStudioModal';
-import ClassSelect from '../components/ClassSelect';
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState([]);
@@ -21,7 +20,7 @@ export default function HolidaysPage() {
     startDateStr: '',
     endDateStr: '',
     scope: 'GLOBAL',
-    targetId: '',
+    targetIds: [],
   });
   const [holidayToDelete, setHolidayToDelete] = useState(null);
 
@@ -67,10 +66,17 @@ export default function HolidaysPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      // Reset targetId if changing scope to GLOBAL
-      ...(name === 'scope' && value === 'GLOBAL' ? { targetId: '' } : {}),
-      ...(name === 'scope' && value !== 'GLOBAL' && prev.scope === 'GLOBAL' ? { targetId: value === 'SHIFT' ? '24' : classes[0]?.code || '' } : {}),
+      ...(name === 'scope' ? { targetIds: [] } : {}),
     }));
+  };
+
+  const handleCheckboxChange = (id) => {
+    setFormData((prev) => {
+      const newTargetIds = prev.targetIds.includes(id)
+        ? prev.targetIds.filter(item => item !== id)
+        : [...prev.targetIds, id];
+      return { ...prev, targetIds: newTargetIds };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -78,8 +84,8 @@ export default function HolidaysPage() {
     setSubmitting(true);
     setMessage({ type: '', text: '' });
 
-    if (formData.scope !== 'GLOBAL' && !formData.targetId) {
-      setMessage({ type: 'error', text: 'Vui lòng chọn đối tượng áp dụng cho ngày nghỉ.' });
+    if (formData.scope !== 'GLOBAL' && formData.targetIds.length === 0) {
+      setMessage({ type: 'error', text: 'Vui lòng chọn ít nhất 1 đối tượng áp dụng cho ngày nghỉ.' });
       setSubmitting(false);
       return;
     }
@@ -99,7 +105,7 @@ export default function HolidaysPage() {
           startDateStr: '',
           endDateStr: '',
           scope: 'GLOBAL',
-          targetId: '',
+          targetIds: [],
         });
         fetchHolidays();
       } else {
@@ -130,6 +136,25 @@ export default function HolidaysPage() {
     } catch (e) {
       setMessage({ type: 'error', text: 'Kết nối API thất bại.' });
     }
+  };
+
+  const getActiveShifts = () => {
+    const activeClasses = classes.filter(c => {
+      if (c.sessionsRemaining !== undefined) return c.sessionsRemaining > 0;
+      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') return false;
+      if (c.expectedEndDate && new Date(c.expectedEndDate) < new Date()) return false;
+      return true;
+    });
+    return Array.from(new Set(activeClasses.map(c => c.schedule).filter(Boolean)));
+  };
+
+  const getActiveClasses = () => {
+    return classes.filter(c => {
+      if (c.sessionsRemaining !== undefined) return c.sessionsRemaining > 0;
+      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') return false;
+      if (c.expectedEndDate && new Date(c.expectedEndDate) < new Date()) return false;
+      return true;
+    });
   };
 
   return (
@@ -218,24 +243,45 @@ export default function HolidaysPage() {
 
             {formData.scope === 'SHIFT' && (
               <div className="form-group">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Chọn ca học (Lịch học tuần) *</label>
-                <ClassSelect name="targetId" value={formData.targetId} onChange={handleInputChange} classes={classes} className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:border-blue-500 bg-white text-gray-900" />
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Chọn ca học (Lịch học tuần) *</label>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem', background: '#f8fafc' }}>
+                  {getActiveShifts().map(shift => (
+                    <label key={shift} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', cursor: 'pointer', borderBottom: '1px solid #e2e8f0' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={formData.targetIds.includes(shift)}
+                        onChange={() => handleCheckboxChange(shift)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Ca {shift}</span>
+                    </label>
+                  ))}
+                  {getActiveShifts().length === 0 && (
+                    <div style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.85rem' }}>Không có ca học nào đang hoạt động.</div>
+                  )}
+                </div>
               </div>
             )}
 
             {formData.scope === 'CLASS' && (
               <div className="form-group">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Chọn lớp học *</label>
-                <select 
-                  name="targetId" 
-                  value={formData.targetId} 
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring focus:border-blue-500 bg-white text-gray-900"
-                >
-                  {classes.map((cls) => (
-                    <option key={cls.code} value={cls.code}>{cls.code}</option>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Chọn lớp học *</label>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem', background: '#f8fafc' }}>
+                  {getActiveClasses().map((cls) => (
+                    <label key={cls.code} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', cursor: 'pointer', borderBottom: '1px solid #e2e8f0' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={formData.targetIds.includes(cls.code)}
+                        onChange={() => handleCheckboxChange(cls.code)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{cls.code}</span>
+                    </label>
                   ))}
-                </select>
+                  {getActiveClasses().length === 0 && (
+                    <div style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.85rem' }}>Không có lớp học nào đang hoạt động.</div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -258,7 +304,7 @@ export default function HolidaysPage() {
           </form>
         </div>
 
-        {/* DANH SÁCH NGÀY NGHỈ LỄ */}
+        {/* DANH SÁCH NGÀY NGHỈ */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <i className="fa-solid fa-list-check"></i> Danh sách ngày nghỉ đã thiết lập
@@ -342,7 +388,7 @@ export default function HolidaysPage() {
             <div className="modal-body" style={{ padding: '1rem 0' }}>
               <p>Bạn có chắc chắn muốn xóa ngày nghỉ <strong>{holidayToDelete.name}</strong> không?</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
-                Lịch học của các lớp bị ảnh hưởng sẽ tự động được hệ thống tịnh tiến cập nhật lại.
+                Lịch học của các lớp bị ảnh hưởng sẽ tự động được hệ thống tính tiến cập nhật lại.
               </p>
             </div>
             <div className="modal-actions" style={{ justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
@@ -362,7 +408,6 @@ export default function HolidaysPage() {
         holiday={selectedStudioHoliday} 
       />
 
-      {/* Local CSS mimicking Tailwind properties with premium style overrides */}
       <style>{`
         .form-group {
           display: flex;
@@ -383,6 +428,9 @@ export default function HolidaysPage() {
         }
         .mb-1 {
           margin-bottom: 0.35rem;
+        }
+        .mb-2 {
+          margin-bottom: 0.5rem;
         }
         .w-full {
           width: 100%;
@@ -418,7 +466,6 @@ export default function HolidaysPage() {
           margin-top: 0.5rem;
         }
         
-        /* Focus ring emulation */
         .focus\\:ring:focus {
           outline: none;
           border-color: var(--color-primary);

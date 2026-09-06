@@ -17,7 +17,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, startDateStr, endDateStr, scope, targetId } = body;
+    const { name, startDateStr, endDateStr, scope, targetId, targetIds } = body;
 
     if (!name || !startDateStr || !endDateStr || !scope) {
       return NextResponse.json({ success: false, error: 'Tên ngày nghỉ, ngày bắt đầu, ngày kết thúc và phạm vi là bắt buộc' }, { status: 400 });
@@ -32,48 +32,55 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Ngày kết thúc không được nhỏ hơn ngày bắt đầu' }, { status: 400 });
     }
 
-    if (scope !== 'GLOBAL' && !targetId) {
+    let finalTargetIds = targetIds || (targetId ? [targetId] : []);
+
+    if (scope !== 'GLOBAL' && finalTargetIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Mã đối tượng áp dụng là bắt buộc khi phạm vi không phải Toàn hệ thống' }, { status: 400 });
     }
 
-    // Tạo Holiday mới
-    const newHoliday = await prisma.holiday.create({
-      data: {
-        name,
-        startDate,
-        endDate,
-        scope,
-        targetId: scope === 'GLOBAL' ? null : targetId,
-      },
-    });
+    if (scope === 'GLOBAL') finalTargetIds = [null];
 
-    // Tịnh tiến lại ngày kết thúc các lớp học chịu ảnh hưởng
-    // Tìm tất cả các lớp có expectedEndDate >= startDate
+    const createdHolidays = [];
     const activeClasses = await prisma.class.findMany({
       where: {
         expectedEndDate: { gte: startDate },
       },
     });
 
-    // Chỉ lọc các lớp thực sự khớp với scope và targetId
-    const affectedClasses = activeClasses.filter(cls => {
-      if (scope === 'GLOBAL') return true;
-      if (scope === 'SHIFT' && cls.schedule === targetId) return true;
-      if (scope === 'CLASS' && cls.code === targetId) return true;
-      return false;
-    });
+    const allAffectedClassCodes = new Set();
 
-    // Chạy tái tính toán trong transaction
+    for (const tId of finalTargetIds) {
+      const newHoliday = await prisma.holiday.create({
+        data: {
+          name,
+          startDate,
+          endDate,
+          scope,
+          targetId: scope === 'GLOBAL' ? null : tId,
+        },
+      });
+      createdHolidays.push(newHoliday);
+
+      const affectedClasses = activeClasses.filter(cls => {
+        if (scope === 'GLOBAL') return true;
+        if (scope === 'SHIFT' && cls.schedule === tId) return true;
+        if (scope === 'CLASS' && cls.code === tId) return true;
+        return false;
+      });
+
+      affectedClasses.forEach(cls => allAffectedClassCodes.add(cls.code));
+    }
+
     await prisma.$transaction(async (tx) => {
-      for (const cls of affectedClasses) {
-        await recalculateClassEndDate(cls.code, tx);
+      for (const classCode of allAffectedClassCodes) {
+        await recalculateClassEndDate(classCode, tx);
       }
     });
 
     return NextResponse.json({ 
       success: true, 
-      data: newHoliday, 
-      message: `Đã tạo ngày nghỉ ${name} và tự động cập nhật lại lịch cho ${affectedClasses.length} lớp học.` 
+      data: createdHolidays.length === 1 ? createdHolidays[0] : createdHolidays, 
+      message: `Đã tạo ${createdHolidays.length} ngày nghỉ ${name} và tự động cập nhật lại lịch cho ${allAffectedClassCodes.size} lớp học.` 
     });
   } catch (error) {
     console.error('Lỗi khi tạo ngày nghỉ:', error);
@@ -97,12 +104,10 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy ngày nghỉ' }, { status: 404 });
     }
 
-    // Xóa Holiday
     await prisma.holiday.delete({
       where: { id },
     });
 
-    // Tịnh tiến lại ngày kết thúc các lớp học chịu ảnh hưởng (tính lại từ ngày khai giảng của chúng)
     const activeClasses = await prisma.class.findMany();
 
     const affectedClasses = activeClasses.filter(cls => {
