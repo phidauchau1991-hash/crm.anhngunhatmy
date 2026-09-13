@@ -685,7 +685,7 @@ export default function AttendancePage() {
                   <th style={{ minWidth: '180px' }}>📋 Cần điều chỉnh</th>
                   <th style={{ minWidth: '280px' }}>Nhận xét của Giáo viên (buổi này)</th>
                   <th style={{ textAlign: 'center', width: '100px' }}>Chuyên cần khóa học</th>
-                  <th style={{ textAlign: 'center', position: 'sticky', right: 0, background: 'var(--color-surface)', zIndex: 5, boxShadow: '-4px 0 10px rgba(0,0,0,0.08)', minWidth: '170px' }}>⚡ Thao Tác & AI</th>
+                  <th className="sticky-col-right" style={{ textAlign: 'center', minWidth: '170px' }}>⚡ Thao Tác & AI</th>
                 </tr>
               </thead>
               <tbody>
@@ -802,7 +802,7 @@ export default function AttendancePage() {
                     </td>
 
                     {/* Nút Copy tin phụ huynh & AI Soạn tin (Sticky Right) */}
-                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap', position: 'sticky', right: 0, background: 'var(--color-surface)', zIndex: 5, boxShadow: '-4px 0 10px rgba(0,0,0,0.08)' }}>
+                    <td className="sticky-col-right" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                         <button
                           title="Copy tin nhắn chuẩn"
@@ -1001,7 +1001,15 @@ export default function AttendancePage() {
         .checkbox-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;}
         .checkbox-group input { width: auto; transform: scale(1.2); }
 
-        @media (max-width: 768px) {
+        
+        .sticky-col-right {
+          position: sticky;
+          right: 0;
+          background: var(--color-surface);
+          z-index: 5;
+          box-shadow: -4px 0 10px rgba(0,0,0,0.08);
+        }
+@media (max-width: 768px) {
           .filters { flex-direction: column; }
           .lesson-plan-grid { grid-template-columns: 1fr; }
           .ai-result-actions { flex-direction: column; }
@@ -1010,6 +1018,8 @@ export default function AttendancePage() {
           .select-fields { flex-direction: column; gap: 1rem; width: 100%; }
           .form-group-horizontal { flex-direction: column; align-items: flex-start; width: 100%; }
           .form-group-horizontal select, .form-group-horizontal input { width: 100%; }
+        
+          .sticky-col-right { position: static !important; box-shadow: none !important; }
         }
 
         .alert-box {
