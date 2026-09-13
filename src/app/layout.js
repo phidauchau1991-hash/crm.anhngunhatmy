@@ -1,8 +1,7 @@
 import { Outfit } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
-import LogoutButton from "@/components/LogoutButton";
-import BranchSwitcher from "@/components/BranchSwitcher";
+import AppLayoutClient from "@/components/AppLayoutClient";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -55,131 +54,9 @@ export default async function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body>
-        <div className="app-container">
-          {/* Sidebar */}
-          <aside className="sidebar">
-            <div className="sidebar-header">
-              <div className="logo-placeholder">
-                <i className="fa-solid fa-graduation-cap"></i>
-              </div>
-              <div className="logo-text">
-                <h3>NHẬT MỸ</h3>
-                <span>Dedicated To Excellence</span>
-              </div>
-            </div>
-            
-            <nav className="sidebar-nav">
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('ACCOUNTANT')) && (
-                <a href="/" className="nav-item active">
-                  <i className="fa-solid fa-chart-line"></i>
-                  <span>Tổng quan</span>
-                </a>
-              )}
-              
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
-                <a href="/leads" className="nav-item">
-                  <i className="fa-solid fa-user-plus"></i>
-                  <span>KHTN (Leads)</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('ACCOUNTANT')) && (
-                <a href="/students" className="nav-item">
-                  <i className="fa-solid fa-user-graduate"></i>
-                  <span>Học viên & Phụ huynh</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
-                <a href="/classes" className="nav-item">
-                  <i className="fa-solid fa-chalkboard-user"></i>
-                  <span>Lớp học</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
-                <a href="/attendance" className="nav-item">
-                  <i className="fa-solid fa-list-check"></i>
-                  <span>Điểm danh</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR') || userRole.includes('TEACHER')) && (
-                <a href="/exams" className="nav-item">
-                  <i className="fa-solid fa-ranking-star"></i>
-                  <span>Đánh giá & Báo cáo</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('ACCOUNTANT') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
-                <a href="/finance" className="nav-item">
-                  <i className="fa-solid fa-wallet"></i>
-                  <span>Học phí & Công nợ</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER')) && (
-                <a href="/inventory" className="nav-item">
-                  <i className="fa-solid fa-boxes-stacked"></i>
-                  <span>Quản lý kho</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER') || userRole.includes('CSKH') || userRole.includes('ADVISOR')) && (
-                <a href="/holidays" className="nav-item">
-                  <i className="fa-solid fa-calendar-minus"></i>
-                  <span>Ngày nghỉ</span>
-                </a>
-              )}
-
-              {userRole.includes('DIRECTOR') && (
-                <a href="/configs" className="nav-item">
-                  <i className="fa-solid fa-gears"></i>
-                  <span>Cấu hình</span>
-                </a>
-              )}
-
-              {(userRole.includes('DIRECTOR') || userRole.includes('MANAGER')) && (
-                <a href="/users" className="nav-item">
-                  <i className="fa-solid fa-users-gear"></i>
-                  <span>Nhân sự & Phân quyền</span>
-                </a>
-              )}
-            </nav>
-            
-            <div className="sidebar-footer">
-              <div className="user-profile">
-                <i className="fa-solid fa-circle-user"></i>
-                <div className="user-info">
-                  <p>{username}</p>
-                  <span>{userRole}</span>
-                </div>
-              </div>
-              <LogoutButton />
-            </div>
-          </aside>
-
-          {/* Main Area */}
-          <div className="main-wrapper">
-            <header className="main-header">
-              <div className="header-search">
-                <i className="fa-solid fa-magnifying-glass"></i>
-                <input type="text" placeholder="Tìm kiếm nhanh học viên, lớp học..." />
-              </div>
-              <div className="header-actions">
-                <BranchSwitcher isGlobalUser={isGlobalUser} />
-                <div className="notification-bell">
-                  <i className="fa-regular fa-bell"></i>
-                  <span className="badge"></span>
-                </div>
-              </div>
-            </header>
-
-            <main className="content-container">
-              {children}
-            </main>
-          </div>
-        </div>
+        <AppLayoutClient userRole={userRole} username={username} isGlobalUser={isGlobalUser}>
+          {children}
+        </AppLayoutClient>
       </body>
     </html>
   );
