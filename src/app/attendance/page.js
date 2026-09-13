@@ -874,21 +874,23 @@ export default function AttendancePage() {
         .form-group-horizontal {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
-          font-size: 0.9rem;
+          gap: 0.75rem;
+          font-size: 1rem;
           font-weight: 700;
-          color: var(--color-text);
+          color: var(--color-primary-dark);
         }
         .form-group-horizontal select, .form-group-horizontal input {
-          padding: 0.5rem 1rem;
-          border-radius: 8px;
-          border: 1px solid var(--color-border);
-          background: var(--color-surface);
-          color: var(--color-text);
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          border: 2px solid var(--color-primary);
+          background: #f8fafc;
+          color: var(--color-primary-dark);
           font-family: inherit;
-          font-weight: 600;
+          font-weight: 800;
+          font-size: 1.05rem;
           cursor: pointer;
-          min-width: 180px;
+          min-width: 220px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
         .btn-sm {
           padding: 0.5rem 1rem;
@@ -897,7 +899,9 @@ export default function AttendancePage() {
         }
         .table-container {
           padding: 0;
-          overflow: hidden;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
           border-radius: 12px;
           transition: opacity 0.3s;
         }
@@ -917,12 +921,14 @@ export default function AttendancePage() {
           padding: 1rem;
           font-size: 0.85rem;
           border-bottom: 2px solid var(--color-border);
+          white-space: nowrap;
         }
         .custom-table td {
           padding: 1rem;
           font-size: 0.85rem;
           border-bottom: 1px solid var(--color-border);
           color: var(--color-text);
+          white-space: nowrap;
         }
         .table-row:hover {
           background-color: rgba(13, 136, 196, 0.02);
@@ -1000,6 +1006,10 @@ export default function AttendancePage() {
           .lesson-plan-grid { grid-template-columns: 1fr; }
           .ai-result-actions { flex-direction: column; }
           .teacher-form { flex-direction: column; align-items: flex-start; gap: 10px; }
+          
+          .select-fields { flex-direction: column; gap: 1rem; width: 100%; }
+          .form-group-horizontal { flex-direction: column; align-items: flex-start; width: 100%; }
+          .form-group-horizontal select, .form-group-horizontal input { width: 100%; }
         }
 
         .alert-box {
