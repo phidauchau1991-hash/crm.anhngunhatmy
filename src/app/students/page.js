@@ -303,6 +303,9 @@ export default function StudentsPage() {
           reservationDeadline: std.reservationDeadline || '',
           dropoutReasonType: 'Lý do khác',
           dropoutReasonText: std.dropoutReason || '',
+          billingType: result.data.currentClass?.billingType || 'COURSE',
+          monthlyRate: result.data.currentClass?.monthlyRate || '',
+          monthlySessions: result.data.currentClass?.monthlySessions || '',
         });
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -449,6 +452,13 @@ export default function StudentsPage() {
         callbackDate: editForm.status === 'Tạm nghỉ' ? editForm.callbackDate : null,
         dropoutReasonType: editForm.dropoutReasonType,
         dropoutReasonText: editForm.dropoutReasonText,
+      };
+    } else if (actionType === 'finance') {
+      payload = {
+        ...payload,
+        billingType: editForm.billingType,
+        monthlyRate: parseFloat(editForm.monthlyRate) || 0,
+        monthlySessions: parseInt(editForm.monthlySessions, 10) || null,
       };
     } else if (actionType === 'transfer') {
       payload = {
@@ -2092,6 +2102,44 @@ export default function StudentsPage() {
                           <i className="fa-solid fa-circle-info"></i> Hệ thống tự động tạo Phiếu Xuất Kho, trừ tồn kho và ghi nhận hóa đơn tài chính (nếu có thu tiền).
                         </p>
                       </div>
+                  </form>
+
+                  {/* TAB 8: Cấu hình Học phí tháng */}
+                  <form onSubmit={(e) => handleEditSubmit(e, 'finance')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative', marginTop: '1rem' }}>
+                    <div className="form-section">
+                      <h3>Luồng Nghiệp vụ: Cấu hình Thu phí Tháng (Đặc biệt)</h3>
+                      <div className="alert-box alert-warning" style={{ margin: '0 0 1rem 0' }}>
+                        <i className="fa-solid fa-triangle-exclamation"></i>
+                        <span>Chỉ dùng cho học viên có Lớp hiện tại và đóng học phí hàng tháng (TOEIC, Kèm). Nếu học viên đang học nhiều lớp, hãy dùng Tab "Chuyển lớp" để cấu hình cho từng lớp cụ thể. Tab này áp dụng cho lớp hiển thị ở trên.</span>
+                      </div>
+                      
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Kiểu thu phí *</label>
+                          <select name="billingType" value={editForm.billingType || 'COURSE'} onChange={handleEditInputChange} required>
+                            <option value="COURSE">Theo khóa (Mặc định)</option>
+                            <option value="MONTHLY_PREPAID">Theo tháng - Đóng trước</option>
+                            <option value="MONTHLY_POSTPAID">Theo tháng - Đóng sau</option>
+                          </select>
+                        </div>
+                        
+                        <div className="form-group">
+                          <label>Học phí 1 tháng / Đơn giá 1 buổi *</label>
+                          <input type="text" name="monthlyRate" value={editForm.monthlyRate || ''} onChange={handleEditInputChange} placeholder="VD: 250000" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label>Số buổi cam kết (Nếu Đóng trước)</label>
+                          <input type="number" name="monthlySessions" value={editForm.monthlySessions || ''} onChange={handleEditInputChange} placeholder="VD: 8" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                      <button type="submit" className="btn btn-primary" disabled={submitting}>
+                        <i className="fa-solid fa-save"></i> Lưu Cấu hình Học phí
+                      </button>
+                    </div>
                   </form>
 
                       </div>
