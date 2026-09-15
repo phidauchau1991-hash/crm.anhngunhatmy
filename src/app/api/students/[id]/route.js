@@ -60,6 +60,9 @@ export async function GET(request, { params }) {
         attendedSessions,
         amountPaid: order ? order.amountPaid : 0,
         feeToPay: order ? order.feeToPay : 0,
+        billingType: currentEnrollment.billingType,
+        monthlyRate: currentEnrollment.monthlyRate,
+        monthlySessions: currentEnrollment.monthlySessions,
       };
     }
 
@@ -308,6 +311,28 @@ export async function PUT(request, { params }) {
           specialPolicyValue: parseFloat(specialPolicyValue) || 0,
           specialPolicy: specialPolicyValue > 0 ? `${specialPolicyType} (-${parseFloat(specialPolicyValue).toLocaleString()}đ)` : 'Không',
         },
+      });
+
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    // LUỒNG TÀI CHÍNH: Cấu hình thu học phí tháng
+    if (action === 'finance') {
+      const { billingType, monthlyRate, monthlySessions } = body;
+      
+      if (!student.enrollments || student.enrollments.length === 0) {
+        return NextResponse.json({ success: false, error: 'Học viên không có lớp đang học để cấu hình' }, { status: 400 });
+      }
+
+      const currentEnrollment = student.enrollments[0];
+      
+      const updated = await prisma.enrollment.update({
+        where: { id: currentEnrollment.id },
+        data: {
+          billingType,
+          monthlyRate,
+          monthlySessions
+        }
       });
 
       return NextResponse.json({ success: true, data: updated });
