@@ -103,12 +103,20 @@ export default function MonthlyBillingPage() {
       <div className="toolbar-panel glass-panel">
         <div className="filter-group">
           <label><i className="fa-solid fa-calendar"></i> Chọn tháng:</label>
-          <input
-            type="month"
-            value={toInputMonth(monthYear)}
-            onChange={handleMonthChange}
-            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
-          />
+          <select 
+            value={monthYear} 
+            onChange={(e) => setMonthYear(e.target.value)}
+            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)', width: '150px' }}
+          >
+            {[...Array(12)].map((_, i) => {
+              const d = new Date();
+              d.setMonth(d.getMonth() - 5 + i);
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const y = d.getFullYear();
+              const val = `${m}/${y}`;
+              return <option key={val} value={val}>{val}</option>;
+            })}
+          </select>
         </div>
       </div>
 

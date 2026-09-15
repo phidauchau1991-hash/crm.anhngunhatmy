@@ -76,7 +76,16 @@ export default function AppLayoutClient({ children, userRole, username, isGlobal
         
         <nav className="sidebar-nav">
           {navItems.filter(item => hasRole(item.roles)).map(item => {
-             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+             // For /finance, only match exact or if it has subroutes that aren't /finance/monthly
+             let isActive = false;
+             if (item.href === '/') {
+               isActive = pathname === '/';
+             } else if (item.href === '/finance') {
+               isActive = pathname === '/finance' || (pathname.startsWith('/finance/') && !pathname.startsWith('/finance/monthly'));
+             } else {
+               isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+             }
+
              return (
               <Link 
                 key={item.href} 
