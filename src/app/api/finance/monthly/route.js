@@ -27,7 +27,6 @@ export async function GET(request) {
     const enrollments = await prisma.enrollment.findMany({
       where: {
         billingType: { in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'] },
-        status: 'Đang học',
       },
       include: {
         student: true,
