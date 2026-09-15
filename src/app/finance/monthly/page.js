@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import MonthlyTuitionAction from './components/MonthlyTuitionAction';
 
 export default function MonthlyBillingPage() {
   const currentDate = new Date();
@@ -172,7 +173,7 @@ export default function MonthlyBillingPage() {
                     )}
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    {row.status === 'NOT_GENERATED' && (
+                    {row.status === 'NOT_GENERATED' ? (
                       <button 
                         className="btn btn-sm btn-primary" 
                         onClick={() => handleGenerateInvoice(row)}
@@ -180,6 +181,8 @@ export default function MonthlyBillingPage() {
                       >
                         <i className="fa-solid fa-file-invoice"></i> Chốt sổ
                       </button>
+                    ) : (
+                      <MonthlyTuitionAction record={row} />
                     )}
                   </td>
                 </tr>

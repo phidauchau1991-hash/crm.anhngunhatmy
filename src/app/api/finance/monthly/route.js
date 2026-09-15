@@ -42,17 +42,30 @@ export async function GET(request) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 1);
 
-      const actualSessions = await prisma.attendance.count({
+      const attendances = await prisma.attendance.findMany({
         where: {
           studentId: enr.studentId,
           classCode: enr.classCode,
-          status: 'Có mặt',
           date: {
             gte: startDate,
             lt: endDate,
           },
         },
       });
+
+      const datesPresent = [];
+      const datesAbsent = [];
+      attendances.forEach(att => {
+        const d = new Date(att.date);
+        const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+        if (att.status === 'Có mặt') {
+          datesPresent.push(dateStr);
+        } else if (att.status === 'Vắng') {
+          datesAbsent.push(dateStr);
+        }
+      });
+
+      const actualSessions = datesPresent.length;
 
       // Lấy hóa đơn tháng trước để tính nợ cũ
       const prevInvoice = await prisma.monthlyInvoice.findUnique({
@@ -113,6 +126,8 @@ export async function GET(request) {
         billingType: enr.billingType,
         committedSessions: monthlySessions,
         actualSessions,
+        datesPresent,
+        datesAbsent,
         feePerSession,
         monthlyRate,
         currentFee,
