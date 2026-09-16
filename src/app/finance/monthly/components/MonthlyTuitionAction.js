@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './MonthlyNoticeTemplate';
 
-export default function MonthlyTuitionAction({ record }) {
+export default function MonthlyTuitionAction({ record, inlinePreview = false }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const templateRef = useRef(null);
@@ -73,6 +73,11 @@ export default function MonthlyTuitionAction({ record }) {
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
+
+  // Nếu là chế độ xem trước inline, chỉ render template không cần button/modal
+  if (inlinePreview) {
+    return <MonthlyNoticeTemplate noticeData={noticeData} />;
+  }
 
   return (
     <>
