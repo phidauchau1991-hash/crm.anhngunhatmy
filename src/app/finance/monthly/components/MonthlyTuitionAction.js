@@ -14,9 +14,9 @@ export default function MonthlyTuitionAction({ record }) {
   // Generating QR URL logic based on standard format used in nhat-my-crm
   const nameNoAccent = record.studentName?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D") || '';
   const firstName = nameNoAccent.split(' ').pop().toUpperCase();
-  const transferContent = `${firstName} HP THANG ${record.monthYear?.replace('/', '')}`;
+  const transferContent = `Hoc phi thang ${record.monthYear} ${record.studentName}`;
   
-  const qrUrl = `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
+  const qrUrl = `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`;
 
   const noticeData = {
     ...record,
