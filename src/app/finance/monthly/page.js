@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
-import MonthlyTuitionAction from './components/MonthlyTuitionAction';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 
 // Helper parse Ngày học và Giờ học từ ClassCode & Schedule
@@ -15,7 +14,7 @@ function getScheduleInfo(classCode, schedule) {
     else if (schedule === '46' || schedule.toLowerCase() === 't46') days = 'Thứ 4, Thứ 6';
     else if (schedule === '246' || schedule.toLowerCase() === 't246') days = 'Thứ 2, 4, 6';
     else if (schedule === '357' || schedule.toLowerCase() === 't357') days = 'Thứ 3, 5, 7';
-    else days = schedule.split('').map(d => (d === 'CN' ? 'CN' : 'T' + d)).join(', ');
+    else days = schedule.split('').map((d) => (d === 'CN' ? 'CN' : 'T' + d)).join(', ');
   }
 
   let shiftTime = '—';
@@ -32,6 +31,45 @@ function getScheduleInfo(classCode, schedule) {
   return { days, shiftTime };
 }
 
+// Soạn tin nhắn Zalo súc tích, phụ huynh nhìn 3 giây là nắm đầy đủ
+function generateZaloMessage(record, adjustedDebt = null) {
+  if (!record) return '';
+  const previousDebt = adjustedDebt !== null ? parseFloat(adjustedDebt) || 0 : record.previousDebt || 0;
+  const currentFee = record.currentFee || record.monthlyRate || 0;
+  const excess = record.excessMissing || 0;
+  const total = currentFee + previousDebt + excess;
+  const monthStr = record.monthYear || '';
+
+  const lines = [];
+  lines.push(`Dạ Anh ngữ Nhật Mỹ xin gửi Ba Mẹ thông tin học phí tháng ${monthStr} của bé ${record.studentName}:`);
+  lines.push(`• Lớp: ${record.classCode}`);
+  lines.push(
+    `• Số buổi học: ${record.actualSessions || 0} buổi${
+      record.datesPresent && record.datesPresent.length
+        ? ` (Điểm danh: ${record.datesPresent.slice(0, 5).join(', ')}${record.datesPresent.length > 5 ? '...' : ''})`
+        : ''
+    }`
+  );
+
+  if (record.billingType === 'MONTHLY_PREPAID') {
+    lines.push(`• Học phí tháng này (${record.committedSessions || 8} buổi): ${Number(currentFee).toLocaleString('vi-VN')}đ`);
+    if (excess !== 0) {
+      lines.push(`• Dư/thiếu tháng trước: ${excess > 0 ? '+' : ''}${Number(excess).toLocaleString('vi-VN')}đ (${excess > 0 ? 'Thiếu' : 'Dư'})`);
+    }
+  } else {
+    lines.push(`• Học phí tháng này: ${Number(currentFee).toLocaleString('vi-VN')}đ`);
+  }
+
+  if (previousDebt > 0) {
+    lines.push(`• Học phí chưa hoàn thành (tháng trước): ${Number(previousDebt).toLocaleString('vi-VN')}đ`);
+  }
+
+  lines.push(`👉 TỔNG CỘNG CẦN ĐÓNG: ${Number(total).toLocaleString('vi-VN')}đ`);
+  lines.push(`\nBa Mẹ có thể quét mã QR trong ảnh đính kèm để chuyển khoản nhanh chóng ạ. Nhật Mỹ xin trân trọng cảm ơn Ba Mẹ! ❤️`);
+
+  return lines.join('\n');
+}
+
 export default function MonthlyBillingPage() {
   const currentDate = new Date();
   const currentMonthYear = `${(currentDate.getMonth() + 1).toString().padStart(2, '0')}/${currentDate.getFullYear()}`;
@@ -41,14 +79,14 @@ export default function MonthlyBillingPage() {
   const [classFilter, setClassFilter] = useState('all');
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Danh sách lớp học toàn hệ thống (dùng cho dropdown thêm HV)
+  // Danh sách lớp học toàn hệ thống
   const [allClasses, setAllClasses] = useState([]);
 
   // Tab 1: Config state
   const [configData, setConfigData] = useState([]);
   const [loadingConfig, setLoadingConfig] = useState(false);
 
-  // Modal Thêm Học viên Tháng (chuẩn như Hình 4)
+  // Modal Thêm Học viên Tháng (1 màn hình KHÔNG KÉO THANH TRƯỢT)
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState('new'); // 'new' | 'existing'
   const [searchStudent, setSearchStudent] = useState('');
@@ -61,10 +99,11 @@ export default function MonthlyBillingPage() {
   const [formPhone, setFormPhone] = useState('');
   const [formDob, setFormDob] = useState('');
   const [formAddress, setFormAddress] = useState('');
+  const [formNationalId, setFormNationalId] = useState(''); // Số CCCD / Mã số định danh xuất HĐ
   const [formClassCode, setFormClassCode] = useState('');
   const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [formBillingType, setFormBillingType] = useState('MONTHLY_PREPAID');
-  const [formMonthlyRate, setFormMonthlyRate] = useState('');
+  const [formMonthlyRate, setFormMonthlyRate] = useState('1200000');
   const [formMonthlySessions, setFormMonthlySessions] = useState('8');
   const [formNotes, setFormNotes] = useState('');
   const [savingStudent, setSavingStudent] = useState(false);
@@ -79,10 +118,14 @@ export default function MonthlyBillingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
-  // Preview Modal realtime cho 1 học viên
-  const [previewNotice, setPreviewNotice] = useState(null);
-  const previewTemplateRef = useRef(null);
+  // Modal Xem Trước Thư Báo & Soạn Tin Nhắn Zalo
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [activeRecord, setActiveRecord] = useState(null);
+  const [adjustedDebt, setAdjustedDebt] = useState(''); // Tùy chọn chỉnh sửa Nợ cũ
+  const [savingDebt, setSavingDebt] = useState(false);
   const [copyingPreview, setCopyingPreview] = useState(false);
+  const [copyingZaloText, setCopyingZaloText] = useState(false);
+  const previewTemplateRef = useRef(null);
 
   // Pay Modal & E-Receipt
   const [showPayModal, setShowPayModal] = useState(false);
@@ -180,13 +223,14 @@ export default function MonthlyBillingPage() {
     setFormPhone(student.phone || '');
     setFormDob(student.dobRaw || (student.dob ? student.dob.split('T')[0] : ''));
     setFormAddress(student.address || '');
+    setFormNationalId(student.nationalId || '');
     if (student.enrollments && student.enrollments.length > 0) {
       setFormClassCode(student.enrollments[0].classCode);
     }
     setSearchResults([]);
   };
 
-  // Reset form modal
+  // Mở modal thêm học viên (reset form)
   const handleOpenAddModal = () => {
     setAddMode('new');
     setSelectedStudent(null);
@@ -196,6 +240,7 @@ export default function MonthlyBillingPage() {
     setFormPhone('');
     setFormDob('');
     setFormAddress('');
+    setFormNationalId('');
     setFormClassCode(allClasses.length > 0 ? allClasses[0].code : '');
     setFormStartDate(new Date().toISOString().split('T')[0]);
     setFormBillingType('MONTHLY_PREPAID');
@@ -229,11 +274,12 @@ export default function MonthlyBillingPage() {
         phone: formPhone.trim(),
         dob: formDob || null,
         address: formAddress.trim() || null,
+        nationalId: formNationalId.trim() || null,
         classCode: formClassCode,
         startDate: formStartDate,
         billingType: formBillingType,
         monthlyRate: parseFloat(formMonthlyRate) || 0,
-        monthlySessions: formBillingType === 'MONTHLY_PREPAID' ? (parseInt(formMonthlySessions, 10) || 0) : null,
+        monthlySessions: formBillingType === 'MONTHLY_PREPAID' ? parseInt(formMonthlySessions, 10) || 0 : null,
         notes: formNotes.trim() || null,
       };
 
@@ -261,7 +307,7 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Toggle Điểm danh nhanh (Trống -> Có mặt -> Vắng -> Trống)
+  // Toggle Điểm danh nhanh
   const handleToggleAttendance = async (studentId, classCode, date, currentStatus) => {
     let nextStatus = '';
     if (currentStatus === '' || currentStatus === 'Trống') nextStatus = 'Có mặt';
@@ -293,7 +339,7 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Chốt sổ & Tạo hóa đơn
+  // Chốt sổ hóa đơn
   const handleGenerateInvoice = async (record) => {
     setMessage({ type: '', text: '' });
     setIsProcessing(true);
@@ -317,7 +363,7 @@ export default function MonthlyBillingPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setMessage({ type: 'success', text: `Tạo hóa đơn thành công cho ${record.studentName}` });
+        setMessage({ type: 'success', text: `Chốt sổ thành công cho ${record.studentName}` });
         fetchNoticesData();
       } else {
         setMessage({ type: 'error', text: json.error || 'Lỗi khi tạo hóa đơn' });
@@ -329,7 +375,138 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Xác nhận Thu tiền -> Cập nhật hóa đơn -> Hiện Phiếu thu
+  // Mở Modal Xem Trước Thư Báo & Soạn Tin Nhắn Zalo
+  const handleOpenNoticeModal = (record) => {
+    setActiveRecord(record);
+    setAdjustedDebt(String(record.previousDebt || 0));
+    setPreviewModalOpen(true);
+  };
+
+  // Tính toán dữ liệu Thư báo động realtime (khi điều chỉnh nợ cũ)
+  const currentDebtNum = parseFloat(adjustedDebt) || 0;
+  const currentFeeNum = activeRecord ? activeRecord.currentFee || activeRecord.monthlyRate || 0 : 0;
+  const excessNum = activeRecord ? activeRecord.excessMissing || 0 : 0;
+  const calculatedTotalToPay = currentFeeNum + currentDebtNum + excessNum;
+
+  // Link QR VietQR động cập nhật realtime theo số tiền tính toán mới
+  const calculatedTransferContent = activeRecord
+    ? `${activeRecord.studentName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .trim()
+        .split(' ')
+        .pop()
+        .toUpperCase()} HP THANG ${monthYear.replace('/', '')}`
+    : '';
+
+  const dynamicQrUrl = activeRecord
+    ? `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(
+        calculatedTransferContent
+      )}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`
+    : '';
+
+  const dynamicNoticeData = activeRecord
+    ? {
+        ...activeRecord,
+        previousDebt: currentDebtNum,
+        totalToPay: calculatedTotalToPay,
+        qrUrl: dynamicQrUrl,
+      }
+    : null;
+
+  // Lưu số tiền nợ cũ mới điều chỉnh vào CSDL
+  const handleSaveAdjustedDebt = async () => {
+    if (!activeRecord) return;
+    setSavingDebt(true);
+    try {
+      const res = await fetch('/api/finance/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: activeRecord.studentId,
+          classCode: activeRecord.classCode,
+          monthYear,
+          billingType: activeRecord.billingType,
+          committedSessions: activeRecord.committedSessions,
+          actualSessions: activeRecord.actualSessions,
+          feePerSession: activeRecord.feePerSession,
+          previousDebt: currentDebtNum,
+          currentFee: currentFeeNum,
+          excessMissing: excessNum,
+          totalToPay: calculatedTotalToPay,
+        }),
+      });
+      if (res.ok) {
+        alert('Đã cập nhật số tiền nợ cũ và tổng thanh toán vào hệ thống!');
+        fetchNoticesData();
+      } else {
+        alert('Có lỗi khi lưu điều chỉnh.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối máy chủ.');
+    } finally {
+      setSavingDebt(false);
+    }
+  };
+
+  // Copy Ảnh Thư Báo Dán Zalo
+  const handleCopyPreviewImage = async () => {
+    if (!previewTemplateRef.current) return;
+    setCopyingPreview(true);
+    try {
+      const canvas = await html2canvas(previewTemplateRef.current, { scale: 2, useCORS: true, logging: false });
+      canvas.toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('Đã copy Ảnh Thư Báo vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
+        } catch (err) {
+          handleDownloadPreviewImage(canvas);
+        } finally {
+          setCopyingPreview(false);
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi khi tạo ảnh thư báo.');
+      setCopyingPreview(false);
+    }
+  };
+
+  const handleDownloadPreviewImage = (canvas) => {
+    if (!canvas && previewTemplateRef.current) {
+      html2canvas(previewTemplateRef.current, { scale: 2, useCORS: true, logging: false }).then((c) => {
+        const link = document.createElement('a');
+        link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${monthYear.replace('/', '_')}.png`;
+        link.href = c.toDataURL('image/png');
+        link.click();
+      });
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${monthYear.replace('/', '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  // Copy Tin Nhắn Zalo soạn sẵn
+  const handleCopyZaloMessage = async () => {
+    const text = generateZaloMessage(activeRecord, currentDebtNum);
+    setCopyingZaloText(true);
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Đã copy tin nhắn Zalo vào Clipboard! Hãy mở Zalo dán (Ctrl+V) cho phụ huynh.');
+    } catch (err) {
+      console.error(err);
+      alert('Không thể tự copy. Vui lòng bôi đen và copy thủ công.');
+    } finally {
+      setCopyingZaloText(false);
+    }
+  };
+
+  // Xác nhận Thu tiền -> In Phiếu thu
   const handlePayInvoice = async () => {
     if (!payInvoice) return;
     try {
@@ -363,7 +540,7 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Copy Ảnh Phiếu thu dán Zalo
+  // Copy Ảnh Phiếu thu
   const copyReceiptImage = async () => {
     if (!receiptRef.current) return;
     setCopyingReceipt(true);
@@ -374,7 +551,6 @@ export default function MonthlyBillingPage() {
           await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
           alert('Đã copy Phiếu thu điện tử vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay.');
         } catch (err) {
-          console.warn('ClipboardItem không hỗ trợ, chuyển sang tải ảnh:', err);
           downloadReceiptImage();
         } finally {
           setCopyingReceipt(false);
@@ -382,7 +558,6 @@ export default function MonthlyBillingPage() {
       });
     } catch (err) {
       console.error(err);
-      alert('Có lỗi khi tạo ảnh phiếu thu.');
       setCopyingReceipt(false);
     }
   };
@@ -398,59 +573,6 @@ export default function MonthlyBillingPage() {
     } catch (err) {
       console.error(err);
     }
-  };
-
-  // Mở Modal Xem trước Thư báo realtime (Preview)
-  const handleOpenPreview = (record) => {
-    const finalAmount = record.totalToPay || 0;
-    const transferContent = `Hoc phi thang ${record.monthYear} ${record.studentName}`;
-    const qrUrl = `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(
-      transferContent
-    )}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`;
-
-    setPreviewNotice({
-      ...record,
-      qrUrl,
-    });
-  };
-
-  // Copy Thư báo từ Preview
-  const handleCopyPreviewImage = async () => {
-    if (!previewTemplateRef.current) return;
-    setCopyingPreview(true);
-    try {
-      const canvas = await html2canvas(previewTemplateRef.current, { scale: 2, useCORS: true, logging: false });
-      canvas.toBlob(async (blob) => {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          alert('Đã copy Thư báo học phí vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
-        } catch (err) {
-          handleDownloadPreviewImage(canvas);
-        } finally {
-          setCopyingPreview(false);
-        }
-      });
-    } catch (err) {
-      console.error(err);
-      alert('Có lỗi khi tạo ảnh thư báo.');
-      setCopyingPreview(false);
-    }
-  };
-
-  const handleDownloadPreviewImage = (canvas) => {
-    if (!canvas && previewTemplateRef.current) {
-      html2canvas(previewTemplateRef.current, { scale: 2, useCORS: true, logging: false }).then((c) => {
-        const link = document.createElement('a');
-        link.download = `ThuBao_${previewNotice.studentName.replace(/\s+/g, '_')}_Thang_${previewNotice.monthYear.replace('/', '_')}.png`;
-        link.href = c.toDataURL('image/png');
-        link.click();
-      });
-      return;
-    }
-    const link = document.createElement('a');
-    link.download = `ThuBao_${previewNotice.studentName.replace(/\s+/g, '_')}_Thang_${previewNotice.monthYear.replace('/', '_')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
   };
 
   // Checkbox chọn học viên
@@ -581,7 +703,7 @@ export default function MonthlyBillingPage() {
       </div>
 
       {/* =========================================================
-          TAB 1: CẤU HÌNH (Bổ sung đầy đủ cột theo yêu cầu)
+          TAB 1: CẤU HÌNH
          ========================================================= */}
       {activeTab === 'config' && (
         <div className="glass-panel p-4">
@@ -613,6 +735,7 @@ export default function MonthlyBillingPage() {
                   <tr>
                     <th style={{ width: '45px', textAlign: 'center' }}>STT</th>
                     <th>Họ tên</th>
+                    <th>Số CCCD / Mã định danh</th>
                     <th>Lớp</th>
                     <th>Ngày học</th>
                     <th>Giờ học</th>
@@ -633,6 +756,7 @@ export default function MonthlyBillingPage() {
                       <tr key={enr.id}>
                         <td style={{ textAlign: 'center' }}>{idx + 1}</td>
                         <td style={{ fontWeight: '700', color: '#085E8A', whiteSpace: 'nowrap' }}>{enr.student?.name}</td>
+                        <td style={{ color: '#475569', fontSize: '0.88rem' }}>{enr.student?.nationalId || '—'}</td>
                         <td style={{ whiteSpace: 'nowrap', fontWeight: '500' }}>{enr.classCode}</td>
                         <td style={{ whiteSpace: 'nowrap', color: '#0284c7', fontWeight: '600' }}>{days}</td>
                         <td style={{ whiteSpace: 'nowrap', color: '#475569' }}>{shiftTime}</td>
@@ -666,7 +790,7 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          TAB 2: ĐIỂM DANH (Cột to rõ, Tên 1 dòng, Ghim cột/hàng)
+          TAB 2: ĐIỂM DANH
          ========================================================= */}
       {activeTab === 'attendance' && (
         <div
@@ -692,7 +816,6 @@ export default function MonthlyBillingPage() {
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.95rem' }}>
               <thead>
                 <tr>
-                  {/* Cột Học viên cố định */}
                   <th
                     style={{
                       position: 'sticky',
@@ -711,8 +834,6 @@ export default function MonthlyBillingPage() {
                   >
                     Học viên
                   </th>
-
-                  {/* Cột Lớp cố định */}
                   <th
                     style={{
                       position: 'sticky',
@@ -731,8 +852,6 @@ export default function MonthlyBillingPage() {
                   >
                     Lớp
                   </th>
-
-                  {/* Các cột ngày: Rộng rãi, dễ nhìn */}
                   {daysList.map((d) => (
                     <th
                       key={d}
@@ -758,7 +877,6 @@ export default function MonthlyBillingPage() {
               <tbody>
                 {getFilteredEnrollments().map((enr) => (
                   <tr key={enr.id}>
-                    {/* Tên Học viên: 1 dòng duy nhất */}
                     <td
                       style={{
                         position: 'sticky',
@@ -774,8 +892,6 @@ export default function MonthlyBillingPage() {
                     >
                       {enr.student?.name}
                     </td>
-
-                    {/* Tên Lớp: 1 dòng duy nhất */}
                     <td
                       style={{
                         position: 'sticky',
@@ -791,8 +907,6 @@ export default function MonthlyBillingPage() {
                     >
                       {enr.classCode}
                     </td>
-
-                    {/* Ô ngày: To, icon lớn, click mượt mà */}
                     {daysList.map((d) => {
                       const att = attendanceData.attendances.find(
                         (a) => a.studentId === enr.studentId && a.classCode === enr.classCode && a.date.startsWith(d)
@@ -824,7 +938,7 @@ export default function MonthlyBillingPage() {
                             transition: 'all 0.15s ease',
                           }}
                           onClick={() => handleToggleAttendance(enr.studentId, enr.classCode, d, att?.status || 'Trống')}
-                          title={`Ngày ${d.split('-')[2]}: ${att?.status || 'Chưa điểm danh'} (Click để đổi)`}
+                          title={`Ngày ${d.split('-')[2]}: ${att?.status || 'Chưa điểm danh'}`}
                         >
                           {icon && (
                             <i
@@ -832,7 +946,6 @@ export default function MonthlyBillingPage() {
                               style={{
                                 fontSize: '1.4rem',
                                 color: color,
-                                strokeWidth: '2px',
                               }}
                             ></i>
                           )}
@@ -848,7 +961,7 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          TAB 3: THƯ BÁO HP (Đầy đủ checkbox, mắt xem trước & nút Copy)
+          TAB 3: THƯ BÁO HP
          ========================================================= */}
       {activeTab === 'notices' && (
         <div className="table-container glass-panel p-4">
@@ -882,7 +995,7 @@ export default function MonthlyBillingPage() {
                     <th style={{ textAlign: 'center' }}>Thực tế</th>
                     <th style={{ textAlign: 'right' }}>HP/Buổi</th>
                     <th style={{ textAlign: 'right' }}>Dư/Thiếu</th>
-                    <th style={{ textAlign: 'right' }}>Nợ cũ</th>
+                    <th style={{ textAlign: 'right' }}>Học phí chưa hoàn thành</th>
                     <th style={{ textAlign: 'right' }}>Tổng thanh toán</th>
                     <th style={{ textAlign: 'center' }}>Trạng thái</th>
                     <th style={{ textAlign: 'center' }}>Thao tác</th>
@@ -893,7 +1006,6 @@ export default function MonthlyBillingPage() {
                     const rowKey = `${row.studentId}-${row.classCode}`;
                     return (
                       <tr key={rowKey} style={{ background: selectedRows.includes(rowKey) ? '#f0f9ff' : 'transparent' }}>
-                        {/* Ô tick chọn */}
                         <td style={{ textAlign: 'center' }}>
                           <input
                             type="checkbox"
@@ -947,17 +1059,17 @@ export default function MonthlyBillingPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
-                            {/* Nút mắt xem trước Thư báo realtime */}
+                            {/* Nút mắt 👁️ xem trước realtime */}
                             <button
                               className="btn btn-sm btn-outline"
-                              title="Xem trước thư báo & QR code"
-                              onClick={() => handleOpenPreview(row)}
+                              title="Xem trước thư báo & tin nhắn Zalo"
+                              onClick={() => handleOpenNoticeModal(row)}
                               style={{ padding: '5px 9px', color: '#0284c7', borderColor: '#0284c7' }}
                             >
                               <i className="fa-solid fa-eye"></i>
                             </button>
 
-                            {/* Chốt sổ hoặc Thư báo */}
+                            {/* Chốt sổ hoặc Nút Thư báo */}
                             {row.status === 'NOT_GENERATED' ? (
                               <button
                                 className="btn btn-sm btn-primary"
@@ -968,21 +1080,27 @@ export default function MonthlyBillingPage() {
                                 <i className="fa-solid fa-file-invoice"></i> Chốt sổ
                               </button>
                             ) : (
-                              <>
-                                <MonthlyTuitionAction record={row} />
-                                {row.status === 'UNPAID' && (
-                                  <button
-                                    className="btn btn-sm"
-                                    style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: '700' }}
-                                    onClick={() => {
-                                      setPayInvoice(row);
-                                      setShowPayModal(true);
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-hand-holding-dollar"></i> Thu tiền
-                                  </button>
-                                )}
-                              </>
+                              <button
+                                className="btn btn-sm"
+                                style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: '700' }}
+                                onClick={() => handleOpenNoticeModal(row)}
+                              >
+                                <i className="fa-solid fa-image"></i> Thư báo
+                              </button>
+                            )}
+
+                            {/* Nút Thu tiền nếu chưa đóng */}
+                            {row.status === 'UNPAID' && (
+                              <button
+                                className="btn btn-sm"
+                                style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: '700' }}
+                                onClick={() => {
+                                  setPayInvoice(row);
+                                  setShowPayModal(true);
+                                }}
+                              >
+                                <i className="fa-solid fa-hand-holding-dollar"></i> Thu tiền
+                              </button>
                             )}
                           </div>
                         </td>
@@ -1017,11 +1135,11 @@ export default function MonthlyBillingPage() {
                           selectedRows.includes(`${r.studentId}-${r.classCode}`)
                         );
                         if (selectedList.length > 0) {
-                          handleOpenPreview(selectedList[0]);
+                          handleOpenNoticeModal(selectedList[0]);
                         }
                       }}
                     >
-                      <i className="fa-solid fa-eye"></i> Xem thư báo đã chọn
+                      <i className="fa-solid fa-eye"></i> Mở Thư Báo Đã Chọn
                     </button>
                   </div>
                 </div>
@@ -1032,140 +1150,178 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          MODAL THÊM HỌC VIÊN THÁNG CHUYÊN NGHIỆP (Tựa như Hình 4)
+          MODAL THÊM HỌC VIÊN THÁNG (1 MÀN HÌNH - KHÔNG KÉO THANH TRƯỢT - CÓ CCCD)
          ========================================================= */}
       {showAddModal && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '820px', width: '95%', padding: '1.5rem', borderRadius: '16px' }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
-              <h2 style={{ color: '#085E8A', fontSize: '1.25rem', fontWeight: '800', margin: 0 }}>
-                <i className="fa-solid fa-user-plus"></i> Thêm Học Viên Đóng Phí Theo Tháng
-              </h2>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" style={{ zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            className="modal-content"
+            style={{
+              width: 'min(880px, 96vw)',
+              maxHeight: '94vh',
+              overflow: 'hidden',
+              padding: '1.15rem 1.35rem',
+              borderRadius: '14px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '0.6rem',
+                marginBottom: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <h2 style={{ color: '#085E8A', fontSize: '1.15rem', fontWeight: '800', margin: 0 }}>
+                  <i className="fa-solid fa-user-plus"></i> Thêm Học Viên Học Phí Tháng
+                </h2>
+                {/* Switch chế độ nhỏ gọn */}
+                <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '2px', borderRadius: '6px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      setAddMode('new');
+                      setSelectedStudent(null);
+                    }}
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '3px 10px',
+                      background: addMode === 'new' ? '#085E8A' : 'transparent',
+                      color: addMode === 'new' ? '#fff' : '#475569',
+                      borderRadius: '4px',
+                      fontWeight: '700',
+                    }}
+                  >
+                    Học viên mới
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setAddMode('existing')}
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '3px 10px',
+                      background: addMode === 'existing' ? '#085E8A' : 'transparent',
+                      color: addMode === 'existing' ? '#fff' : '#475569',
+                      borderRadius: '4px',
+                      fontWeight: '700',
+                    }}
+                  >
+                    Chọn học viên có sẵn
+                  </button>
+                </div>
+              </div>
+
+              <button className="close-btn" onClick={() => setShowAddModal(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>
                 <i className="fa-solid fa-times"></i>
               </button>
             </div>
 
-            {/* Toggle chế độ: Tạo mới hoàn toàn HOẶC Chọn từ học viên có sẵn */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <button
-                className={`btn btn-sm ${addMode === 'new' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => {
-                  setAddMode('new');
-                  setSelectedStudent(null);
-                }}
-                style={{ fontWeight: '700' }}
-              >
-                <i className="fa-solid fa-user-pen"></i> Nhập học viên mới
-              </button>
-              <button
-                className={`btn btn-sm ${addMode === 'existing' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setAddMode('existing')}
-                style={{ fontWeight: '700' }}
-              >
-                <i className="fa-solid fa-magnifying-glass"></i> Chọn học viên đã có trong hệ thống
-              </button>
-            </div>
-
-            {/* Khung tìm kiếm học viên có sẵn */}
-            {addMode === 'existing' && !selectedStudent && (
+            {/* Thanh tìm nhanh nếu chọn học viên có sẵn */}
+            {addMode === 'existing' && (
               <div
                 style={{
                   background: '#f8fafc',
-                  border: '1.5px dashed #cbd5e1',
-                  borderRadius: '10px',
-                  padding: '1rem',
-                  marginBottom: '1.25rem',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  marginBottom: '0.75rem',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
                 }}
               >
-                <label style={{ fontWeight: '700', color: '#085E8A', display: 'block', marginBottom: '0.4rem' }}>
-                  Tìm nhanh theo Tên hoặc Số điện thoại:
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Nhập tên bé hoặc SĐT phụ huynh..."
-                    className="form-control"
-                    value={searchStudent}
-                    onChange={(e) => setSearchStudent(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearchStudent()}
-                    style={{ flex: 1 }}
-                  />
-                  <button className="btn btn-primary" onClick={handleSearchStudent} disabled={searchingStudent}>
-                    {searchingStudent ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-search"></i>} Tìm
-                  </button>
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div style={{ maxHeight: '180px', overflowY: 'auto', marginTop: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                    {searchResults.map((s) => (
-                      <div
-                        key={s.id}
-                        style={{
-                          padding: '8px 12px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          borderBottom: '1px solid #f1f5f9',
-                          background: '#fff',
-                        }}
-                      >
-                        <div>
-                          <strong style={{ color: '#085E8A' }}>{s.name}</strong> - <span>{s.phone || 'Chưa có SĐT'}</span>
-                          {s.enrollments && s.enrollments.length > 0 && (
-                            <span style={{ fontSize: '0.8rem', color: '#64748b', marginLeft: '8px' }}>
-                              ({s.enrollments.map((e) => e.classCode).join(', ')})
-                            </span>
-                          )}
-                        </div>
-                        <button className="btn btn-sm btn-outline" onClick={() => handleSelectExistingStudent(s)}>
-                          <i className="fa-solid fa-check"></i> Chọn
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                <input
+                  type="text"
+                  placeholder="Nhập tên bé hoặc SĐT phụ huynh để tìm..."
+                  className="form-control"
+                  value={searchStudent}
+                  onChange={(e) => setSearchStudent(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchStudent()}
+                  style={{ flex: 1, padding: '0.35rem 0.65rem', fontSize: '0.88rem' }}
+                />
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={handleSearchStudent}
+                  disabled={searchingStudent}
+                  style={{ padding: '0.35rem 0.85rem' }}
+                >
+                  {searchingStudent ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-search"></i>} Tìm
+                </button>
+                {selectedStudent && (
+                  <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: '700' }}>
+                    ✓ Đã chọn: {selectedStudent.name}
+                  </span>
                 )}
               </div>
             )}
 
-            {selectedStudent && (
+            {/* Kết quả tìm kiếm nhanh dạng dropdown popup nếu có */}
+            {addMode === 'existing' && searchResults.length > 0 && !selectedStudent && (
               <div
                 style={{
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  borderRadius: '8px',
-                  padding: '0.6rem 1rem',
-                  marginBottom: '1.25rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  maxHeight: '120px',
+                  overflowY: 'auto',
+                  background: '#fff',
+                  border: '1px solid #3b82f6',
+                  borderRadius: '6px',
+                  marginBottom: '0.65rem',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
                 }}
               >
-                <span>
-                  Đang chọn học viên: <strong style={{ color: '#1d4ed8' }}>{selectedStudent.name}</strong> ({selectedStudent.id})
-                </span>
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setSelectedStudent(null);
-                    setFormName('');
-                  }}
-                >
-                  Đổi bé khác
-                </button>
+                {searchResults.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => handleSelectExistingStudent(s)}
+                    style={{
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f9ff')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                  >
+                    <span>
+                      <strong style={{ color: '#085E8A' }}>{s.name}</strong> - {s.phone || 'Không có SĐT'}
+                    </span>
+                    <span style={{ color: '#3b82f6', fontWeight: '700' }}>Bấm để chọn</span>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Bố cục 2 cột chuẩn như Hình 4 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              {/* CỘT TRÁI: THÔNG TIN HỌC VIÊN */}
-              <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ fontSize: '1rem', color: '#085E8A', fontWeight: '800', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* Bố cục 2 Cột - Vừa vặn 1 màn hình */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1 }}>
+              {/* CỘT 1: THÔNG TIN HỌC VIÊN */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ fontWeight: '800', color: '#085E8A', fontSize: '0.92rem', marginBottom: '0.1rem' }}>
                   <i className="fa-solid fa-id-card"></i> Thông tin học viên
-                </h3>
+                </div>
 
-                <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-                  <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                {/* Họ và tên */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                     Họ và Tên *
                   </label>
                   <input
@@ -1174,13 +1330,14 @@ export default function MonthlyBillingPage() {
                     placeholder="VD: Nguyễn Văn An"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    style={{ fontWeight: '700' }}
+                    style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem', fontWeight: '700' }}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                {/* Số điện thoại & Số CCCD (Yêu cầu 1 của User) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                       Số điện thoại
                     </label>
                     <input
@@ -1189,10 +1346,29 @@ export default function MonthlyBillingPage() {
                       placeholder="09xxxxxxxx"
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value)}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem' }}
                     />
                   </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#085E8A', display: 'block', marginBottom: '2px' }}>
+                      Số CCCD (Xuất HĐ)
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Số CCCD người mua..."
+                      value={formNationalId}
+                      onChange={(e) => setFormNationalId(e.target.value)}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem', borderColor: '#93c5fd' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Ngày sinh & Địa chỉ */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                       Ngày sinh
                     </label>
                     <input
@@ -1200,39 +1376,52 @@ export default function MonthlyBillingPage() {
                       className="form-control"
                       value={formDob}
                       onChange={(e) => setFormDob(e.target.value)}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Địa chỉ thường trú
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Địa chỉ cư trú..."
+                      value={formAddress}
+                      onChange={(e) => setFormAddress(e.target.value)}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem' }}
                     />
                   </div>
                 </div>
-
-                <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-                  <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
-                    Địa chỉ thường trú
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Số nhà, đường, phường/xã..."
-                    value={formAddress}
-                    onChange={(e) => setFormAddress(e.target.value)}
-                  />
-                </div>
               </div>
 
-              {/* CỘT PHẢI: LỚP HỌC & HỌC PHÍ THÁNG */}
-              <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ fontSize: '1rem', color: '#085E8A', fontWeight: '800', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* CỘT 2: LỚP HỌC & HỌC PHÍ THÁNG */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ fontWeight: '800', color: '#085E8A', fontSize: '0.92rem', marginBottom: '0.1rem' }}>
                   <i className="fa-solid fa-graduation-cap"></i> Cấu hình lớp & Học phí tháng
-                </h3>
+                </div>
 
-                <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-                  <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                {/* Chọn Lớp học */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                     Chọn Lớp học *
                   </label>
                   <select
                     className="form-control"
                     value={formClassCode}
                     onChange={(e) => setFormClassCode(e.target.value)}
-                    style={{ fontWeight: '600' }}
+                    style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem', fontWeight: '600' }}
                   >
                     <option value="">-- Chọn lớp học --</option>
                     {allClasses.map((c) => (
@@ -1243,28 +1432,35 @@ export default function MonthlyBillingPage() {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
-                      Bắt đầu học từ ngày
+                {/* Ngày bắt đầu & Tùy chọn đóng học phí */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Bắt đầu học từ
                     </label>
                     <input
                       type="date"
                       className="form-control"
                       value={formStartDate}
                       onChange={(e) => setFormStartDate(e.target.value)}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem' }}
                     />
                   </div>
 
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
-                      Tùy chọn đóng học phí *
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Tùy chọn đóng phí *
                     </label>
                     <select
                       className="form-control"
                       value={formBillingType}
                       onChange={(e) => setFormBillingType(e.target.value)}
-                      style={{ fontWeight: '700', color: formBillingType === 'MONTHLY_PREPAID' ? '#0284c7' : '#d97706' }}
+                      style={{
+                        padding: '0.4rem 0.65rem',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        color: formBillingType === 'MONTHLY_PREPAID' ? '#0284c7' : '#d97706',
+                      }}
                     >
                       <option value="MONTHLY_PREPAID">Đóng trước (Prepaid)</option>
                       <option value="MONTHLY_POSTPAID">Đóng sau (Postpaid)</option>
@@ -1272,9 +1468,10 @@ export default function MonthlyBillingPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                {/* Học phí cam kết & Số buổi */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                       Học phí cam kết / Tháng (đ) *
                     </label>
                     <input
@@ -1283,69 +1480,77 @@ export default function MonthlyBillingPage() {
                       placeholder="VD: 1200000"
                       value={formMonthlyRate}
                       onChange={(e) => setFormMonthlyRate(e.target.value)}
-                      style={{ fontWeight: '700' }}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem', fontWeight: '700' }}
                     />
                   </div>
 
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
-                      Số buổi cam kết / Tháng
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Số buổi cam kết
                     </label>
                     <input
                       type="number"
                       className="form-control"
-                      placeholder="VD: 8, 10, 12"
+                      placeholder="VD: 8"
                       value={formMonthlySessions}
                       onChange={(e) => setFormMonthlySessions(e.target.value)}
                       disabled={formBillingType === 'MONTHLY_POSTPAID'}
+                      style={{ padding: '0.4rem 0.65rem', fontSize: '0.88rem' }}
                     />
                   </div>
                 </div>
 
-                {/* Khối hiển thị HP/Buổi tính tự động */}
+                {/* HP / Buổi tự tính realtime */}
                 <div
                   style={{
                     background: '#fff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '0.6rem 0.85rem',
-                    marginBottom: '0.85rem',
+                    borderRadius: '6px',
+                    padding: '0.35rem 0.75rem',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ fontSize: '0.9rem', color: '#64748b' }}>Học phí tương đương 1 buổi:</span>
-                  <strong style={{ fontSize: '1.05rem', color: '#059669' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đơn giá tương đương:</span>
+                  <strong style={{ fontSize: '0.92rem', color: '#059669' }}>
                     {calculatedFeePerSession.toLocaleString('vi-VN')}đ / buổi
                   </strong>
                 </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
-                    Ghi chú cấu hình
-                  </label>
+                {/* Ghi chú */}
+                <div>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="VD: Bé học kèm, phụ huynh yêu cầu thu ngày 01 hàng tháng..."
+                    placeholder="Ghi chú cấu hình (nếu có)..."
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}
                   />
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)} style={{ padding: '0.6rem 1.5rem' }}>
+            <div
+              style={{
+                marginTop: '0.75rem',
+                paddingTop: '0.65rem',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)} style={{ padding: '0.45rem 1.25rem' }}>
                 Hủy bỏ
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleSaveStudent}
                 disabled={savingStudent}
-                style={{ padding: '0.6rem 1.75rem', fontWeight: '700', fontSize: '1rem' }}
+                style={{ padding: '0.45rem 1.75rem', fontWeight: '800' }}
               >
                 {savingStudent ? (
                   <>
@@ -1363,47 +1568,178 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          MODAL XEM TRƯỚC THƯ BÁO REALTIME (Khi bấm nút mắt 👁️)
+          MODAL XEM TRƯỚC THƯ BÁO, TIN NHẮN ZALO 3S & TÙY CHỌN NỢ CŨ (YÊU CẦU 2 & 3)
          ========================================================= */}
-      {previewNotice && (
+      {previewModalOpen && activeRecord && dynamicNoticeData && (
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '850px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ color: '#085E8A', margin: 0 }}>
-                <i className="fa-solid fa-envelope-open-text"></i> Xem Trước Thư Báo Học Phí - {previewNotice.studentName}
-              </h2>
-              <button className="close-btn" onClick={() => setPreviewNotice(null)}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '920px',
+              width: '94%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              padding: '1.25rem',
+              borderRadius: '16px',
+            }}
+          >
+            {/* Header Modal */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '0.6rem',
+                marginBottom: '1rem',
+              }}
+            >
+              <div>
+                <h2 style={{ color: '#085E8A', margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>
+                  <i className="fa-solid fa-envelope-open-text"></i> Thư Báo Học Phí & Soạn Tin Zalo
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Học viên: <strong>{activeRecord.studentName}</strong> | Lớp: {activeRecord.classCode} | Tháng: {monthYear}
+                </span>
+              </div>
+              <button className="close-btn" onClick={() => setPreviewModalOpen(false)}>
                 <i className="fa-solid fa-times"></i>
               </button>
             </div>
 
+            {/* KHỐI 1: TÙY CHỌN ĐIỀU CHỈNH NỢ CŨ / HỌC PHÍ CHƯA HOÀN THÀNH (YÊU CẦU 3) */}
             <div
-              className="modal-body"
+              style={{
+                background: '#FFFBEB',
+                border: '1.5px solid #F59E0B',
+                borderRadius: '10px',
+                padding: '0.75rem 1.25rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <i className="fa-solid fa-coins" style={{ fontSize: '1.4rem', color: '#D97706' }}></i>
+                <div>
+                  <strong style={{ color: '#92400E', fontSize: '0.95rem' }}>Học phí chưa hoàn thành (Nợ cũ tháng trước):</strong>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#78350F' }}>
+                    Hệ thống tự động tính nợ tháng trước, bạn có thể chỉnh sửa tự do con số này:
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={adjustedDebt}
+                  onChange={(e) => setAdjustedDebt(e.target.value)}
+                  placeholder="0"
+                  style={{ width: '150px', fontWeight: '800', fontSize: '1rem', textAlign: 'right', color: '#B45309' }}
+                />
+                <span style={{ fontWeight: '700', color: '#92400E' }}>đ</span>
+
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={handleSaveAdjustedDebt}
+                  disabled={savingDebt}
+                  style={{ borderColor: '#D97706', color: '#D97706', fontWeight: '700' }}
+                  title="Lưu số nợ này vào hóa đơn của tháng"
+                >
+                  {savingDebt ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-save"></i>} Lưu nợ
+                </button>
+              </div>
+
+              {/* Tóm tắt nhanh số tiền mới */}
+              <div style={{ width: '100%', borderTop: '1px dashed #FCD34D', paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                <span>
+                  Học phí tháng này: <strong>{Number(currentFeeNum).toLocaleString('vi-VN')}đ</strong> | Cấn trừ dư/thiếu: <strong>{Number(excessNum).toLocaleString('vi-VN')}đ</strong>
+                </span>
+                <span style={{ color: '#B45309', fontWeight: '800', fontSize: '1.05rem' }}>
+                  👉 TỔNG CỘNG MỚI: {Number(calculatedTotalToPay).toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+            </div>
+
+            {/* KHỐI 2: SOẠN TIN NHẮN ZALO 3 GIÂY (YÊU CẦU 2 CỦA USER) */}
+            <div
+              style={{
+                background: '#F0FDF4',
+                border: '1.5px solid #22C55E',
+                borderRadius: '10px',
+                padding: '0.85rem 1.25rem',
+                marginBottom: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <strong style={{ color: '#166534', fontSize: '0.95rem' }}>
+                  <i className="fa-solid fa-comment-dots"></i> Tin nhắn Zalo gửi phụ huynh (Đọc lướt trong 3 giây):
+                </strong>
+                <button
+                  className="btn btn-sm"
+                  onClick={handleCopyZaloMessage}
+                  style={{
+                    backgroundColor: '#16a34a',
+                    color: '#fff',
+                    fontWeight: '800',
+                    fontSize: '0.85rem',
+                    padding: '4px 12px',
+                  }}
+                >
+                  {copyingZaloText ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-copy"></i>} Copy Tin Nhắn Zalo
+                </button>
+              </div>
+
+              <pre
+                style={{
+                  margin: 0,
+                  fontFamily: 'inherit',
+                  fontSize: '0.88rem',
+                  lineHeight: '1.5',
+                  color: '#14532D',
+                  whiteSpace: 'pre-wrap',
+                  background: '#DCFCE7',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '6px',
+                }}
+              >
+                {generateZaloMessage(activeRecord, currentDebtNum)}
+              </pre>
+            </div>
+
+            {/* KHỐI 3: BẢN XEM TRƯỚC HÌNH ẢNH THƯ BÁO VỚI MÃ VIETQR */}
+            <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
                 backgroundColor: '#f1f5f9',
-                padding: '20px',
-                borderRadius: '8px',
-                margin: '10px 0',
+                padding: '1.25rem',
+                borderRadius: '10px',
+                marginBottom: '1rem',
+                overflowX: 'auto',
               }}
             >
               <div ref={previewTemplateRef} style={{ width: '800px', background: '#fff' }}>
-                <MonthlyNoticeTemplate noticeData={previewNotice} />
+                <MonthlyNoticeTemplate noticeData={dynamicNoticeData} />
               </div>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            {/* KHỐI 4: CÁC NÚT HÀNH ĐỘNG CUỐI */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button
                 onClick={handleCopyPreviewImage}
-                className="btn btn-primary"
+                className="btn"
                 style={{
-                  flex: 1,
-                  padding: '0.75rem',
+                  background: '#085E8A',
+                  color: '#fff',
+                  flex: 1.5,
+                  padding: '0.85rem',
                   fontWeight: '800',
                   fontSize: '1rem',
-                  background: '#085E8A',
-                  borderColor: '#085E8A',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1417,21 +1753,36 @@ export default function MonthlyBillingPage() {
                   </>
                 ) : (
                   <>
-                    <i className="fa-solid fa-copy"></i> Copy Ảnh (Dán Zalo)
+                    <i className="fa-solid fa-copy"></i> Copy Ảnh Thư Báo (Dán Zalo)
                   </>
                 )}
               </button>
+
               <button
-                onClick={() => handleDownloadPreviewImage()}
-                className="btn btn-secondary"
+                onClick={handleCopyZaloMessage}
+                className="btn"
                 style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  fontWeight: '700',
+                  background: '#16a34a',
+                  color: '#fff',
+                  flex: 1.2,
+                  padding: '0.85rem',
+                  fontWeight: '800',
+                  fontSize: '0.95rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
+                }}
+              >
+                <i className="fa-solid fa-message"></i> Copy Tin Nhắn Zalo
+              </button>
+
+              <button
+                onClick={() => handleDownloadPreviewImage()}
+                className="btn btn-secondary"
+                style={{
+                  padding: '0.85rem 1.25rem',
+                  fontWeight: '700',
                 }}
               >
                 <i className="fa-solid fa-download"></i> Tải Ảnh Xuống
@@ -1442,7 +1793,7 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          MODAL THU TIỀN & PHIẾU THU ĐIỆN TỬ CHUẨN
+          MODAL THU TIỀN & PHIẾU THU ĐIỆN TỬ
          ========================================================= */}
       {showPayModal && payInvoice && (
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
@@ -1509,7 +1860,6 @@ export default function MonthlyBillingPage() {
                   </button>
                 </div>
               ) : (
-                /* PHIẾU THU ĐIỆN TỬ CHUẨN NHẬT MỸ */
                 <div style={{ textAlign: 'center' }}>
                   <div
                     ref={receiptRef}
@@ -1523,7 +1873,6 @@ export default function MonthlyBillingPage() {
                       margin: '0 auto',
                     }}
                   >
-                    {/* Dải line nhận diện thương hiệu Xanh & Vàng */}
                     <div
                       style={{
                         height: '6px',
@@ -1539,7 +1888,6 @@ export default function MonthlyBillingPage() {
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                       }}
                     >
-                      {/* Header Logo */}
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
                         <img
                           src="/logo.png"
@@ -1576,7 +1924,6 @@ export default function MonthlyBillingPage() {
                         </div>
                       </div>
 
-                      {/* Thông tin học viên */}
                       <div
                         style={{
                           margin: '1rem 0',
@@ -1609,7 +1956,6 @@ export default function MonthlyBillingPage() {
                         </div>
                       </div>
 
-                      {/* Khối chi tiết Học phí */}
                       <div style={{ margin: '0.75rem 0', fontSize: '0.95rem', lineHeight: '1.8' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#475569' }}>Học phí cần đóng:</span>
@@ -1635,7 +1981,6 @@ export default function MonthlyBillingPage() {
                         </div>
                       </div>
 
-                      {/* Tổng thu */}
                       <div
                         style={{
                           marginTop: '1rem',
@@ -1656,7 +2001,6 @@ export default function MonthlyBillingPage() {
                     </div>
                   </div>
 
-                  {/* 2 Nút hành động: Copy Dán Zalo & Tải ảnh */}
                   <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                     <button
                       className="btn"

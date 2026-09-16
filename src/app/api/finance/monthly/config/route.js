@@ -13,7 +13,7 @@ export async function GET(request) {
       },
       orderBy: {
         id: 'desc',
-      }
+      },
     });
     return NextResponse.json(enrollments);
   } catch (error) {
@@ -33,6 +33,7 @@ export async function POST(request) {
       phone,
       dob,
       address,
+      nationalId,
       classCode,
       billingType, 
       monthlyRate, 
@@ -52,8 +53,21 @@ export async function POST(request) {
         include: {
           student: true,
           class: true,
-        }
+        },
       });
+
+      // Nếu có cập nhật CCCD hoặc SĐT cho học viên đó
+      if (updated.studentId && (nationalId || phone || address)) {
+        await prisma.student.update({
+          where: { id: updated.studentId },
+          data: {
+            ...(nationalId ? { nationalId: nationalId.trim() } : {}),
+            ...(phone ? { phone: phone.trim() } : {}),
+            ...(address ? { address: address.trim() } : {}),
+          },
+        });
+      }
+
       return NextResponse.json({ success: true, data: updated });
     }
 
@@ -85,6 +99,7 @@ export async function POST(request) {
 
       const formattedPhone = phone ? phone.toString().trim() : null;
       const formattedPhoneFinal = (formattedPhone && /^[1-9][0-9]*$/.test(formattedPhone)) ? '0' + formattedPhone : formattedPhone;
+      const formattedCCCD = nationalId ? nationalId.toString().trim() : finalStudentId;
 
       await prisma.student.create({
         data: {
@@ -92,19 +107,31 @@ export async function POST(request) {
           name: name.trim(),
           phone: formattedPhoneFinal,
           dob: dob ? new Date(dob) : null,
-          address: address || null,
-          nationalId: finalStudentId,
+          address: address ? address.trim() : null,
+          nationalId: formattedCCCD,
           specialPolicyType: 'Không giảm',
           specialPolicy: 'Không',
           referralCode: finalStudentId,
           branchId: 'CN1',
           status: 'Đang học',
-        }
+        },
       });
     }
 
     if (!finalStudentId) {
       return NextResponse.json({ error: 'Chưa xác định được học viên' }, { status: 400 });
+    }
+
+    // Nếu là học viên cũ nhưng có truyền CCCD mới -> Cập nhật luôn
+    if (existingStudentId && nationalId) {
+      await prisma.student.update({
+        where: { id: existingStudentId },
+        data: {
+          nationalId: nationalId.trim(),
+          ...(address ? { address: address.trim() } : {}),
+          ...(phone ? { phone: phone.trim() } : {}),
+        },
+      });
     }
 
     if (!classCode) {
@@ -116,7 +143,7 @@ export async function POST(request) {
       where: {
         studentId: finalStudentId,
         classCode: classCode,
-      }
+      },
     });
 
     const parsedRate = parseFloat(monthlyRate) || 0;
@@ -135,7 +162,7 @@ export async function POST(request) {
         include: {
           student: true,
           class: true,
-        }
+        },
       });
     } else {
       enrollmentRecord = await prisma.enrollment.create({
@@ -150,7 +177,7 @@ export async function POST(request) {
         include: {
           student: true,
           class: true,
-        }
+        },
       });
     }
 

@@ -106,21 +106,32 @@ export async function GET(request) {
       let currentFee = 0;
       let totalToPay = 0;
 
-      if (enr.billingType === 'MONTHLY_PREPAID') {
-        currentFee = monthlyRate;
-        excessMissing = (actualSessions - monthlySessions) * feePerSession;
-        totalToPay = currentFee + previousDebt + excessMissing;
+      // Nếu đã có hóa đơn trong DB, lấy các số liệu đã chốt
+      if (currentInvoice) {
+        currentFee = currentInvoice.currentFee;
+        excessMissing = currentInvoice.excessMissing;
+        previousDebt = currentInvoice.previousDebt;
+        totalToPay = currentInvoice.totalToPay;
       } else {
-        // POSTPAID
-        currentFee = actualSessions * feePerSession;
-        excessMissing = 0;
-        totalToPay = currentFee + previousDebt;
+        // Nếu chưa chốt, tính toán tự động
+        if (enr.billingType === 'MONTHLY_PREPAID') {
+          currentFee = monthlyRate;
+          excessMissing = (actualSessions - monthlySessions) * feePerSession;
+          totalToPay = currentFee + previousDebt + excessMissing;
+        } else {
+          // POSTPAID
+          currentFee = actualSessions * feePerSession;
+          excessMissing = 0;
+          totalToPay = currentFee + previousDebt;
+        }
       }
 
       data.push({
         enrollmentId: enr.id,
         studentId: enr.studentId,
         studentName: enr.student.name,
+        studentPhone: enr.student.phone,
+        studentNationalId: enr.student.nationalId,
         classCode: enr.classCode,
         billingType: enr.billingType,
         committedSessions: monthlySessions,
@@ -140,7 +151,7 @@ export async function GET(request) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error(error);
+    console.error('Lỗi khi lấy dữ liệu học phí tháng:', error);
     return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
   }
 }
@@ -172,10 +183,24 @@ export async function POST(request) {
       },
     });
 
+    // Nếu đã có hóa đơn -> Cho phép cập nhật số tiền / nợ cũ
     if (existing) {
-      return NextResponse.json({ error: 'Hóa đơn đã tồn tại' }, { status: 400 });
+      const updated = await prisma.monthlyInvoice.update({
+        where: { id: existing.id },
+        data: {
+          committedSessions: parseInt(committedSessions, 10) || existing.committedSessions,
+          actualSessions: parseInt(actualSessions, 10) || existing.actualSessions,
+          feePerSession: parseFloat(feePerSession) || existing.feePerSession,
+          previousDebt: parseFloat(previousDebt) || 0,
+          currentFee: parseFloat(currentFee) || existing.currentFee,
+          excessMissing: parseFloat(excessMissing) || 0,
+          totalToPay: parseFloat(totalToPay) || 0,
+        },
+      });
+      return NextResponse.json({ success: true, invoice: updated });
     }
 
+    // Nếu chưa có -> Tạo mới
     const uniqueId = Math.floor(Math.random() * 10000);
     const paymentCode = `HP${monthYear.replace('/', '')}${studentId}${uniqueId}`;
 
@@ -185,21 +210,21 @@ export async function POST(request) {
         classCode,
         monthYear,
         billingType,
-        committedSessions,
-        actualSessions,
-        feePerSession,
-        previousDebt,
-        currentFee,
-        excessMissing,
-        totalToPay,
+        committedSessions: parseInt(committedSessions, 10) || 0,
+        actualSessions: parseInt(actualSessions, 10) || 0,
+        feePerSession: parseFloat(feePerSession) || 0,
+        previousDebt: parseFloat(previousDebt) || 0,
+        currentFee: parseFloat(currentFee) || 0,
+        excessMissing: parseFloat(excessMissing) || 0,
+        totalToPay: parseFloat(totalToPay) || 0,
         paymentCode,
         status: 'UNPAID',
       },
     });
 
-    return NextResponse.json(invoice);
+    return NextResponse.json({ success: true, invoice });
   } catch (error) {
-    console.error(error);
+    console.error('Lỗi khi chốt/cập nhật hóa đơn tháng:', error);
     return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
   }
 }
