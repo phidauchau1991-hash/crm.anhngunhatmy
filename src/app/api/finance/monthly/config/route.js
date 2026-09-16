@@ -194,8 +194,8 @@ export async function POST(request) {
 }
 
 // Xóa học viên:
-// - permanent = true: XÓA VĨNH VIỄN KHỎI HỆ THỐNG (Dành cho học viên demo / tạo thử)
-// - permanent = false: Chỉ rút khỏi danh sách học phí tháng (chuyển sang COURSE)
+// - permanent = true: Xóa vĩnh viễn khỏi toàn bộ hệ thống (dành cho học viên demo / tạo thử)
+// - permanent = false: Xóa khỏi danh sách học phí tháng (xóa enrollment, độc lập hoàn toàn, không liên quan học theo khóa)
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -235,20 +235,14 @@ export async function DELETE(request) {
       });
     }
 
-    // Mặc định: Chỉ chuyển về học phí theo khóa, bảo toàn học viên trên hệ thống
-    const updated = await prisma.enrollment.update({
+    // Xóa học viên khỏi danh sách tháng (Xóa enrollment lớp tháng này, độc lập 100%, không dính líu đến học theo khóa)
+    await prisma.enrollment.delete({
       where: { id: enrollmentId },
-      data: {
-        billingType: 'COURSE',
-        monthlyRate: null,
-        monthlySessions: null,
-      },
     });
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Đã rút học viên khỏi danh sách học phí tháng (chuyển về học theo khóa).', 
-      data: updated 
+      message: 'Đã xóa học viên khỏi danh sách học phí tháng.' 
     });
   } catch (error) {
     console.error('Lỗi khi xóa học viên khỏi danh sách tháng:', error);

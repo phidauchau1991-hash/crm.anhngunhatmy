@@ -360,7 +360,7 @@ export default function MonthlyBillingPage() {
           type: 'success',
           text: permanent
             ? 'Đã xóa vĩnh viễn học viên và toàn bộ dữ liệu liên quan khỏi hệ thống hoàn toàn.'
-            : 'Đã rút học viên khỏi danh sách học phí tháng (chuyển về học phí khóa).',
+            : 'Đã xóa học viên khỏi danh sách lớp học phí tháng.',
         });
         setDeleteTarget(null);
         fetchConfigData();
@@ -2216,15 +2216,15 @@ export default function MonthlyBillingPage() {
                 </div>
               </div>
 
-              {/* Lựa chọn 2: Chỉ rút khỏi học phí tháng */}
+              {/* Lựa chọn 2: Xóa khỏi danh sách học phí tháng */}
               <div style={{ border: '1.5px solid #fed7aa', background: '#fffbeb', borderRadius: '10px', padding: '0.85rem 1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
                   <div>
                     <strong style={{ color: '#c2410c', fontSize: '0.95rem' }}>
-                      <i className="fa-solid fa-arrow-right-from-bracket"></i> Chỉ rút khỏi học phí tháng
+                      <i className="fa-solid fa-arrow-right-from-bracket"></i> Xóa khỏi danh sách học phí tháng
                     </strong>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#7c2d12', lineHeight: '1.4' }}>
-                      Chuyển học viên về hệ <strong>học phí theo khóa</strong>. Toàn bộ thông tin học viên và lịch sử học tập vẫn được giữ an toàn trên CRM.
+                      Rút học viên khỏi danh sách và lớp học phí tháng này. Hoàn toàn độc lập, không liên quan và không ảnh hưởng gì tới các dữ liệu khác.
                     </p>
                   </div>
                   <button
@@ -2233,7 +2233,7 @@ export default function MonthlyBillingPage() {
                     onClick={() => handleConfirmDelete(deleteTarget.enrollmentId, false)}
                     style={{ background: '#d97706', color: '#fff', fontWeight: '700', padding: '6px 14px', whiteSpace: 'nowrap', borderRadius: '6px' }}
                   >
-                    {deletingStudent ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Rút khỏi tháng'}
+                    {deletingStudent ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Xóa khỏi tháng'}
                   </button>
                 </div>
               </div>
