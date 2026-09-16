@@ -142,7 +142,7 @@ export default function ClassPortalPage() {
       </div>
 
       {/* Tab Content Area */}
-      <div className="glass-panel" style={{ overflowX: 'auto' }}>
+      <div className="glass-panel" style={{ overflowX: 'auto', overflowY: 'hidden', paddingBottom: '8px' }}>
         
         {activeTab === 'attendance' && (
           <div>
