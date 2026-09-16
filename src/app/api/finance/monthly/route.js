@@ -144,6 +144,7 @@ export async function GET(request) {
         excessMissing,
         previousDebt,
         totalToPay,
+        monthYear,
         status: currentInvoice ? currentInvoice.status : 'NOT_GENERATED',
         invoiceId: currentInvoice?.id || null,
       });

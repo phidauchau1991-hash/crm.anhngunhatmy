@@ -31,17 +31,17 @@ function getScheduleInfo(classCode, schedule) {
   return { days, shiftTime };
 }
 
-// Soạn tin nhắn Zalo súc tích, phụ huynh nhìn 3 giây là nắm đầy đủ
-function generateZaloMessage(record, adjustedDebt = null) {
+// Soạn tin nhắn Zalo súc tích, phụ huynh nhìn 3 giây là nắm đầy đủ, gần gũi thân thiện
+function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '') {
   if (!record) return '';
   const previousDebt = adjustedDebt !== null ? parseFloat(adjustedDebt) || 0 : record.previousDebt || 0;
   const currentFee = record.currentFee || record.monthlyRate || 0;
   const excess = record.excessMissing || 0;
   const total = currentFee + previousDebt + excess;
-  const monthStr = record.monthYear || '';
+  const monthStr = record.monthYear || currentMonthYear || '';
 
   const lines = [];
-  lines.push(`Dạ Anh ngữ Nhật Mỹ xin gửi Ba Mẹ thông tin học phí tháng ${monthStr} của bé ${record.studentName}:`);
+  lines.push(`Dạ Trung tâm xin gửi Ba Mẹ thông tin học phí tháng ${monthStr} của bé ${record.studentName}:`);
   lines.push(`• Lớp: ${record.classCode}`);
   lines.push(
     `• Số buổi học: ${record.actualSessions || 0} buổi${
@@ -65,42 +65,9 @@ function generateZaloMessage(record, adjustedDebt = null) {
   }
 
   lines.push(`👉 TỔNG CỘNG CẦN ĐÓNG: ${Number(total).toLocaleString('vi-VN')}đ`);
-  lines.push(`\nBa Mẹ có thể quét mã QR trong ảnh đính kèm để chuyển khoản nhanh chóng ạ. Nhật Mỹ xin trân trọng cảm ơn Ba Mẹ! ❤️`);
+  lines.push(`\nBa Mẹ có thể quét mã QR trong ảnh đính kèm để chuyển khoản nhanh chóng ạ. Trung tâm xin cảm ơn Ba Mẹ nhiều ạ! ❤️`);
 
   return lines.join('\n');
-}
-
-// Tạo danh sách tháng nhóm theo từng năm & kỳ 6 tháng
-function getGroupedMonthOptions() {
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear + 1, currentYear, currentYear - 1]; // 2027, 2026, 2025
-  const groups = [];
-
-  years.forEach((y) => {
-    // 6 tháng cuối năm (T12 -> T7)
-    const h2 = [];
-    for (let m = 12; m >= 7; m--) {
-      const val = `${String(m).padStart(2, '0')}/${y}`;
-      h2.push({ label: `Tháng ${val}`, value: val });
-    }
-    groups.push({
-      groupName: `Năm ${y} - 6 Tháng Cuối Năm (T7 - T12)`,
-      options: h2,
-    });
-
-    // 6 tháng đầu năm (T6 -> T1)
-    const h1 = [];
-    for (let m = 6; m >= 1; m--) {
-      const val = `${String(m).padStart(2, '0')}/${y}`;
-      h1.push({ label: `Tháng ${val}`, value: val });
-    }
-    groups.push({
-      groupName: `Năm ${y} - 6 Tháng Đầu Năm (T1 - T6)`,
-      options: h1,
-    });
-  });
-
-  return groups;
 }
 
 export default function MonthlyBillingPage() {
@@ -121,8 +88,8 @@ export default function MonthlyBillingPage() {
 
   // Modal Thêm / Sửa Học viên Tháng (1 màn hình KHÔNG KÉO THANH TRƯỢT)
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingEnrollmentId, setEditingEnrollmentId] = useState(null); // null = Thêm mới, số = Đang sửa
-  const [addMode, setAddMode] = useState('new'); // 'new' | 'existing'
+  const [editingEnrollmentId, setEditingEnrollmentId] = useState(null);
+  const [addMode, setAddMode] = useState('new');
   const [searchStudent, setSearchStudent] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchingStudent, setSearchingStudent] = useState(false);
@@ -168,6 +135,12 @@ export default function MonthlyBillingPage() {
   const [eReceiptData, setEReceiptData] = useState(null);
   const receiptRef = useRef(null);
   const [copyingReceipt, setCopyingReceipt] = useState(false);
+
+  // Nấc thang lọc thời gian: Năm -> 6 Tháng (Kỳ 1 / Kỳ 2) -> Tháng
+  const [currentMStr, currentYStr] = monthYear.split('/');
+  const selectedYear = parseInt(currentYStr, 10) || currentDate.getFullYear();
+  const selectedMonthNum = parseInt(currentMStr, 10) || currentDate.getMonth() + 1;
+  const selectedPeriod = selectedMonthNum <= 6 ? 'H1' : 'H2';
 
   // Load danh sách lớp khi mount
   useEffect(() => {
@@ -230,11 +203,28 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Điều hướng nhanh giữa các tháng (1 cú click)
+  // Điều khiển Nấc thang Lọc Thời Gian
+  const handleYearChange = (newYear) => {
+    setMonthYear(`${currentMStr}/${newYear}`);
+  };
+
+  const handlePeriodChange = (newPeriod) => {
+    if (newPeriod === 'H1') {
+      const newM = selectedMonthNum > 6 ? selectedMonthNum - 6 : selectedMonthNum;
+      setMonthYear(`${String(newM).padStart(2, '0')}/${selectedYear}`);
+    } else {
+      const newM = selectedMonthNum <= 6 ? selectedMonthNum + 6 : selectedMonthNum;
+      setMonthYear(`${String(newM).padStart(2, '0')}/${selectedYear}`);
+    }
+  };
+
+  const handleMonthChange = (newMonthStr) => {
+    setMonthYear(`${newMonthStr}/${selectedYear}`);
+  };
+
   const handlePrevMonth = () => {
-    const [m, y] = monthYear.split('/');
-    let prevM = parseInt(m, 10) - 1;
-    let prevY = parseInt(y, 10);
+    let prevM = selectedMonthNum - 1;
+    let prevY = selectedYear;
     if (prevM === 0) {
       prevM = 12;
       prevY -= 1;
@@ -243,9 +233,8 @@ export default function MonthlyBillingPage() {
   };
 
   const handleNextMonth = () => {
-    const [m, y] = monthYear.split('/');
-    let nextM = parseInt(m, 10) + 1;
-    let nextY = parseInt(y, 10);
+    let nextM = selectedMonthNum + 1;
+    let nextY = selectedYear;
     if (nextM === 13) {
       nextM = 1;
       nextY += 1;
@@ -329,7 +318,7 @@ export default function MonthlyBillingPage() {
     setShowAddModal(true);
   };
 
-  // Xóa học viên khỏi danh sách tháng (Chuyển về học phí khóa)
+  // Xóa học viên khỏi danh sách tháng
   const handleDeleteEnrollment = async (enr) => {
     const confirmDelete = window.confirm(
       `Bạn có chắc chắn muốn xóa học viên "${enr.student?.name}" khỏi danh sách đóng phí theo tháng?\n\nHọc viên sẽ được chuyển về kiểu học phí theo khóa thông thường. Toàn bộ hồ sơ học viên trong hệ thống vẫn luôn an toàn 100%!`
@@ -373,7 +362,7 @@ export default function MonthlyBillingPage() {
     setSavingStudent(true);
     try {
       const payload = {
-        enrollmentId: editingEnrollmentId, // nếu có id thì API sẽ cập nhật
+        enrollmentId: editingEnrollmentId,
         isNewStudent: !editingEnrollmentId && !selectedStudent,
         studentId: selectedStudent ? selectedStudent.id : null,
         name: formName.trim(),
@@ -425,7 +414,6 @@ export default function MonthlyBillingPage() {
     else if (currentStatus === 'Có mặt') nextStatus = 'Vắng';
     else nextStatus = 'Trống';
 
-    // Optimistic UI update
     const updatedAttendances = [...attendanceData.attendances];
     const existingIndex = updatedAttendances.findIndex(
       (a) => a.studentId === studentId && a.classCode === classCode && a.date.startsWith(date)
@@ -520,6 +508,7 @@ export default function MonthlyBillingPage() {
   const dynamicNoticeData = activeRecord
     ? {
         ...activeRecord,
+        monthYear: activeRecord.monthYear || monthYear,
         previousDebt: currentDebtNum,
         totalToPay: calculatedTotalToPay,
         qrUrl: dynamicQrUrl,
@@ -603,7 +592,7 @@ export default function MonthlyBillingPage() {
 
   // Copy Tin Nhắn Zalo
   const handleCopyZaloMessage = async () => {
-    const text = generateZaloMessage(activeRecord, currentDebtNum);
+    const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear);
     setCopyingZaloText(true);
     try {
       await navigator.clipboard.writeText(text);
@@ -718,8 +707,6 @@ export default function MonthlyBillingPage() {
       ? Math.round(parseFloat(formMonthlyRate) / parseInt(formMonthlySessions, 10))
       : parseFloat(formMonthlyRate) || 0;
 
-  const groupedMonthOptions = getGroupedMonthOptions();
-
   return (
     <div className="page-container">
       {/* Header */}
@@ -765,68 +752,119 @@ export default function MonthlyBillingPage() {
         </button>
       </div>
 
-      {/* Toolbar lọc Tháng (Nhóm theo 6 tháng/năm + Nút điều hướng nhanh) & Lớp học */}
+      {/* =========================================================
+          TOOLBAR: NẤC THANG CHỌN THỜI GIAN (NĂM -> 6 THÁNG -> THÁNG) & LỌC LỚP
+         ========================================================= */}
       <div
         className="toolbar-panel glass-panel"
         style={{ marginBottom: '1.25rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}
       >
-        {/* Bộ chọn tháng thông minh: Có nút mũi tên lùi/tiến & Group 6 tháng */}
-        <div className="filter-group" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <label style={{ fontWeight: '700', color: '#085E8A', marginRight: '4px' }}>
+        {/* Bộ chọn thời gian theo 3 Nấc Thang */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: '800', color: '#085E8A', marginRight: '4px', fontSize: '0.95rem' }}>
             <i className="fa-solid fa-calendar-days"></i> Chọn tháng:
           </label>
 
+          {/* Nút lùi 1 tháng */}
           <button
             type="button"
             className="btn btn-sm btn-outline"
             onClick={handlePrevMonth}
             title="Lùi lại 1 tháng"
-            style={{ padding: '4px 8px', fontWeight: 'bold' }}
+            style={{ padding: '5px 9px', fontWeight: 'bold' }}
           >
             <i className="fa-solid fa-chevron-left"></i>
           </button>
 
+          {/* Nấc 1: Chọn Năm */}
           <select
-            value={monthYear}
-            onChange={(e) => setMonthYear(e.target.value)}
+            value={selectedYear}
+            onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
             style={{
-              padding: '0.45rem 0.65rem',
+              padding: '0.45rem 0.6rem',
               borderRadius: '6px',
-              border: '1.5px solid #085E8A',
+              border: '1.5px solid #cbd5e1',
               fontWeight: '700',
-              color: '#085E8A',
+              color: '#1e293b',
               background: '#fff',
-              minWidth: '180px',
+              fontSize: '0.9rem',
             }}
           >
-            {groupedMonthOptions.map((grp) => (
-              <optgroup key={grp.groupName} label={grp.groupName}>
-                {grp.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </optgroup>
+            {[2025, 2026, 2027, 2028].map((y) => (
+              <option key={y} value={y}>
+                Năm {y}
+              </option>
             ))}
           </select>
 
+          {/* Nấc 2: Chọn Kỳ 6 Tháng */}
+          <select
+            value={selectedPeriod}
+            onChange={(e) => handlePeriodChange(e.target.value)}
+            style={{
+              padding: '0.45rem 0.6rem',
+              borderRadius: '6px',
+              border: '1.5px solid #cbd5e1',
+              fontWeight: '700',
+              color: '#334155',
+              background: '#fff',
+              fontSize: '0.9rem',
+            }}
+          >
+            <option value="H1">6 Tháng Đầu (T1 - T6)</option>
+            <option value="H2">6 Tháng Cuối (T7 - T12)</option>
+          </select>
+
+          {/* Nấc 3: Chọn Tháng cần xem (Chỉ hiển thị 6 tháng của kỳ) */}
+          <select
+            value={currentMStr}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: '6px',
+              border: '2px solid #085E8A',
+              fontWeight: '800',
+              color: '#085E8A',
+              background: '#eff6ff',
+              fontSize: '0.95rem',
+            }}
+          >
+            {(selectedPeriod === 'H1' ? ['01', '02', '03', '04', '05', '06'] : ['07', '08', '09', '10', '11', '12']).map(
+              (m) => (
+                <option key={m} value={m}>
+                  Tháng {m}/{selectedYear}
+                </option>
+              )
+            )}
+          </select>
+
+          {/* Nút tiến 1 tháng */}
           <button
             type="button"
             className="btn btn-sm btn-outline"
             onClick={handleNextMonth}
             title="Tiến tới 1 tháng"
-            style={{ padding: '4px 8px', fontWeight: 'bold' }}
+            style={{ padding: '5px 9px', fontWeight: 'bold' }}
           >
             <i className="fa-solid fa-chevron-right"></i>
           </button>
 
+          {/* Nút về Tháng hiện tại */}
           {monthYear !== currentMonthYear && (
             <button
               type="button"
               className="btn btn-sm"
               onClick={handleCurrentMonth}
-              style={{ padding: '4px 8px', fontSize: '0.78rem', background: '#e0f2fe', color: '#0369a1', fontWeight: '700', border: 'none', borderRadius: '4px' }}
-              title="Quay về tháng hiện tại"
+              style={{
+                padding: '4px 10px',
+                fontSize: '0.8rem',
+                background: '#085E8A',
+                color: '#fff',
+                fontWeight: '700',
+                border: 'none',
+                borderRadius: '6px',
+              }}
+              title="Quay lại tháng hiện tại"
             >
               Hiện tại
             </button>
@@ -932,7 +970,7 @@ export default function MonthlyBillingPage() {
                           {hpPerSession ? Number(hpPerSession).toLocaleString('vi-VN') + 'đ' : '0đ'}
                         </td>
 
-                        {/* Cột Thao tác: Nút Sửa & Nút Xóa khỏi tháng */}
+                        {/* Nút Sửa & Nút Xóa khỏi tháng */}
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
                             <button
@@ -1360,7 +1398,6 @@ export default function MonthlyBillingPage() {
                   {editingEnrollmentId ? 'Chỉnh Sửa Thông Tin & Cấu Hình Học Viên' : 'Thêm Học Viên Học Phí Tháng'}
                 </h2>
 
-                {/* Switch chế độ nếu là thêm mới */}
                 {!editingEnrollmentId && (
                   <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '2px', borderRadius: '6px' }}>
                     <button
@@ -1481,7 +1518,7 @@ export default function MonthlyBillingPage() {
               </div>
             )}
 
-            {/* Bố cục 2 Cột - Vừa vặn 1 màn hình */}
+            {/* Bố cục 2 Cột */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1 }}>
               {/* CỘT 1: THÔNG TIN HỌC VIÊN */}
               <div
@@ -1499,7 +1536,6 @@ export default function MonthlyBillingPage() {
                   <i className="fa-solid fa-id-card"></i> Thông tin học viên
                 </div>
 
-                {/* Họ và tên */}
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                     Họ và Tên *
@@ -1514,7 +1550,6 @@ export default function MonthlyBillingPage() {
                   />
                 </div>
 
-                {/* Số điện thoại & Số CCCD */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
@@ -1545,7 +1580,6 @@ export default function MonthlyBillingPage() {
                   </div>
                 </div>
 
-                {/* Ngày sinh & Địa chỉ */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '0.5rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
@@ -1592,7 +1626,6 @@ export default function MonthlyBillingPage() {
                   <i className="fa-solid fa-graduation-cap"></i> Cấu hình lớp & Học phí tháng
                 </div>
 
-                {/* Chọn Lớp học */}
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
                     Chọn Lớp học *
@@ -1612,7 +1645,6 @@ export default function MonthlyBillingPage() {
                   </select>
                 </div>
 
-                {/* Ngày bắt đầu & Tùy chọn đóng học phí */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
@@ -1648,7 +1680,6 @@ export default function MonthlyBillingPage() {
                   </div>
                 </div>
 
-                {/* Học phí cam kết & Số buổi */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '2px' }}>
@@ -1680,7 +1711,6 @@ export default function MonthlyBillingPage() {
                   </div>
                 </div>
 
-                {/* HP / Buổi tự tính realtime */}
                 <div
                   style={{
                     background: '#fff',
@@ -1698,7 +1728,6 @@ export default function MonthlyBillingPage() {
                   </strong>
                 </div>
 
-                {/* Ghi chú */}
                 <div>
                   <input
                     type="text"
@@ -1748,7 +1777,9 @@ export default function MonthlyBillingPage() {
       )}
 
       {/* =========================================================
-          MODAL XEM TRƯỚC THƯ BÁO, TIN NHẮN ZALO 3S & TÙY CHỌN NỢ CŨ
+          MODAL XEM TRƯỚC THƯ BÁO:
+          - HÌNH THƯ BÁO LÊN TRÊN VÀ CỐ ĐỊNH DỄ XEM & CHỈNH SỬA
+          - NỘI DUNG COPY ZALO CHO XUỐNG DƯỚI (THAY BẰNG "TRUNG TÂM")
          ========================================================= */}
       {previewModalOpen && activeRecord && dynamicNoticeData && (
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
@@ -1757,7 +1788,7 @@ export default function MonthlyBillingPage() {
             style={{
               maxWidth: '920px',
               width: '94%',
-              maxHeight: '92vh',
+              maxHeight: '94vh',
               overflowY: 'auto',
               padding: '1.25rem',
               borderRadius: '16px',
@@ -1787,7 +1818,7 @@ export default function MonthlyBillingPage() {
               </button>
             </div>
 
-            {/* KHỐI 1: TÙY CHỌN ĐIỀU CHỈNH NỢ CŨ / HỌC PHÍ CHƯA HOÀN THÀNH */}
+            {/* KHỐI 1: TÙY CHỌN ĐIỀU CHỈNH NỢ CŨ / HỌC PHÍ CHƯA HOÀN THÀNH (TRÊN CÙNG ĐỂ CHỈNH) */}
             <div
               style={{
                 background: '#FFFBEB',
@@ -1807,7 +1838,7 @@ export default function MonthlyBillingPage() {
                 <div>
                   <strong style={{ color: '#92400E', fontSize: '0.95rem' }}>Học phí chưa hoàn thành (Nợ cũ tháng trước):</strong>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: '#78350F' }}>
-                    Hệ thống tự động cộng dồn nợ cũ, bạn có thể chỉnh sửa trực tiếp con số này:
+                    Nhập số tiền nợ cũ nếu muốn chỉnh sửa, Thư báo và mã QR bên dưới sẽ tự động nhảy số tiền mới tức thì:
                   </p>
                 </div>
               </div>
@@ -1845,7 +1876,25 @@ export default function MonthlyBillingPage() {
               </div>
             </div>
 
-            {/* KHỐI 2: SOẠN TIN NHẮN ZALO 3 GIÂY */}
+            {/* KHỐI 2: HÌNH THƯ BÁO LÊN TRÊN VÀ CỐ ĐỊNH ĐỂ DỄ DÀNG XEM & CHỈNH SỬA (YÊU CẦU 2 CỦA USER) */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                backgroundColor: '#f1f5f9',
+                padding: '1.25rem',
+                borderRadius: '10px',
+                marginBottom: '1rem',
+                overflowX: 'auto',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <div ref={previewTemplateRef} style={{ width: '800px', background: '#fff' }}>
+                <MonthlyNoticeTemplate noticeData={dynamicNoticeData} />
+              </div>
+            </div>
+
+            {/* KHỐI 3: NỘI DUNG TIN NHẮN COPY ZALO CHO XUỐNG DƯỚI (THAY BẰNG "TRUNG TÂM" GẦN GŨI) */}
             <div
               style={{
                 background: '#F0FDF4',
@@ -1887,28 +1936,11 @@ export default function MonthlyBillingPage() {
                   borderRadius: '6px',
                 }}
               >
-                {generateZaloMessage(activeRecord, currentDebtNum)}
+                {generateZaloMessage(activeRecord, currentDebtNum, monthYear)}
               </pre>
             </div>
 
-            {/* KHỐI 3: BẢN XEM TRƯỚC HÌNH ẢNH THƯ BÁO VỚI MÃ VIETQR */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                backgroundColor: '#f1f5f9',
-                padding: '1.25rem',
-                borderRadius: '10px',
-                marginBottom: '1rem',
-                overflowX: 'auto',
-              }}
-            >
-              <div ref={previewTemplateRef} style={{ width: '800px', background: '#fff' }}>
-                <MonthlyNoticeTemplate noticeData={dynamicNoticeData} />
-              </div>
-            </div>
-
-            {/* KHỐI 4: CÁC NÚT HÀNH ĐỘNG CUỐI */}
+            {/* KHỐI 4: CÁC NÚT HÀNH ĐỘNG CUỐI MODAL */}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button
                 onClick={handleCopyPreviewImage}
