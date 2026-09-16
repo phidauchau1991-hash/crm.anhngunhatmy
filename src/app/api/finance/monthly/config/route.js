@@ -193,16 +193,49 @@ export async function POST(request) {
   }
 }
 
-// Xóa học viên khỏi danh sách tháng (Chuyển về học phí khóa an toàn 100%)
+// Xóa học viên:
+// - permanent = true: XÓA VĨNH VIỄN KHỎI HỆ THỐNG (Dành cho học viên demo / tạo thử)
+// - permanent = false: Chỉ rút khỏi danh sách học phí tháng (chuyển sang COURSE)
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const enrollmentId = parseInt(searchParams.get('enrollmentId'), 10);
+    const permanent = searchParams.get('permanent') === 'true';
 
     if (!enrollmentId) {
       return NextResponse.json({ error: 'Thiếu enrollmentId' }, { status: 400 });
     }
 
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+    });
+
+    if (!enrollment) {
+      return NextResponse.json({ error: 'Không tìm thấy thông tin phân lớp của học viên' }, { status: 404 });
+    }
+
+    const studentId = enrollment.studentId;
+
+    if (permanent && studentId) {
+      // Xóa vĩnh viễn học viên và mọi bản ghi liên quan trong CSDL
+      await prisma.$transaction(async (tx) => {
+        await tx.attendance.deleteMany({ where: { studentId } });
+        await tx.monthlyInvoice.deleteMany({ where: { studentId } });
+        await tx.orderFinance.deleteMany({ where: { studentId } });
+        await tx.inventoryLog.deleteMany({ where: { studentId } });
+        await tx.examResult.deleteMany({ where: { studentId } });
+        await tx.certificate.deleteMany({ where: { studentId } });
+        await tx.enrollment.deleteMany({ where: { studentId } });
+        await tx.student.delete({ where: { id: studentId } });
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Đã xóa vĩnh viễn học viên và toàn bộ dữ liệu liên quan khỏi hệ thống hoàn toàn.' 
+      });
+    }
+
+    // Mặc định: Chỉ chuyển về học phí theo khóa, bảo toàn học viên trên hệ thống
     const updated = await prisma.enrollment.update({
       where: { id: enrollmentId },
       data: {
@@ -212,7 +245,11 @@ export async function DELETE(request) {
       },
     });
 
-    return NextResponse.json({ success: true, message: 'Đã chuyển học viên về học phí theo khóa', data: updated });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Đã rút học viên khỏi danh sách học phí tháng (chuyển về học theo khóa).', 
+      data: updated 
+    });
   } catch (error) {
     console.error('Lỗi khi xóa học viên khỏi danh sách tháng:', error);
     return NextResponse.json({ error: error.message || 'Lỗi hệ thống' }, { status: 500 });
