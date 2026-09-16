@@ -41,7 +41,7 @@ export async function POST(request) {
       notes 
     } = body;
 
-    // 1. Trường hợp cập nhật Enrollment đã có
+    // 1. Trường hợp cập nhật Enrollment đã có (Chỉnh sửa học viên)
     if (enrollmentId) {
       const updated = await prisma.enrollment.update({
         where: { id: enrollmentId },
@@ -49,6 +49,7 @@ export async function POST(request) {
           billingType: billingType || 'MONTHLY_PREPAID',
           monthlyRate: parseFloat(monthlyRate) || 0,
           monthlySessions: billingType === 'MONTHLY_PREPAID' ? (parseInt(monthlySessions, 10) || 0) : null,
+          ...(classCode ? { classCode } : {}),
         },
         include: {
           student: true,
@@ -56,14 +57,16 @@ export async function POST(request) {
         },
       });
 
-      // Nếu có cập nhật CCCD hoặc SĐT cho học viên đó
-      if (updated.studentId && (nationalId || phone || address)) {
+      // Cập nhật thông tin học viên (Họ tên, SĐT, CCCD, Ngày sinh, Địa chỉ)
+      if (updated.studentId) {
         await prisma.student.update({
           where: { id: updated.studentId },
           data: {
-            ...(nationalId ? { nationalId: nationalId.trim() } : {}),
-            ...(phone ? { phone: phone.trim() } : {}),
-            ...(address ? { address: address.trim() } : {}),
+            ...(name ? { name: name.trim() } : {}),
+            ...(nationalId !== undefined ? { nationalId: nationalId ? nationalId.trim() : null } : {}),
+            ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+            ...(address !== undefined ? { address: address ? address.trim() : null } : {}),
+            ...(dob ? { dob: new Date(dob) } : {}),
           },
         });
       }
@@ -122,14 +125,16 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Chưa xác định được học viên' }, { status: 400 });
     }
 
-    // Nếu là học viên cũ nhưng có truyền CCCD mới -> Cập nhật luôn
-    if (existingStudentId && nationalId) {
+    // Nếu là học viên cũ nhưng có truyền CCCD/SĐT mới -> Cập nhật luôn
+    if (existingStudentId) {
       await prisma.student.update({
         where: { id: existingStudentId },
         data: {
-          nationalId: nationalId.trim(),
-          ...(address ? { address: address.trim() } : {}),
-          ...(phone ? { phone: phone.trim() } : {}),
+          ...(name ? { name: name.trim() } : {}),
+          ...(nationalId !== undefined ? { nationalId: nationalId ? nationalId.trim() : null } : {}),
+          ...(address !== undefined ? { address: address ? address.trim() : null } : {}),
+          ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+          ...(dob ? { dob: new Date(dob) } : {}),
         },
       });
     }
@@ -184,6 +189,32 @@ export async function POST(request) {
     return NextResponse.json({ success: true, data: enrollmentRecord });
   } catch (error) {
     console.error('Lỗi khi lưu cấu hình học phí tháng:', error);
+    return NextResponse.json({ error: error.message || 'Lỗi hệ thống' }, { status: 500 });
+  }
+}
+
+// Xóa học viên khỏi danh sách tháng (Chuyển về học phí khóa an toàn 100%)
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const enrollmentId = parseInt(searchParams.get('enrollmentId'), 10);
+
+    if (!enrollmentId) {
+      return NextResponse.json({ error: 'Thiếu enrollmentId' }, { status: 400 });
+    }
+
+    const updated = await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        billingType: 'COURSE',
+        monthlyRate: null,
+        monthlySessions: null,
+      },
+    });
+
+    return NextResponse.json({ success: true, message: 'Đã chuyển học viên về học phí theo khóa', data: updated });
+  } catch (error) {
+    console.error('Lỗi khi xóa học viên khỏi danh sách tháng:', error);
     return NextResponse.json({ error: error.message || 'Lỗi hệ thống' }, { status: 500 });
   }
 }
