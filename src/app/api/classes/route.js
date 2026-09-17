@@ -76,6 +76,10 @@ export async function GET(request) {
         startDate: new Date(cls.startDate).toLocaleDateString('vi-VN'),
         startDateIso: new Date(cls.startDate).toISOString().split('T')[0],
         schedule: (() => {
+          if (cls.schedule.includes('|')) {
+            const parts = cls.schedule.split('|');
+            return parts[0].trim();
+          }
           const days = [];
           if (cls.schedule.includes('2')) days.push('Thứ 2');
           if (cls.schedule.includes('3')) days.push('Thứ 3');
@@ -84,11 +88,11 @@ export async function GET(request) {
           if (cls.schedule.includes('6')) days.push('Thứ 6');
           if (cls.schedule.includes('7')) days.push('Thứ 7');
           if (cls.schedule.includes('8') || cls.schedule.includes('CN') || cls.schedule.toUpperCase().includes('C')) days.push('Chủ Nhật');
-          return days.join(', ');
+          return days.join(', ') || cls.schedule;
         })(),
         scheduleRaw: cls.schedule,
         careStaff: cls.careStaff || 'Chưa phân công',
-        expectedEndDate: new Date(cls.expectedEndDate).toLocaleDateString('vi-VN'),
+        expectedEndDate: cls.expectedEndDate && new Date(cls.expectedEndDate).getFullYear() > 2090 ? 'Học liên tục' : new Date(cls.expectedEndDate).toLocaleDateString('vi-VN'),
         expectedEndDateIso: new Date(cls.expectedEndDate).toISOString().split('T')[0],
         studentCount: cls.enrollments.length,
         totalSessions,
@@ -108,14 +112,88 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { level, teacherName, teacherId, careStaff, startDateStr, schedule } = body;
-
-    if (!level || !startDateStr || !schedule) {
-      return NextResponse.json({ success: false, error: 'Cấp độ, ngày khai giảng và lịch học là bắt buộc' }, { status: 400 });
-    }
+    const { 
+      customCode, 
+      code: inputCode, 
+      isMonthly, 
+      level, 
+      teacherName, 
+      teacherId, 
+      careStaff, 
+      startDateStr, 
+      schedule, 
+      shiftHours 
+    } = body;
 
     const branchId = request.headers.get('x-user-branch') || "CN1";
     const branchPrefix = branchId.split('_')[0]; // e.g. CN1_BinhDuong -> CN1
+
+    // TRƯỜNG HỢP 1: TẠO LỚP HỌC CHO HỌC VIÊN THÁNG / LỚP TÙY CHỈNH (KHÔNG CẦN NGÀY KHAI GIẢNG, TÊN TỰ NHẬP)
+    if (isMonthly || customCode) {
+      const classCode = (customCode || inputCode || '').trim();
+      if (!classCode) {
+        return NextResponse.json({ success: false, error: 'Vui lòng nhập tên / mã lớp học' }, { status: 400 });
+      }
+
+      // Kiểm tra xem tên / mã lớp đã tồn tại chưa
+      const existingClass = await prisma.class.findUnique({
+        where: { code: classCode },
+      });
+      if (existingClass) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `Lớp học "${classCode}" đã tồn tại trên hệ thống. Vui lòng đặt tên khác hoặc chọn lớp này!` 
+        }, { status: 400 });
+      }
+
+      // Lịch học & Ca học
+      let fullSchedule = (schedule || '').trim();
+      if (shiftHours && shiftHours.trim()) {
+        fullSchedule = fullSchedule ? `${fullSchedule} | ${shiftHours.trim()}` : shiftHours.trim();
+      }
+      if (!fullSchedule) fullSchedule = '—';
+
+      // Giáo viên
+      let finalTeacherName = teacherName ? teacherName.trim() : 'Chưa phân công';
+      if (teacherId) {
+        const teacherObj = await prisma.user.findUnique({ where: { id: teacherId } });
+        if (teacherObj) {
+          finalTeacherName = teacherObj.shortName || teacherObj.fullName;
+        }
+      }
+
+      // Lớp tháng học liên tục xuyên suốt, không có ngày khai giảng hay ngày kết thúc cố định
+      const startDate = startDateStr ? new Date(startDateStr) : new Date();
+      startDate.setHours(0, 0, 0, 0);
+      const expectedEndDate = new Date('2099-12-31T23:59:59.999Z');
+
+      const newClass = await prisma.class.create({
+        data: {
+          code: classCode,
+          level: level || 'MONTHLY',
+          teacherName: finalTeacherName,
+          teacherId: teacherId || null,
+          careStaff: careStaff || null,
+          startDate,
+          schedule: fullSchedule,
+          expectedEndDate,
+          branchId: branchId || 'CN1_BinhDuong',
+        },
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        data: {
+          ...newClass,
+          expectedEndDateStr: 'Học liên tục',
+        } 
+      });
+    }
+
+    // TRƯỜNG HỢP 2: TẠO LỚP HỌC THEO KHÓA CỐ ĐỊNH (GIỮ NGUYÊN 100% LOGIC CŨ)
+    if (!level || !startDateStr || !schedule) {
+      return NextResponse.json({ success: false, error: 'Cấp độ, ngày khai giảng và lịch học là bắt buộc' }, { status: 400 });
+    }
 
     const courseConfig = await prisma.courseConfig.findUnique({
       where: { level },

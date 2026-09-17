@@ -7,18 +7,26 @@ import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 // Helper parse Ngày học và Giờ học từ ClassCode & Schedule
 function getScheduleInfo(classCode, schedule) {
   let days = '—';
+  let shiftTime = '—';
+
   if (schedule) {
+    if (schedule.includes('|')) {
+      const parts = schedule.split('|');
+      days = parts[0].trim();
+      shiftTime = parts.slice(1).join('|').trim();
+      return { days, shiftTime };
+    }
     if (schedule === '7CN' || schedule.toLowerCase() === 't7cn') days = 'Thứ 7, CN';
     else if (schedule === '24' || schedule.toLowerCase() === 't24') days = 'Thứ 2, Thứ 4';
     else if (schedule === '35' || schedule.toLowerCase() === 't35') days = 'Thứ 3, Thứ 5';
     else if (schedule === '46' || schedule.toLowerCase() === 't46') days = 'Thứ 4, Thứ 6';
     else if (schedule === '246' || schedule.toLowerCase() === 't246') days = 'Thứ 2, 4, 6';
     else if (schedule === '357' || schedule.toLowerCase() === 't357') days = 'Thứ 3, 5, 7';
+    else if (schedule.includes('Thứ') || schedule.includes('CN') || schedule.includes('Chủ Nhật')) days = schedule;
     else days = schedule.split('').map((d) => (d === 'CN' ? 'CN' : 'T' + d)).join(', ');
   }
 
-  let shiftTime = '—';
-  if (classCode) {
+  if (shiftTime === '—' && classCode) {
     const parts = classCode.split('_');
     const rawShift = parts.length >= 5 ? parts[4].toLowerCase() : '';
     if (rawShift === '01' || rawShift === 'ca1') shiftTime = 'Ca 1 (17:30 - 19:00)';
@@ -134,14 +142,21 @@ export default function MonthlyBillingPage() {
   const [deleteTarget, setDeleteTarget] = useState(null); // { enrollmentId, studentName, studentId, classCode }
   const [deletingStudent, setDeletingStudent] = useState(false);
 
-  // Modal Tạo Lớp Học Mới nhanh
+  // Modal Tạo Lớp Học Mới nhanh (cho học viên tháng)
   const [showCreateClassModal, setShowCreateClassModal] = useState(false);
-  const [classLevel, setClassLevel] = useState('M1');
+  const [customClassName, setCustomClassName] = useState('');
   const [classTeacherName, setClassTeacherName] = useState('');
-  const [classSchedule, setClassSchedule] = useState('35');
-  const [classShift, setClassShift] = useState('01');
-  const [classStartDate, setClassStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDays, setSelectedDays] = useState([]);
+  const [classHoursNotes, setClassHoursNotes] = useState('');
   const [creatingClass, setCreatingClass] = useState(false);
+
+  const handleOpenCreateClassModal = () => {
+    setCustomClassName('');
+    setClassTeacherName('');
+    setSelectedDays([]);
+    setClassHoursNotes('');
+    setShowCreateClassModal(true);
+  };
 
   // Pay Modal & E-Receipt
   const [showPayModal, setShowPayModal] = useState(false);
@@ -173,7 +188,11 @@ export default function MonthlyBillingPage() {
     try {
       const res = await fetch('/api/classes');
       const data = await res.json();
-      if (Array.isArray(data)) setAllClasses(data);
+      if (data && data.success && Array.isArray(data.data)) {
+        setAllClasses(data.data);
+      } else if (Array.isArray(data)) {
+        setAllClasses(data);
+      }
     } catch (err) {
       console.error('Lỗi tải danh sách lớp:', err);
     }
@@ -380,29 +399,40 @@ export default function MonthlyBillingPage() {
   // Tạo Lớp Học Mới nhanh cho học viên tháng
   const handleCreateClass = async (e) => {
     if (e) e.preventDefault();
-    if (!classTeacherName.trim()) {
-      alert('Vui lòng nhập tên giáo viên phụ trách!');
+    if (!customClassName.trim()) {
+      alert('Vui lòng nhập tên lớp học!');
       return;
     }
+    if (selectedDays.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 ngày học trong tuần!');
+      return;
+    }
+
     setCreatingClass(true);
     try {
+      const scheduleString = selectedDays.join(', ');
       const res = await fetch('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          level: classLevel,
-          teacherName: classTeacherName.trim(),
-          startDateStr: classStartDate,
-          schedule: classSchedule + '_' + classShift,
+          customCode: customClassName.trim(),
+          isMonthly: true,
+          teacherName: classTeacherName.trim() || 'Chưa phân công',
+          schedule: scheduleString,
+          shiftHours: classHoursNotes.trim(),
         }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         const createdClass = json.data;
-        setMessage({ type: 'success', text: `Đã tạo thành công lớp ${createdClass.code}!` });
+        setMessage({ type: 'success', text: `Đã tạo thành công lớp "${createdClass.code}"!` });
         await fetchClasses();
         setFormClassCode(createdClass.code);
         setShowCreateClassModal(false);
+        setCustomClassName('');
+        setClassTeacherName('');
+        setSelectedDays([]);
+        setClassHoursNotes('');
       } else {
         alert('Lỗi: ' + (json.error || 'Không thể tạo lớp'));
       }
@@ -994,7 +1024,7 @@ export default function MonthlyBillingPage() {
             <div style={{ display: 'flex', gap: '0.65rem' }}>
               <button
                 className="btn btn-outline"
-                onClick={() => setShowCreateClassModal(true)}
+                onClick={handleOpenCreateClassModal}
                 style={{ fontWeight: '700', padding: '0.6rem 1.15rem', borderColor: '#085E8A', color: '#085E8A' }}
                 title="Tạo lớp học mới nhanh cho hệ thống và học viên tháng"
               >
@@ -1050,7 +1080,7 @@ export default function MonthlyBillingPage() {
                         <td style={{ color: '#475569', fontSize: '0.88rem' }}>{enr.student?.nationalId || '—'}</td>
                         <td style={{ whiteSpace: 'nowrap', fontWeight: '500' }}>{enr.classCode}</td>
                         <td style={{ whiteSpace: 'nowrap', color: '#0284c7', fontWeight: '600' }}>{days}</td>
-                        <td style={{ whiteSpace: 'nowrap', color: '#475569' }}>{shiftTime}</td>
+                        <td style={{ whiteSpace: 'pre-line', color: '#475569', fontSize: '0.88rem' }}>{shiftTime}</td>
                         <td style={{ textAlign: 'center' }}>
                           <span
                             className={`status-badge ${
@@ -1731,7 +1761,7 @@ export default function MonthlyBillingPage() {
                   <button
                     type="button"
                     className="btn btn-sm btn-outline"
-                    onClick={() => setShowCreateClassModal(true)}
+                    onClick={handleOpenCreateClassModal}
                     style={{ fontSize: '0.75rem', padding: '2px 8px', borderColor: '#085E8A', color: '#085E8A', fontWeight: '700' }}
                     title="Mở nhanh hộp thoại tạo lớp học mới"
                   >
@@ -2271,41 +2301,35 @@ export default function MonthlyBillingPage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, color: '#085E8A', fontSize: '1.15rem', fontWeight: '800' }}>
-                <i className="fa-solid fa-chalkboard-user"></i> Tạo Lớp Học Mới
+                <i className="fa-solid fa-chalkboard-user"></i> Tạo Lớp Học Mới (Học Viên Tháng)
               </h3>
               <button className="close-btn" onClick={() => setShowCreateClassModal(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}>
                 <i className="fa-solid fa-times"></i>
               </button>
             </div>
 
-            <form onSubmit={handleCreateClass} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <form onSubmit={handleCreateClass} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {/* 1. Tên lớp học (Tự do nhập không gợi ý trước) & Giáo viên phụ trách */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '0.75rem' }}>
                 <div style={{ minWidth: 0 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '3px' }}>
-                    Cấp độ (Level) *
+                  <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '4px' }}>
+                    Tên / Mã Lớp Học *
                   </label>
-                  <select
+                  <input
+                    type="text"
                     className="form-control"
-                    value={classLevel}
-                    onChange={(e) => setClassLevel(e.target.value)}
-                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.88rem', fontWeight: '700', width: '100%', boxSizing: 'border-box' }}
-                  >
-                    <option value="M1">M1 (Mầm non 1)</option>
-                    <option value="M2">M2 (Mầm non 2)</option>
-                    <option value="M3">M3 (Mầm non 3)</option>
-                    <option value="K1">K1 (Thiếu nhi 1)</option>
-                    <option value="K2">K2 (Thiếu nhi 2)</option>
-                    <option value="K3">K3 (Thiếu nhi 3)</option>
-                    <option value="S1">S1 (Thiếu niên 1)</option>
-                    <option value="S2">S2 (Thiếu niên 2)</option>
-                    <option value="IELTS">IELTS</option>
-                    <option value="TOEIC">TOEIC</option>
-                  </select>
+                    placeholder="VD: Lớp M3 T2-T4, Lớp Kèm Riêng..."
+                    value={customClassName}
+                    onChange={(e) => setCustomClassName(e.target.value)}
+                    required
+                    autoFocus
+                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', fontWeight: '700', color: '#085E8A', width: '100%', boxSizing: 'border-box' }}
+                  />
                 </div>
 
                 <div style={{ minWidth: 0 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '3px' }}>
-                    Tên Giáo viên phụ trách *
+                  <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Giáo viên phụ trách
                   </label>
                   <input
                     type="text"
@@ -2313,69 +2337,95 @@ export default function MonthlyBillingPage() {
                     placeholder="VD: Ms My, Thầy Hoàng..."
                     value={classTeacherName}
                     onChange={(e) => setClassTeacherName(e.target.value)}
-                    required
-                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' }}
+                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ minWidth: 0 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '3px' }}>
-                    Lịch học *
-                  </label>
-                  <select
-                    className="form-control"
-                    value={classSchedule}
-                    onChange={(e) => setClassSchedule(e.target.value)}
-                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' }}
-                  >
-                    <option value="35">Thứ 3, Thứ 5 (35)</option>
-                    <option value="24">Thứ 2, Thứ 4 (24)</option>
-                    <option value="46">Thứ 4, Thứ 6 (46)</option>
-                    <option value="7CN">Thứ 7, Chủ Nhật (7CN)</option>
-                    <option value="246">Thứ 2, 4, 6 (246)</option>
-                    <option value="357">Thứ 3, 5, 7 (357)</option>
-                  </select>
-                </div>
-
-                <div style={{ minWidth: 0 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '3px' }}>
-                    Ca học / Giờ học *
-                  </label>
-                  <select
-                    className="form-control"
-                    value={classShift}
-                    onChange={(e) => setClassShift(e.target.value)}
-                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' }}
-                  >
-                    <option value="01">Ca 1 (17:30 - 19:00)</option>
-                    <option value="02">Ca 2 (19:15 - 20:45)</option>
-                    <option value="03">Ca 3 (08:00 - 09:30)</option>
-                    <option value="04">Ca 4 (09:45 - 11:15)</option>
-                  </select>
+              {/* 2. Lịch học: 7 ngày trong tuần tích chọn ngày nào */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '6px' }}>
+                  Lịch học trong tuần (Tích chọn ngày học) *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(76px, 1fr))', gap: '7px' }}>
+                  {[
+                    { id: 'T2', name: 'Thứ 2' },
+                    { id: 'T3', name: 'Thứ 3' },
+                    { id: 'T4', name: 'Thứ 4' },
+                    { id: 'T5', name: 'Thứ 5' },
+                    { id: 'T6', name: 'Thứ 6' },
+                    { id: 'T7', name: 'Thứ 7' },
+                    { id: 'CN', name: 'Chủ Nhật' },
+                  ].map((day) => {
+                    const isChecked = selectedDays.includes(day.name);
+                    return (
+                      <label
+                        key={day.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '0.5rem 0.35rem',
+                          borderRadius: '8px',
+                          border: isChecked ? '2px solid #085E8A' : '1.5px solid #cbd5e1',
+                          background: isChecked ? '#e0f2fe' : '#f8fafc',
+                          color: isChecked ? '#085E8A' : '#475569',
+                          fontWeight: isChecked ? '800' : '600',
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDays([...selectedDays, day.name]);
+                            } else {
+                              setSelectedDays(selectedDays.filter((d) => d !== day.name));
+                            }
+                          }}
+                          style={{ accentColor: '#085E8A', width: '15px', height: '15px', cursor: 'pointer' }}
+                        />
+                        <span>{day.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* 3. Ca học / Giờ học: textarea tự do nhập và có thể xuống dòng */}
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '3px' }}>
-                  Ngày khai giảng / bắt đầu *
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '4px' }}>
+                  Ca học / Giờ học (Tự do nhập, có thể nhấn Enter xuống dòng)
                 </label>
-                <input
-                  type="date"
+                <textarea
                   className="form-control"
-                  value={classStartDate}
-                  onChange={(e) => setClassStartDate(e.target.value)}
-                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' }}
+                  rows={3}
+                  placeholder={'Nhập giờ học hoặc ca học (có thể xuống dòng)...\nVD:\nCa 1: 17:30 - 19:00\nCa 2: 19:15 - 20:45'}
+                  value={classHoursNotes}
+                  onChange={(e) => setClassHoursNotes(e.target.value)}
+                  style={{
+                    padding: '0.55rem 0.85rem',
+                    fontSize: '0.88rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    lineHeight: '1.5',
+                  }}
                 />
               </div>
 
-              <div style={{ background: '#f1f5f9', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', color: '#475569' }}>
-                <i className="fa-solid fa-circle-info" style={{ color: '#085E8A', marginRight: '5px' }}></i>
-                Mã lớp sẽ được hệ thống sinh tự động chuẩn hóa (VD: <code>CN1_{classLevel}_{classTeacherName ? classTeacherName.replace(/\s+/g, '') : 'GV'}_{classSchedule}_01</code>).
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', color: '#64748b', lineHeight: '1.45' }}>
+                <i className="fa-solid fa-circle-info" style={{ color: '#085E8A', marginRight: '6px' }}></i>
+                Lớp học theo tháng diễn ra xuyên suốt qua các tháng, học phí và điểm danh sẽ được theo dõi tự động theo từng chu kỳ tháng mà không cần khai giảng lại.
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.4rem' }}>
                 <button
                   type="button"
                   className="btn btn-outline"
