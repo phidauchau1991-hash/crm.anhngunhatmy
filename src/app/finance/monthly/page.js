@@ -1142,10 +1142,14 @@ export default function MonthlyBillingPage() {
           className="glass-panel p-4"
           style={{
             overflowX: 'auto',
-            overflowY: 'hidden',
+            overflowY: 'auto',
             paddingBottom: '12px',
             position: 'relative',
-            maxHeight: '75vh',
+            maxHeight: 'calc(100vh - 250px)',
+            minHeight: '420px',
+            border: '1px solid #cbd5e1',
+            borderRadius: '12px',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
           }}
         >
           {loadingAttendance ? (
@@ -1158,149 +1162,246 @@ export default function MonthlyBillingPage() {
               <p>Chưa có học viên nào trong danh sách điểm danh tháng {monthYear}.</p>
             </div>
           ) : (
-            <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.95rem' }}>
-              <thead>
-                <tr>
-                  <th
-                    style={{
-                      position: 'sticky',
-                      top: 0,
-                      left: 0,
-                      zIndex: 12,
-                      background: '#f1f5f9',
-                      padding: '12px 16px',
-                      whiteSpace: 'nowrap',
-                      borderBottom: '2px solid #cbd5e1',
-                      minWidth: '180px',
-                      textAlign: 'left',
-                      fontWeight: '800',
-                      color: '#085E8A',
-                    }}
-                  >
-                    Học viên
-                  </th>
-                  <th
-                    style={{
-                      position: 'sticky',
-                      top: 0,
-                      left: '180px',
-                      zIndex: 12,
-                      background: '#f1f5f9',
-                      padding: '12px 16px',
-                      whiteSpace: 'nowrap',
-                      borderBottom: '2px solid #cbd5e1',
-                      minWidth: '170px',
-                      textAlign: 'left',
-                      fontWeight: '800',
-                      color: '#334155',
-                    }}
-                  >
-                    Lớp
-                  </th>
-                  {daysList.map((d) => (
+            <>
+              {/* Thanh chỉ dẫn trực quan: Thứ 7 & CN cuối tuần, Có mặt, Vắng mặt */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '0.85rem',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  fontSize: '0.85rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '16px',
+                        height: '16px',
+                        background: '#dcfce7',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '4px',
+                      }}
+                    ></span>
+                    <strong style={{ color: '#166534' }}>Thứ 7 & Chủ Nhật (Cuối tuần)</strong>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="fa-solid fa-check" style={{ color: '#16a34a', fontSize: '1.1rem', fontWeight: '900' }}></i>
+                    <span style={{ color: '#15803d', fontWeight: '700' }}>Có mặt</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="fa-solid fa-xmark" style={{ color: '#dc2626', fontSize: '1.1rem', fontWeight: '900' }}></i>
+                    <span style={{ color: '#b91c1c', fontWeight: '700' }}>Vắng mặt</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '16px',
+                        height: '16px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                      }}
+                    ></span>
+                    <span style={{ color: '#64748b' }}>Trống (Click để điểm danh)</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic' }}>
+                  * Cuộn dọc để xem thêm học viên, cuộn ngang để xem tất cả ngày trong tháng
+                </div>
+              </div>
+
+              <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.95rem' }}>
+                <thead>
+                  <tr>
                     <th
-                      key={d}
                       style={{
                         position: 'sticky',
                         top: 0,
-                        zIndex: 10,
-                        background: '#f1f5f9',
-                        padding: '12px 8px',
-                        textAlign: 'center',
-                        borderBottom: '2px solid #cbd5e1',
-                        minWidth: '54px',
-                        fontSize: '1rem',
-                        fontWeight: '800',
-                        color: '#1e293b',
-                      }}
-                    >
-                      {parseInt(d.split('-')[2], 10)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {getFilteredEnrollments().map((enr) => (
-                  <tr key={enr.id}>
-                    <td
-                      style={{
-                        position: 'sticky',
                         left: 0,
-                        zIndex: 9,
-                        background: '#fff',
-                        padding: '12px 16px',
+                        zIndex: 35,
+                        background: '#f1f5f9',
+                        padding: '10px 14px',
                         whiteSpace: 'nowrap',
-                        fontWeight: '700',
-                        color: '#0f172a',
-                        borderBottom: '1px solid #e2e8f0',
+                        borderBottom: '2px solid #94a3b8',
+                        borderRight: '1px solid #cbd5e1',
+                        minWidth: '180px',
+                        textAlign: 'left',
+                        fontWeight: '800',
+                        color: '#085E8A',
                       }}
                     >
-                      {enr.student?.name}
-                    </td>
-                    <td
+                      Học viên
+                    </th>
+                    <th
                       style={{
                         position: 'sticky',
+                        top: 0,
                         left: '180px',
-                        zIndex: 9,
-                        background: '#fff',
-                        padding: '12px 16px',
+                        zIndex: 35,
+                        background: '#f1f5f9',
+                        padding: '10px 14px',
                         whiteSpace: 'nowrap',
-                        borderBottom: '1px solid #e2e8f0',
-                        fontSize: '0.88rem',
-                        color: '#64748b',
+                        borderBottom: '2px solid #94a3b8',
+                        borderRight: '2px solid #94a3b8',
+                        minWidth: '170px',
+                        textAlign: 'left',
+                        fontWeight: '800',
+                        color: '#334155',
                       }}
                     >
-                      {enr.classCode}
-                    </td>
+                      Lớp
+                    </th>
                     {daysList.map((d) => {
-                      const att = attendanceData.attendances.find(
-                        (a) => a.studentId === enr.studentId && a.classCode === enr.classCode && a.date.startsWith(d)
-                      );
-                      let icon = '';
-                      let bgColor = 'transparent';
-                      let color = '';
-
-                      if (att?.status === 'Có mặt') {
-                        icon = 'fa-check';
-                        color = '#10b981';
-                        bgColor = '#ecfdf5';
-                      } else if (att?.status === 'Vắng') {
-                        icon = 'fa-xmark';
-                        color = '#ef4444';
-                        bgColor = '#fef2f2';
-                      }
+                      const dateParts = d.split('-');
+                      const dateObj = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
+                      const dayOfWeek = dateObj.getDay(); // 0 = CN, 6 = T7
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      const dayName = dayOfWeek === 0 ? 'CN' : `T${dayOfWeek + 1}`;
+                      const dayNum = parseInt(dateParts[2], 10);
 
                       return (
-                        <td
+                        <th
                           key={d}
                           style={{
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 25,
+                            background: isWeekend ? '#dcfce7' : '#f8fafc',
+                            padding: '6px 4px',
                             textAlign: 'center',
-                            cursor: 'pointer',
-                            padding: '10px 4px',
-                            borderBottom: '1px solid #e2e8f0',
-                            background: bgColor,
+                            borderBottom: isWeekend ? '2px solid #86efac' : '2px solid #cbd5e1',
+                            borderRight: isWeekend ? '1px solid #86efac' : '1px solid #cbd5e1',
+                            minWidth: '52px',
                             userSelect: 'none',
-                            transition: 'all 0.15s ease',
                           }}
-                          onClick={() => handleToggleAttendance(enr.studentId, enr.classCode, d, att?.status || 'Trống')}
-                          title={`Ngày ${d.split('-')[2]}: ${att?.status || 'Chưa điểm danh'}`}
                         >
-                          {icon && (
-                            <i
-                              className={`fa-solid ${icon}`}
-                              style={{
-                                fontSize: '1.4rem',
-                                color: color,
-                              }}
-                            ></i>
-                          )}
-                        </td>
+                          <div
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: '800',
+                              color: isWeekend ? '#166534' : '#64748b',
+                              textTransform: 'uppercase',
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {dayName}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.98rem',
+                              fontWeight: '900',
+                              color: isWeekend ? '#14532d' : '#1e293b',
+                              lineHeight: 1.2,
+                              marginTop: '2px',
+                            }}
+                          >
+                            {dayNum}
+                          </div>
+                        </th>
                       );
                     })}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {getFilteredEnrollments().map((enr) => (
+                    <tr key={enr.id}>
+                      <td
+                        style={{
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 15,
+                          background: '#fff',
+                          padding: '10px 14px',
+                          whiteSpace: 'nowrap',
+                          fontWeight: '700',
+                          color: '#085E8A',
+                          borderBottom: '1px solid #e2e8f0',
+                          borderRight: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {enr.student?.name}
+                      </td>
+                      <td
+                        style={{
+                          position: 'sticky',
+                          left: '180px',
+                          zIndex: 15,
+                          background: '#fff',
+                          padding: '10px 14px',
+                          whiteSpace: 'nowrap',
+                          borderBottom: '1px solid #e2e8f0',
+                          borderRight: '2px solid #94a3b8',
+                          fontSize: '0.88rem',
+                          color: '#475569',
+                          fontWeight: '600',
+                        }}
+                      >
+                        {enr.classCode}
+                      </td>
+                      {daysList.map((d) => {
+                        const dateParts = d.split('-');
+                        const dateObj = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
+                        const dayOfWeek = dateObj.getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        const dayName = dayOfWeek === 0 ? 'Chủ Nhật' : dayOfWeek === 6 ? 'Thứ 7' : `Thứ ${dayOfWeek + 1}`;
+
+                        const att = attendanceData.attendances.find(
+                          (a) => a.studentId === enr.studentId && a.classCode === enr.classCode && a.date.startsWith(d)
+                        );
+                        let icon = '';
+                        // Cột cuối tuần (T7 & CN) tô màu xanh nhạt phân biệt rõ như hình 2, ngày trong tuần nền trắng
+                        let bgColor = isWeekend ? '#f0fdf4' : '#ffffff';
+                        let color = '';
+
+                        if (att?.status === 'Có mặt') {
+                          icon = 'fa-check';
+                          color = '#16a34a';
+                          bgColor = isWeekend ? '#dcfce7' : '#ecfdf5';
+                        } else if (att?.status === 'Vắng') {
+                          icon = 'fa-xmark';
+                          color = '#dc2626';
+                          bgColor = '#fee2e2';
+                        }
+
+                        return (
+                          <td
+                            key={d}
+                            style={{
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              padding: '8px 2px',
+                              borderBottom: '1px solid #e2e8f0',
+                              borderRight: isWeekend ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                              background: bgColor,
+                              userSelect: 'none',
+                              transition: 'all 0.12s ease',
+                            }}
+                            onClick={() => handleToggleAttendance(enr.studentId, enr.classCode, d, att?.status || 'Trống')}
+                            title={`${dayName}, ngày ${dateParts[2]}/${dateParts[1]}: ${att?.status || 'Chưa điểm danh (Bấm để đổi)'}`}
+                          >
+                            {icon && (
+                              <i
+                                className={`fa-solid ${icon}`}
+                                style={{
+                                  fontSize: '1.4rem',
+                                  color: color,
+                                }}
+                              ></i>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       )}
