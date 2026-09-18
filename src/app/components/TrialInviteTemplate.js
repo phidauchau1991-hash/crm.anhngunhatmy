@@ -86,7 +86,7 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
               <div style={{ backgroundColor: '#0d88c4', color: 'white', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>1</div>
               <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>Trung tâm chuẩn bị</h3>
             </div>
-            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.5' }}>{centerPrep}</p>
+            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{centerPrep}</p>
           </div>
 
           <div style={{ flex: 1, backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
@@ -94,7 +94,7 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
               <div style={{ backgroundColor: '#10b981', color: 'white', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>2</div>
               <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>Ba mẹ & bé chuẩn bị</h3>
             </div>
-            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.5' }}>{parentPrep}</p>
+            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{parentPrep}</p>
           </div>
         </div>
       </div>

@@ -199,7 +199,7 @@ export default function StudentsPage() {
       const resClasses = await fetch('/api/classes');
       const resultClasses = await resClasses.json();
       if (resultClasses.success) {
-        setClasses(resultClasses.data);
+        setClasses(resultClasses.data.filter(c => c.level !== 'MONTHLY'));
       }
 
       const resInventory = await fetch('/api/inventory');

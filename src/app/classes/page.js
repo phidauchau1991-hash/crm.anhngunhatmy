@@ -458,6 +458,7 @@ export default function ClassesPage() {
   };
 
   const filteredClasses = classes.filter(cls => {
+    if (cls.level === 'MONTHLY') return false; // Hide monthly classes from this view
     if (statusFilter === 'active') return cls.sessionsRemaining > 0;
     if (statusFilter === 'completed') return cls.sessionsRemaining <= 0;
     return true;
