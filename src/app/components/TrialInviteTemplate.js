@@ -26,9 +26,11 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
     durationText = `${startDate} ${data.endDate ? `- ${data.endDate}` : ''}`;
   }
 
-  // Colors: Subtle variation for Assessment (Navy blue instead of light blue)
-  const accentColor = isAssessment ? '#1e40af' : '#0d88c4'; // #1e40af is a deeper blue
-  const headerBgColor = '#FFCA29'; // Keep yellow for logo visibility
+  // Colors: Giữ nguyên xanh thương hiệu, chỉ thay đổi màu nền để phân biệt
+  const accentColor = '#0d88c4';
+  const headerBgColor = '#FFCA29';
+  const footerBgColor = isAssessment ? '#fef9c3' : '#e0f2fe'; // Vàng nhạt cho ĐGNL, Xanh nhạt cho Học thử
+  const middleBoxBgColor = isAssessment ? '#fef9c3' : '#f0f9ff';
   const footerText = isAssessment ? 'Chúc con tự tin và đạt kết quả tốt nhất trong buổi đánh giá!' : 'Chào mừng con đến với Trung tâm Anh ngữ Nhật Mỹ!';
 
   return (
@@ -82,7 +84,7 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', backgroundColor: '#f0f9ff', padding: '15px', borderRadius: '8px', borderLeft: `4px solid ${accentColor}` }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', backgroundColor: middleBoxBgColor, padding: '15px', borderRadius: '8px', borderLeft: `4px solid ${accentColor}` }}>
             <div style={{ flex: '1 1 30%' }}>
               <p style={{ color: accentColor, fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>{labelDate}</p>
               <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{data.studyDays || 'Đang cập nhật'}</p>
@@ -120,7 +122,7 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '20px 40px', backgroundColor: 'white', textAlign: 'center', borderTop: '1px dashed #cbd5e1', color: '#64748b' }}>
+      <div style={{ padding: '20px 40px', backgroundColor: footerBgColor, textAlign: 'center', borderTop: '1px dashed #cbd5e1', color: '#64748b' }}>
         <p style={{ margin: '0 0 5px 0', fontSize: '14px' }}>{footerText}</p>
         <p style={{ margin: 0, fontWeight: 'bold', color: accentColor }}>Hotline: 0911 767 069</p>
       </div>
