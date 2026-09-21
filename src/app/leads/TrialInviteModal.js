@@ -9,6 +9,7 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
   const templateRef = useRef(null);
 
   // Form State
+  const [inviteType, setInviteType] = useState('TRIAL'); // 'TRIAL' | 'ASSESSMENT'
   const [studentName, setStudentName] = useState(lead?.name || '');
   const [className, setClassName] = useState(lead?.trialClassCode || '');
   const [startDate, setStartDate] = useState('');
@@ -45,13 +46,19 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
       }
       setStudyDays(guessedTime);
       setStudyHours('');
-      setEndDate('');
       
-      setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời học thử của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch học của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
+      if (inviteType === 'ASSESSMENT') {
+        setEndDate('45 phút');
+        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời Đánh giá năng lực của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch đánh giá của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
+      } else {
+        setEndDate('');
+        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời học thử của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch học của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
+      }
     }
-  }, [lead]);
+  }, [lead, inviteType]);
 
   const templateData = {
+    inviteType,
     studentName,
     className,
     studyDays,
@@ -117,13 +124,37 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
       <div className="modal-overlay">
         <div className="modal-content" style={{ maxWidth: '650px', width: '90%' }}>
           <div className="modal-header">
-            <h2><i className="fa-solid fa-ticket-simple"></i> Tạo Thư Mời Học Thử</h2>
+            <h2><i className="fa-solid fa-ticket-simple"></i> Tạo Thư Mời</h2>
             <button className="close-btn" onClick={onClose}>
               <i className="fa-solid fa-times"></i>
             </button>
           </div>
           
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '70vh', overflowY: 'auto' }}>
+            {/* Invite Type Toggle */}
+            <div style={{ display: 'flex', gap: '1.5rem', padding: '10px 15px', backgroundColor: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <input 
+                  type="radio" 
+                  name="inviteType" 
+                  value="TRIAL" 
+                  checked={inviteType === 'TRIAL'} 
+                  onChange={() => setInviteType('TRIAL')} 
+                />
+                Học Thử
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <input 
+                  type="radio" 
+                  name="inviteType" 
+                  value="ASSESSMENT" 
+                  checked={inviteType === 'ASSESSMENT'} 
+                  onChange={() => setInviteType('ASSESSMENT')} 
+                />
+                Đánh Giá Năng Lực
+              </label>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Tên Học Viên</label>
@@ -135,7 +166,7 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
                 />
               </div>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Lớp Học Thử</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Bài Đánh Giá' : 'Lớp Học Thử'}</label>
                 <input 
                   type="text" 
                   value={className} 
@@ -147,7 +178,7 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Học</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Ngày Đánh Giá' : 'Ngày Học'}</label>
                 <input 
                   type="text" 
                   value={studyDays} 
@@ -157,7 +188,7 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
                 />
               </div>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Giờ Học</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Giờ Đánh Giá' : 'Giờ Học'}</label>
                 <input 
                   type="text" 
                   value={studyHours} 
@@ -170,7 +201,7 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Bắt Đầu</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Ngày Đánh Giá (Cụ thể)' : 'Ngày Bắt Đầu'}</label>
                 <input 
                   type="text" 
                   value={startDate} 
@@ -180,12 +211,12 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
                 />
               </div>
               <div>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>Ngày Kết Thúc (Dự kiến)</label>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Thời gian làm bài' : 'Ngày Kết Thúc (Dự kiến)'}</label>
                 <input 
                   type="text" 
                   value={endDate} 
                   onChange={e => setEndDate(e.target.value)}
-                  placeholder="VD: 22/08/2026 (2 buổi)"
+                  placeholder={inviteType === 'ASSESSMENT' ? 'VD: 45 phút' : 'VD: 22/08/2026 (2 buổi)'}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>
