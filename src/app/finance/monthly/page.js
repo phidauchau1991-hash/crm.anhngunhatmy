@@ -39,8 +39,29 @@ function getScheduleInfo(classCode, schedule) {
   return { days, shiftTime };
 }
 
+// Helper tính toán tháng liền kề
+function getAdjacentMonthsHelper(my) {
+  if (!my || !my.includes('/')) return { current: my || '', prev: '', next: '' };
+  const [mm, yyyy] = my.split('/');
+  const m = parseInt(mm, 10);
+  const y = parseInt(yyyy, 10);
+  if (isNaN(m) || isNaN(y)) return { current: my, prev: '', next: '' };
+
+  let pm = m - 1, py = y;
+  if (pm === 0) { pm = 12; py -= 1; }
+
+  let nm = m + 1, ny = y;
+  if (nm === 13) { nm = 1; ny += 1; }
+
+  return {
+    current: my,
+    prev: `${pm.toString().padStart(2, '0')}/${py}`,
+    next: `${nm.toString().padStart(2, '0')}/${ny}`
+  };
+}
+
 // Soạn tin nhắn Zalo súc tích, phụ huynh nhìn 3 giây là nắm đầy đủ, gần gũi thân thiện
-function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '') {
+function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '', customDebtMonth = '') {
   if (!record) return '';
   const previousDebt = adjustedDebt !== null ? parseFloat(adjustedDebt) || 0 : record.previousDebt || 0;
   const currentFee = record.currentFee || record.monthlyRate || 0;
@@ -48,11 +69,15 @@ function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '')
   const total = currentFee + previousDebt + excess;
   const monthStr = record.monthYear || currentMonthYear || '';
 
+  const { current: reviewedMonth, prev: defaultDebtMonth, next: nextMonth } = getAdjacentMonthsHelper(monthStr);
+  const targetNoticeMonth = record.billingType === 'MONTHLY_PREPAID' ? nextMonth : reviewedMonth;
+  const actualDebtMonth = customDebtMonth || defaultDebtMonth;
+
   const lines = [];
-  lines.push(`Dạ Trung tâm xin gửi Ba Mẹ thông tin học phí tháng ${monthStr} của bé ${record.studentName}:`);
+  lines.push(`Dạ Trung tâm xin gửi Ba Mẹ thông tin học phí tháng ${targetNoticeMonth} của bé ${record.studentName}:`);
   lines.push(`• Lớp: ${record.classCode}`);
   lines.push(
-    `• Số buổi học: ${record.actualSessions || 0} buổi${
+    `• Số buổi đã học trong tháng ${reviewedMonth}: ${record.actualSessions || 0} buổi${
       record.datesPresent && record.datesPresent.length
         ? ` (Điểm danh: ${record.datesPresent.slice(0, 5).join(', ')}${record.datesPresent.length > 5 ? '...' : ''})`
         : ''
@@ -60,16 +85,16 @@ function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '')
   );
 
   if (record.billingType === 'MONTHLY_PREPAID') {
-    lines.push(`• Học phí tháng này (${record.committedSessions || 8} buổi): ${Number(currentFee).toLocaleString('vi-VN')}đ`);
     if (excess !== 0) {
-      lines.push(`• Dư/thiếu tháng trước: ${excess > 0 ? '+' : ''}${Number(excess).toLocaleString('vi-VN')}đ (${excess > 0 ? 'Thiếu' : 'Dư'})`);
+      lines.push(`• Học phí dư/thiếu sau tháng ${reviewedMonth}: ${excess > 0 ? '+' : ''}${Number(excess).toLocaleString('vi-VN')}đ (${excess > 0 ? 'Thiếu' : 'Dư'})`);
     }
+    lines.push(`• Học phí ${record.committedSessions || 8} buổi của tháng ${targetNoticeMonth}: ${Number(currentFee).toLocaleString('vi-VN')}đ`);
   } else {
-    lines.push(`• Học phí tháng này: ${Number(currentFee).toLocaleString('vi-VN')}đ`);
+    lines.push(`• Học phí của số buổi học trong tháng ${reviewedMonth}: ${Number(currentFee).toLocaleString('vi-VN')}đ`);
   }
 
   if (previousDebt > 0) {
-    lines.push(`• Học phí chưa hoàn thành (tháng trước): ${Number(previousDebt).toLocaleString('vi-VN')}đ`);
+    lines.push(`• Học phí chưa hoàn thành của tháng ${actualDebtMonth}: ${Number(previousDebt).toLocaleString('vi-VN')}đ`);
   }
 
   lines.push(`👉 TỔNG CỘNG CẦN ĐÓNG: ${Number(total).toLocaleString('vi-VN')}đ`);
@@ -131,6 +156,7 @@ export default function MonthlyBillingPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [activeRecord, setActiveRecord] = useState(null);
   const [adjustedDebt, setAdjustedDebt] = useState('');
+  const [adjustedDebtMonth, setAdjustedDebtMonth] = useState('');
   const [savingDebt, setSavingDebt] = useState(false);
   const [copyingPreview, setCopyingPreview] = useState(false);
   const [copyingZaloText, setCopyingZaloText] = useState(false);
@@ -578,10 +604,19 @@ export default function MonthlyBillingPage() {
   const handleOpenNoticeModal = (record) => {
     setActiveRecord(record);
     setAdjustedDebt(String(record.previousDebt || 0));
+    const months = getAdjacentMonthsHelper(record.monthYear || monthYear);
+    let savedDebtMonth = '';
+    if (record.notes && record.notes.includes('Nợ cũ tháng')) {
+      const match = record.notes.match(/Nợ cũ tháng\s*([0-9]{2}\/[0-9]{4})/);
+      if (match) savedDebtMonth = match[1];
+    }
+    setAdjustedDebtMonth(record.debtMonth || savedDebtMonth || months.prev);
     setPreviewModalOpen(true);
   };
 
   // Tính toán dữ liệu Thư báo động realtime
+  const currentMonths = getAdjacentMonthsHelper(monthYear);
+  const targetNoticeMonth = activeRecord?.billingType === 'MONTHLY_PREPAID' ? currentMonths.next : currentMonths.current;
   const currentDebtNum = parseFloat(adjustedDebt) || 0;
   const currentFeeNum = activeRecord ? activeRecord.currentFee || activeRecord.monthlyRate || 0 : 0;
   const excessNum = activeRecord ? activeRecord.excessMissing || 0 : 0;
@@ -596,7 +631,7 @@ export default function MonthlyBillingPage() {
         .trim()
         .split(' ')
         .pop()
-        .toUpperCase()} HP THANG ${monthYear.replace('/', '')}`
+        .toUpperCase()} HP THANG ${targetNoticeMonth.replace('/', '')}`
     : '';
 
   const dynamicQrUrl = activeRecord
@@ -609,6 +644,7 @@ export default function MonthlyBillingPage() {
     ? {
         ...activeRecord,
         monthYear: activeRecord.monthYear || monthYear,
+        debtMonth: adjustedDebtMonth || currentMonths.prev,
         previousDebt: currentDebtNum,
         totalToPay: calculatedTotalToPay,
         qrUrl: dynamicQrUrl,
@@ -635,6 +671,7 @@ export default function MonthlyBillingPage() {
           currentFee: currentFeeNum,
           excessMissing: excessNum,
           totalToPay: calculatedTotalToPay,
+          notes: adjustedDebtMonth ? `Nợ cũ tháng ${adjustedDebtMonth}` : activeRecord.notes,
         }),
       });
       if (res.ok) {
@@ -685,7 +722,7 @@ export default function MonthlyBillingPage() {
   const handleDownloadPreviewImage = async (existingCanvas = null) => {
     if (existingCanvas) {
       const link = document.createElement('a');
-      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${monthYear.replace('/', '_')}.png`;
+      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${targetNoticeMonth.replace('/', '_')}.png`;
       link.href = existingCanvas.toDataURL('image/png');
       link.click();
       return;
@@ -702,7 +739,7 @@ export default function MonthlyBillingPage() {
         windowWidth: 1000,
       });
       const link = document.createElement('a');
-      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${monthYear.replace('/', '_')}.png`;
+      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${targetNoticeMonth.replace('/', '_')}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
@@ -713,7 +750,7 @@ export default function MonthlyBillingPage() {
 
   // Copy Tin Nhắn Zalo
   const handleCopyZaloMessage = async () => {
-    const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear);
+    const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev);
     setCopyingZaloText(true);
     try {
       await navigator.clipboard.writeText(text);
@@ -2067,7 +2104,11 @@ export default function MonthlyBillingPage() {
                   <i className="fa-solid fa-envelope-open-text"></i> Thư Báo Học Phí & Soạn Tin Zalo
                 </h2>
                 <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  Học viên: <strong>{activeRecord.studentName}</strong> | Lớp: <strong>{activeRecord.classCode}</strong> | Tháng: <strong>{monthYear}</strong>
+                  Học viên: <strong>{activeRecord.studentName}</strong> | Lớp: <strong>{activeRecord.classCode}</strong> | {activeRecord.billingType === 'MONTHLY_PREPAID' ? (
+                    <>Điểm danh tháng: <strong>{monthYear}</strong> ➔ Thu HP tháng: <strong style={{ color: '#085E8A', fontSize: '0.95rem' }}>{targetNoticeMonth}</strong></>
+                  ) : (
+                    <>Tháng học phí: <strong>{monthYear}</strong></>
+                  )}
                 </span>
               </div>
               <button className="close-btn" onClick={() => setPreviewModalOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#64748b' }}>
@@ -2093,21 +2134,34 @@ export default function MonthlyBillingPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <i className="fa-solid fa-coins" style={{ fontSize: '1.3rem', color: '#D97706' }}></i>
                 <div>
-                  <strong style={{ color: '#92400E', fontSize: '0.92rem' }}>Học phí chưa hoàn thành (Nợ cũ tháng trước):</strong>
+                  <strong style={{ color: '#92400E', fontSize: '0.92rem' }}>
+                    Học phí chưa hoàn thành (Nợ cũ tháng {adjustedDebtMonth || currentMonths.prev}):
+                  </strong>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: '#78350F' }}>
-                    Nhập số tiền nợ cũ nếu muốn chỉnh sửa, Thư báo và mã QR bên dưới sẽ tự động cập nhật số tiền mới:
+                    Nhập số tiền nợ cũ và tháng nợ nếu muốn chỉnh sửa, Thư báo và mã QR bên dưới sẽ tự động cập nhật số tiền mới:
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: '#92400E', fontWeight: '600' }}>Của tháng:</span>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={adjustedDebtMonth}
+                  onChange={(e) => setAdjustedDebtMonth(e.target.value)}
+                  placeholder={currentMonths.prev}
+                  style={{ width: '85px', fontWeight: '700', fontSize: '0.88rem', textAlign: 'center', color: '#B45309' }}
+                  title="Tháng nợ cũ (VD: 08/2026)"
+                />
+
                 <input
                   type="number"
                   className="form-control"
                   value={adjustedDebt}
                   onChange={(e) => setAdjustedDebt(e.target.value)}
                   placeholder="0"
-                  style={{ width: '140px', fontWeight: '800', fontSize: '0.95rem', textAlign: 'right', color: '#B45309' }}
+                  style={{ width: '130px', fontWeight: '800', fontSize: '0.95rem', textAlign: 'right', color: '#B45309' }}
                 />
                 <span style={{ fontWeight: '700', color: '#92400E' }}>đ</span>
 
@@ -2123,9 +2177,19 @@ export default function MonthlyBillingPage() {
               </div>
 
               {/* Tóm tắt nhanh số tiền mới */}
-              <div style={{ width: '100%', borderTop: '1px dashed #FCD34D', paddingTop: '0.35rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
+              <div style={{ width: '100%', borderTop: '1px dashed #FCD34D', paddingTop: '0.35rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <span>
-                  Học phí tháng này: <strong>{Number(currentFeeNum).toLocaleString('vi-VN')}đ</strong> | Cấn trừ dư/thiếu: <strong>{Number(excessNum).toLocaleString('vi-VN')}đ</strong>
+                  {activeRecord.billingType === 'MONTHLY_PREPAID' ? (
+                    <>
+                      Học phí tháng {targetNoticeMonth}: <strong>{Number(currentFeeNum).toLocaleString('vi-VN')}đ</strong> | Cấn trừ dư/thiếu sau tháng {currentMonths.current}: <strong>{Number(excessNum).toLocaleString('vi-VN')}đ</strong>
+                      {currentDebtNum > 0 && <> | Nợ tháng {adjustedDebtMonth || currentMonths.prev}: <strong>{Number(currentDebtNum).toLocaleString('vi-VN')}đ</strong></>}
+                    </>
+                  ) : (
+                    <>
+                      Học phí tháng {currentMonths.current}: <strong>{Number(currentFeeNum).toLocaleString('vi-VN')}đ</strong>
+                      {currentDebtNum > 0 && <> | Nợ tháng {adjustedDebtMonth || currentMonths.prev}: <strong>{Number(currentDebtNum).toLocaleString('vi-VN')}đ</strong></>}
+                    </>
+                  )}
                 </span>
                 <span style={{ color: '#B45309', fontWeight: '800', fontSize: '1.05rem' }}>
                   👉 TỔNG CỘNG MỚI: {Number(calculatedTotalToPay).toLocaleString('vi-VN')}đ
@@ -2204,7 +2268,7 @@ export default function MonthlyBillingPage() {
                   borderRadius: '6px',
                 }}
               >
-                {generateZaloMessage(activeRecord, currentDebtNum, monthYear)}
+                {generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev)}
               </pre>
             </div>
 

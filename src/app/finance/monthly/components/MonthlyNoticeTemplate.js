@@ -17,16 +17,42 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
     totalToPay = 0,
     qrUrl = '',
     datesPresent = [],
-    datesAbsent = []
+    datesAbsent = [],
+    debtMonth = ''
   } = noticeData || {};
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
   };
 
+  // Tính toán tháng trước, tháng hiện tại và tháng tiếp theo
+  const getAdjacentMonths = (my) => {
+    if (!my || !my.includes('/')) return { current: my || '', prev: '', next: '' };
+    const [mm, yyyy] = my.split('/');
+    const m = parseInt(mm, 10);
+    const y = parseInt(yyyy, 10);
+    if (isNaN(m) || isNaN(y)) return { current: my, prev: '', next: '' };
+
+    let pm = m - 1, py = y;
+    if (pm === 0) { pm = 12; py -= 1; }
+
+    let nm = m + 1, ny = y;
+    if (nm === 13) { nm = 1; ny += 1; }
+
+    return {
+      current: my,
+      prev: `${pm.toString().padStart(2, '0')}/${py}`,
+      next: `${nm.toString().padStart(2, '0')}/${ny}`
+    };
+  };
+
+  const { current: reviewedMonth, prev: defaultDebtMonth, next: nextMonth } = getAdjacentMonths(monthYear);
+  const targetNoticeMonth = billingType === 'MONTHLY_PREPAID' ? nextMonth : reviewedMonth;
+  const actualDebtMonth = debtMonth || defaultDebtMonth;
+
   const nameNoAccent = studentName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
-  const firstName = nameNoAccent.split(' ').pop().toUpperCase();
-  const transferContent = `${firstName} HP THANG ${monthYear.replace('/', '')}`;
+  const firstName = nameNoAccent.trim().split(' ').pop().toUpperCase();
+  const transferContent = `${firstName} HP THANG ${targetNoticeMonth.replace('/', '')}`;
 
   return (
     <div
@@ -59,7 +85,7 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
           <div style={{ flex: 1, textAlign: 'center', paddingRight: '150px' }}>
             <h1 style={{ margin: 0, fontSize: '26px', textTransform: 'uppercase', color: '#0d88c4', letterSpacing: '1px' }}>THƯ THÔNG BÁO</h1>
             <p style={{ margin: 0, fontStyle: 'italic', fontSize: '18px', color: '#475569', marginTop: '4px' }}>
-              V/v đóng học phí tháng {monthYear}
+              V/v đóng học phí tháng {targetNoticeMonth}
             </p>
           </div>
         </div>
@@ -78,27 +104,27 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
           <p style={{ margin: '0 0 0.5rem 0' }}>
             Anh ngữ Nhật Mỹ xin gửi lời chào, lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng và đồng hành cùng Trung tâm trong thời gian vừa qua.
             <br/>
-            Trung tâm xin gửi đến ba mẹ thông tin học phí tháng {monthYear} của lớp <strong>{classCode}</strong> như sau:
+            Trung tâm xin gửi đến ba mẹ thông tin học phí tháng {targetNoticeMonth} của lớp <strong>{classCode}</strong> như sau:
           </p>
         </div>
 
         {/* Fee details */}
         <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
           <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
-            <li style={{ marginBottom: '8px' }}>Số buổi đã học trong tháng: <strong>{actualSessions} buổi</strong></li>
+            <li style={{ marginBottom: '8px' }}>Số buổi đã học trong tháng {reviewedMonth}: <strong>{actualSessions} buổi</strong></li>
             
             {previousDebt > 0 && (
-              <li style={{ marginBottom: '8px', color: '#ea580c' }}>Học phí chưa hoàn thành (các tháng trước): <strong>{formatCurrency(previousDebt)}</strong></li>
+              <li style={{ marginBottom: '8px', color: '#ea580c' }}>Học phí chưa hoàn thành của tháng {actualDebtMonth}: <strong>{formatCurrency(previousDebt)}</strong></li>
             )}
             
             {billingType === 'MONTHLY_PREPAID' ? (
               <>
-                <li style={{ marginBottom: '8px' }}>Học phí dư/thiếu tháng trước: <strong style={{ color: excessMissing > 0 ? '#ea580c' : '#16a34a' }}>{formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : '(Dư)'}</strong></li>
-                <li style={{ marginBottom: '8px' }}>Học phí cam kết tháng này ({committedSessions} buổi): <strong>{formatCurrency(currentFee)}</strong></li>
+                <li style={{ marginBottom: '8px' }}>Học phí dư/thiếu sau tháng {reviewedMonth}: <strong style={{ color: excessMissing > 0 ? '#ea580c' : excessMissing < 0 ? '#16a34a' : '#475569' }}>{formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : excessMissing < 0 ? '(Dư)' : ''}</strong></li>
+                <li style={{ marginBottom: '8px' }}>Học phí {committedSessions} buổi của tháng {targetNoticeMonth}: <strong>{formatCurrency(currentFee)}</strong></li>
               </>
             ) : (
               <>
-                <li style={{ marginBottom: '8px' }}>Học phí tháng này (Số buổi x Đơn giá): <strong>{actualSessions} x {formatCurrency(feePerSession)} = {formatCurrency(currentFee)}</strong></li>
+                <li style={{ marginBottom: '8px' }}>Học phí của số buổi học trong tháng {reviewedMonth}: <strong>{formatCurrency(currentFee)}</strong></li>
               </>
             )}
           </ul>
@@ -107,7 +133,7 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
         {/* Attendance details */}
         {(datesPresent.length > 0 || datesAbsent.length > 0) && (
           <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-            <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>Chi tiết điểm danh tháng:</p>
+            <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>Chi tiết điểm danh tháng {reviewedMonth}:</p>
             {datesPresent.length > 0 && (
               <p style={{ margin: '0 0 5px 0' }}>
                 <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Ngày có mặt:</span> {datesPresent.join(', ')}

@@ -9,17 +9,43 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
   const [isGenerating, setIsGenerating] = useState(false);
   const templateRef = useRef(null);
 
+  // Helper tính toán tháng liền kề
+  const getAdjacentMonths = (my) => {
+    if (!my || !my.includes('/')) return { current: my || '', prev: '', next: '' };
+    const [mm, yyyy] = my.split('/');
+    const m = parseInt(mm, 10);
+    const y = parseInt(yyyy, 10);
+    if (isNaN(m) || isNaN(y)) return { current: my, prev: '', next: '' };
+
+    let pm = m - 1, py = y;
+    if (pm === 0) { pm = 12; py -= 1; }
+
+    let nm = m + 1, ny = y;
+    if (nm === 13) { nm = 1; ny += 1; }
+
+    return {
+      current: my,
+      prev: `${pm.toString().padStart(2, '0')}/${py}`,
+      next: `${nm.toString().padStart(2, '0')}/${ny}`
+    };
+  };
+
+  const { current: reviewedMonth, prev: defaultDebtMonth, next: nextMonth } = getAdjacentMonths(record.monthYear);
+  const targetNoticeMonth = record.billingType === 'MONTHLY_PREPAID' ? nextMonth : reviewedMonth;
+  const actualDebtMonth = record.debtMonth || defaultDebtMonth;
+
   const finalAmount = record.totalToPay || 0;
   
-  // Generating QR URL logic based on standard format used in nhat-my-crm
+  // Tạo nội dung chuyển khoản và URL VietQR đồng bộ
   const nameNoAccent = record.studentName?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D") || '';
-  const firstName = nameNoAccent.split(' ').pop().toUpperCase();
-  const transferContent = `Hoc phi thang ${record.monthYear} ${record.studentName}`;
+  const firstName = nameNoAccent.trim().split(' ').pop().toUpperCase();
+  const transferContent = `Hoc phi thang ${targetNoticeMonth} ${record.studentName}`;
   
   const qrUrl = `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`;
 
   const noticeData = {
     ...record,
+    debtMonth: actualDebtMonth,
     qrUrl,
   };
 
@@ -69,7 +95,7 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
 
   const downloadCanvas = (canvas) => {
     const link = document.createElement('a');
-    link.download = `ThuBao_${record.studentName.replace(/\s+/g, '_')}_Thang_${record.monthYear.replace('/', '_')}.png`;
+    link.download = `ThuBao_${record.studentName.replace(/\s+/g, '_')}_Thang_${targetNoticeMonth.replace('/', '_')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
