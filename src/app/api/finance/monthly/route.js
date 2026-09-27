@@ -189,13 +189,13 @@ export async function POST(request) {
       const updated = await prisma.monthlyInvoice.update({
         where: { id: existing.id },
         data: {
-          committedSessions: parseInt(committedSessions, 10) || existing.committedSessions,
-          actualSessions: parseInt(actualSessions, 10) || existing.actualSessions,
-          feePerSession: parseFloat(feePerSession) || existing.feePerSession,
-          previousDebt: parseFloat(previousDebt) || 0,
-          currentFee: parseFloat(currentFee) || existing.currentFee,
-          excessMissing: parseFloat(excessMissing) || 0,
-          totalToPay: parseFloat(totalToPay) || 0,
+          committedSessions: committedSessions !== undefined && committedSessions !== null ? parseInt(committedSessions, 10) : existing.committedSessions,
+          actualSessions: actualSessions !== undefined && actualSessions !== null ? parseInt(actualSessions, 10) : existing.actualSessions,
+          feePerSession: feePerSession !== undefined && feePerSession !== null ? parseFloat(feePerSession) : existing.feePerSession,
+          previousDebt: previousDebt !== undefined && previousDebt !== null ? parseFloat(previousDebt) : existing.previousDebt,
+          currentFee: currentFee !== undefined && currentFee !== null ? parseFloat(currentFee) : existing.currentFee,
+          excessMissing: excessMissing !== undefined && excessMissing !== null ? parseFloat(excessMissing) : existing.excessMissing,
+          totalToPay: totalToPay !== undefined && totalToPay !== null ? parseFloat(totalToPay) : existing.totalToPay,
         },
       });
       return NextResponse.json({ success: true, invoice: updated });

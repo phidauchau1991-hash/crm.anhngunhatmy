@@ -48,7 +48,7 @@ export async function POST(request) {
         data: {
           billingType: billingType || 'MONTHLY_PREPAID',
           monthlyRate: parseFloat(monthlyRate) || 0,
-          monthlySessions: billingType === 'MONTHLY_PREPAID' ? (parseInt(monthlySessions, 10) || 0) : null,
+          monthlySessions: parseInt(monthlySessions, 10) || 0,
           ...(classCode ? { classCode } : {}),
         },
         include: {
@@ -152,7 +152,7 @@ export async function POST(request) {
     });
 
     const parsedRate = parseFloat(monthlyRate) || 0;
-    const parsedSessions = billingType === 'MONTHLY_PREPAID' ? (parseInt(monthlySessions, 10) || 0) : null;
+    const parsedSessions = parseInt(monthlySessions, 10) || 0;
 
     let enrollmentRecord;
     if (existingEnrollment) {

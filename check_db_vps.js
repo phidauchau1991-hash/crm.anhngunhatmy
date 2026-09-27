@@ -1,0 +1,1 @@
+const { NodeSSH } = require('node-ssh'); const ssh = new NodeSSH(); async function check() { try { await ssh.connect({ host: '103.165.144.154', username: 'root', password: '4jGbRF9eQRXybRJr3vQP' }); const res = await ssh.execCommand('ls -la /var/www/nhat-my-crm/dev.db*'); console.log(res.stdout); process.exit(0); } catch(e) { console.error(e); process.exit(1); } } check();

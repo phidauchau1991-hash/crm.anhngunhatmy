@@ -64,7 +64,7 @@ function getAdjacentMonthsHelper(my) {
 function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '', customDebtMonth = '') {
   if (!record) return '';
   const previousDebt = adjustedDebt !== null ? parseFloat(adjustedDebt) || 0 : record.previousDebt || 0;
-  const currentFee = record.currentFee || record.monthlyRate || 0;
+  const currentFee = record.currentFee !== undefined && record.currentFee !== null ? record.currentFee : (record.monthlyRate || 0);
   const excess = record.excessMissing || 0;
   const total = currentFee + previousDebt + excess;
   const monthStr = record.monthYear || currentMonthYear || '';
@@ -500,7 +500,7 @@ export default function MonthlyBillingPage() {
         startDate: formStartDate,
         billingType: formBillingType,
         monthlyRate: parseFloat(formMonthlyRate) || 0,
-        monthlySessions: formBillingType === 'MONTHLY_PREPAID' ? parseInt(formMonthlySessions, 10) || 0 : null,
+        monthlySessions: parseInt(formMonthlySessions, 10) || 0,
         notes: formNotes.trim() || null,
       };
 
@@ -618,7 +618,7 @@ export default function MonthlyBillingPage() {
   const currentMonths = getAdjacentMonthsHelper(monthYear);
   const targetNoticeMonth = activeRecord?.billingType === 'MONTHLY_PREPAID' ? currentMonths.next : currentMonths.current;
   const currentDebtNum = parseFloat(adjustedDebt) || 0;
-  const currentFeeNum = activeRecord ? activeRecord.currentFee || activeRecord.monthlyRate || 0 : 0;
+  const currentFeeNum = activeRecord ? (activeRecord.currentFee !== undefined && activeRecord.currentFee !== null ? activeRecord.currentFee : (activeRecord.monthlyRate || 0)) : 0;
   const excessNum = activeRecord ? activeRecord.excessMissing || 0 : 0;
   const calculatedTotalToPay = currentFeeNum + currentDebtNum + excessNum;
 
@@ -861,7 +861,7 @@ export default function MonthlyBillingPage() {
   const getFilteredNotices = () => (classFilter === 'all' ? noticesData : noticesData.filter((e) => e.classCode === classFilter));
 
   const calculatedFeePerSession =
-    formMonthlyRate && formMonthlySessions && formBillingType === 'MONTHLY_PREPAID'
+    formMonthlyRate && formMonthlySessions
       ? Math.round(parseFloat(formMonthlyRate) / parseInt(formMonthlySessions, 10))
       : parseFloat(formMonthlyRate) || 0;
 
@@ -1988,7 +1988,6 @@ export default function MonthlyBillingPage() {
                       placeholder="VD: 8"
                       value={formMonthlySessions}
                       onChange={(e) => setFormMonthlySessions(e.target.value)}
-                      disabled={formBillingType === 'MONTHLY_POSTPAID'}
                       style={{ padding: '0.45rem 0.75rem', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }}
                     />
                   </div>
