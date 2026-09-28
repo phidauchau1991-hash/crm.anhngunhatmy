@@ -14,13 +14,17 @@ const styles = {
   container: {
     width: '794px', // A4 width at 96 DPI
     backgroundColor: '#ffffff',
-    fontFamily: '"Outfit", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     color: '#333333',
     padding: '40px',
     boxSizing: 'border-box',
     position: 'relative',
     overflow: 'hidden',
-    textAlign: 'left'
+    textAlign: 'left',
+    fontVariantLigatures: 'none',
+    textRendering: 'geometricPrecision',
+    letterSpacing: 'normal',
+    wordSpacing: 'normal'
   },
   headerBlue: {
     backgroundColor: '#0D88C4',
