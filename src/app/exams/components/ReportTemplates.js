@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useRef } from 'react';
 import * as htmlToImage from 'html-to-image';
 
@@ -394,8 +394,7 @@ export const ExportImageWrapper = ({ children, targetId, filename }) => {
     const element = document.getElementById(targetId);
     if (!element) return;
     
-    setIsExporting(true);
-    try {
+    const parent = element.parentElement; const ot = parent?parent.style.transform:""; const oh = parent?parent.style.height:""; if(parent){parent.style.transform="none"; parent.style.height="auto";} setIsExporting(true); try {
       // Sử dụng html2canvas thay vì html-to-image để tránh lỗi tràn bộ nhớ (paralyzed button)
       const canvas = await html2canvas(element, { 
         scale: 2, 
@@ -408,8 +407,7 @@ export const ExportImageWrapper = ({ children, targetId, filename }) => {
     } catch (error) {
       console.error('Lỗi xuất ảnh:', error);
       alert('Không thể xuất ảnh, vui lòng thử lại');
-    } finally {
-      setIsExporting(false);
+    } finally { if(parent){parent.style.transform=ot; parent.style.height=oh;} setIsExporting(false);
     }
   };
 

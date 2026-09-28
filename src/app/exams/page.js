@@ -818,7 +818,7 @@ export default function ExamsPage() {
                     <i className="fa-solid fa-download"></i> Tải Nhận Xét
                   </button>
                 </div>
-                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', zoom: 0.55, overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', transform: 'scale(0.55)', transformOrigin: 'top center', height: '650px', overflowX: 'hidden', display: 'flex', justifyContent: 'center' }}>
                   <div id={`modal-comment-report-${previewModalData.student.id}`}>
                     <CommentsReportTemplate student={previewModalData.student} result={previewModalData} />
                   </div>
@@ -845,7 +845,7 @@ export default function ExamsPage() {
                     <i className="fa-solid fa-download"></i> Tải Bảng Điểm
                   </button>
                 </div>
-                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', zoom: 0.55, overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ border: '2px dashed #cbd5e1', padding: '15px', borderRadius: '12px', background: '#f8fafc', transform: 'scale(0.55)', transformOrigin: 'top center', height: '650px', overflowX: 'hidden', display: 'flex', justifyContent: 'center' }}>
                   <div id={`modal-score-report-${previewModalData.student.id}`}>
                     <ScoreReportTemplate student={previewModalData.student} config={configs.find(c => c.id === parseInt(selectedConfig))} result={previewModalData} />
                   </div>
@@ -1106,7 +1106,7 @@ export default function ExamsPage() {
             </div>
 
             {selectedClass ? (
-              <div style={{ border: '2px dashed #cbd5e1', padding: '1rem', borderRadius: '12px', background: '#f8fafc', zoom: 0.6, overflowX: 'auto' }}>
+              <div style={{ border: '2px dashed #cbd5e1', padding: '1rem', borderRadius: '12px', background: '#f8fafc', transform: 'scale(0.6)', transformOrigin: 'top center', height: '650px', overflowX: 'hidden', display: 'flex', justifyContent: 'center' }}>
                 {noticeType === 'exam' ? (
                   <ExamNoticeTemplate 
                     className={classes.find(c => c.code === selectedClass)?.code} 
