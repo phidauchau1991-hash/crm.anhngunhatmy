@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import ClassSelect from '../components/ClassSelect';
+import MonthlyReportTab from './components/MonthlyReportTab';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
 
 export default function ExamsPage() {
@@ -1145,6 +1146,7 @@ export default function ExamsPage() {
         </div>
       )}
 
+      {activeTab === 'monthly-reports' && <MonthlyReportTab classes={classes} />}
     </div>
   );
 }
