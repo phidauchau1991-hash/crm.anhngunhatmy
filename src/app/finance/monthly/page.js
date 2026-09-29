@@ -1527,6 +1527,33 @@ export default function MonthlyBillingPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {row.status === 'NOT_GENERATED' ? (
+                            <span className="status-badge bg-warning-light" style={{ fontWeight: '600' }}>
+                              Chưa chốt
+                            </span>
+                          ) : row.status === 'UNPAID' ? (
+                            <span className="status-badge bg-danger-light" style={{ fontWeight: '700' }}>
+                              Chưa đóng
+                            </span>
+                          ) : (
+                            <span className="status-badge bg-success-light" style={{ fontWeight: '700' }}>
+                              Đã đóng
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                            {/* Nút mắt 👁️ xem trước realtime */}
+                            <button
+                              className="btn btn-sm btn-outline"
+                              title="Xem trước thư báo & tin nhắn Zalo"
+                              onClick={() => handleOpenNoticeModal(row)}
+                              style={{ padding: '5px 9px', color: '#0284c7', borderColor: '#0284c7' }}
+                            >
+                              <i className="fa-solid fa-eye"></i>
+                            </button>
+
+                            {/* Chốt sổ hoặc Nút Thư báo */}
+                            {row.status === 'NOT_GENERATED' ? (
                               <button
                                 className="btn btn-sm btn-primary"
                                 onClick={() => handleGenerateInvoice(row)}
