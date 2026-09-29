@@ -1527,50 +1527,33 @@ export default function MonthlyBillingPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {row.status === 'NOT_GENERATED' ? (
-                            <span className="status-badge bg-warning-light" style={{ fontWeight: '600' }}>
-                              Chưa chốt
-                            </span>
-                          ) : row.status === 'UNPAID' ? (
-                            <span className="status-badge bg-danger-light" style={{ fontWeight: '700' }}>
-                              Chưa đóng
-                            </span>
-                          ) : (
-                            <span className="status-badge bg-success-light" style={{ fontWeight: '700' }}>
-                              Đã đóng
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
-                            {/* Nút mắt 👁️ xem trước realtime */}
-                            <button
-                              className="btn btn-sm btn-outline"
-                              title="Xem trước thư báo & tin nhắn Zalo"
-                              onClick={() => handleOpenNoticeModal(row)}
-                              style={{ padding: '5px 9px', color: '#0284c7', borderColor: '#0284c7' }}
-                            >
-                              <i className="fa-solid fa-eye"></i>
-                            </button>
-
-                            {/* Chốt sổ hoặc Nút Thư báo */}
-                            {row.status === 'NOT_GENERATED' ? (
-                              <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleGenerateInvoice(row)}
-                                disabled={isProcessing}
-                                style={{ fontWeight: '600' }}
-                              >
-                                <i className="fa-solid fa-file-invoice"></i> Chốt sổ
-                              </button>
-                            ) : (
-                              <button
-                                className="btn btn-sm"
-                                style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: '700' }}
-                                onClick={() => handleOpenNoticeModal(row)}
-                              >
-                                <i className="fa-solid fa-image"></i> Thư báo
-                              </button>
-                            )}
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => handleGenerateInvoice(row)}
+                                  disabled={isProcessing}
+                                  style={{ fontWeight: '600' }}
+                                >
+                                  <i className="fa-solid fa-file-invoice"></i> Chốt sổ
+                                </button>
+                              ) : row.needsUpdate ? (
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => handleGenerateInvoice(row)}
+                                  disabled={isProcessing}
+                                  style={{ fontWeight: '600', backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                                  title="Dữ liệu điểm danh đã thay đổi, cần cập nhật lại hóa đơn"
+                                >
+                                  <i className="fa-solid fa-rotate"></i> Cập nhật
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: '700' }}
+                                  onClick={() => handleOpenNoticeModal(row)}
+                                >
+                                  <i className="fa-solid fa-image"></i> Thư báo
+                                </button>
+                              )}
 
                             {/* Nút Thu tiền nếu chưa đóng */}
                             {row.status === 'UNPAID' && (

@@ -105,25 +105,49 @@ export async function GET(request) {
       let excessMissing = 0;
       let currentFee = 0;
       let totalToPay = 0;
+      let needsUpdate = false;
 
-      // Nếu đã có hóa đơn trong DB, lấy các số liệu đã chốt
+      // LUÔN TÍNH TOÁN DỮ LIỆU ĐỘNG THEO ĐIỂM DANH HIỆN TẠI
+      let liveCurrentFee = 0;
+      let liveExcessMissing = 0;
+      let liveTotalToPay = 0;
+
+      if (enr.billingType === 'MONTHLY_PREPAID') {
+        liveCurrentFee = monthlyRate;
+        liveExcessMissing = (actualSessions - monthlySessions) * feePerSession;
+        liveTotalToPay = liveCurrentFee + previousDebt + liveExcessMissing;
+      } else {
+        // POSTPAID
+        liveCurrentFee = actualSessions * feePerSession;
+        liveExcessMissing = 0;
+        liveTotalToPay = liveCurrentFee + previousDebt;
+      }
+
+      // Nếu đã có hóa đơn trong DB, lấy các số liệu đã chốt
       if (currentInvoice) {
         currentFee = currentInvoice.currentFee;
         excessMissing = currentInvoice.excessMissing;
         previousDebt = currentInvoice.previousDebt;
         totalToPay = currentInvoice.totalToPay;
-      } else {
-        // Nếu chưa chốt, tính toán tự động
-        if (enr.billingType === 'MONTHLY_PREPAID') {
-          currentFee = monthlyRate;
-          excessMissing = (actualSessions - monthlySessions) * feePerSession;
-          totalToPay = currentFee + previousDebt + excessMissing;
-        } else {
-          // POSTPAID
-          currentFee = actualSessions * feePerSession;
-          excessMissing = 0;
-          totalToPay = currentFee + previousDebt;
+
+        // KIỂM TRA LỆCH DỮ LIỆU (Chỉ khi chưa thanh toán)
+        if (currentInvoice.status === 'UNPAID') {
+          if (
+            currentInvoice.actualSessions !== actualSessions ||
+            currentInvoice.totalToPay !== liveTotalToPay
+          ) {
+            needsUpdate = true;
+            // Bơm dữ liệu live ra UI để hiển thị đúng và user có thể bấm "Cập nhật"
+            currentFee = liveCurrentFee;
+            excessMissing = liveExcessMissing;
+            totalToPay = liveTotalToPay;
+          }
         }
+      } else {
+        // Nếu chưa chốt, dùng luôn live
+        currentFee = liveCurrentFee;
+        excessMissing = liveExcessMissing;
+        totalToPay = liveTotalToPay;
       }
 
       data.push({
@@ -147,6 +171,7 @@ export async function GET(request) {
         monthYear,
         status: currentInvoice ? currentInvoice.status : 'NOT_GENERATED',
         invoiceId: currentInvoice?.id || null,
+        needsUpdate,
       });
     }
 

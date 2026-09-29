@@ -463,6 +463,12 @@ export default function ExamsPage() {
         >
           📢 Tạo Thư Thông Báo (Tự động)
         </button>
+        <button 
+          onClick={() => setActiveTab('monthly-reports')}
+          style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 'bold', background: activeTab === 'monthly-reports' ? '#10b981' : 'transparent', color: activeTab === 'monthly-reports' ? 'white' : '#475569', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
+        >
+          📅 Báo Cáo Học Tập Tháng
+        </button>
       </div>
 
       {/* Tab 1: Config */}
