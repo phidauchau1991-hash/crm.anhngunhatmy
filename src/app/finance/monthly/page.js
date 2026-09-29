@@ -1140,27 +1140,59 @@ export default function MonthlyBillingPage() {
 
                         {/* Nút Sửa & Nút Xóa khỏi tháng */}
                         <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline"
-                              onClick={() => handleOpenEditModal(enr)}
-                              title="Chỉnh sửa thông tin học viên & cấu hình học phí"
-                              style={{ padding: '4px 8px', color: '#0284c7', borderColor: '#0284c7' }}
-                            >
-                              <i className="fa-solid fa-pen-to-square"></i>
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline"
-                              onClick={() => handleOpenDeleteModal(enr)}
-                              title="Tùy chọn xóa học viên (Xóa vĩnh viễn khỏi hệ thống hoặc rút khỏi tháng)"
-                              style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
-                            >
-                              <i className="fa-solid fa-trash-can"></i>
-                            </button>
-                          </div>
-                        </td>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                              <button
+                                className="btn btn-sm btn-outline"
+                                title="Xem trước thư báo & tin nhắn Zalo"
+                                onClick={() => handleOpenNoticeModal(row)}
+                                style={{ padding: '5px 9px', color: '#0284c7', borderColor: '#0284c7' }}
+                              >
+                                <i className="fa-solid fa-eye"></i>
+                              </button>
+
+                              {row.status === 'NOT_GENERATED' ? (
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => handleGenerateInvoice(row)}
+                                  disabled={isProcessing}
+                                  style={{ fontWeight: '600' }}
+                                >
+                                  <i className="fa-solid fa-file-invoice"></i> Chốt sổ
+                                </button>
+                              ) : row.needsUpdate ? (
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => handleGenerateInvoice(row)}
+                                  disabled={isProcessing}
+                                  style={{ fontWeight: '600', backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                                  title="Dữ liệu điểm danh đã thay đổi, cần cập nhật lại hóa đơn"
+                                >
+                                  <i className="fa-solid fa-rotate"></i> Cập nhật
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: '700' }}
+                                  onClick={() => handleOpenNoticeModal(row)}
+                                >
+                                  <i className="fa-solid fa-image"></i> Thư báo
+                                </button>
+                              )}
+
+                              {row.status === 'UNPAID' && (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: '700' }}
+                                  onClick={() => {
+                                    setPayInvoice(row);
+                                    setShowPayModal(true);
+                                  }}
+                                >
+                                  <i className="fa-solid fa-hand-holding-dollar"></i> Thu tiền
+                                </button>
+                              )}
+                            </div>
+                          </td>
                       </tr>
                     );
                   })}
