@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import TrialInviteModal from './TrialInviteModal';
+import PlacementTestModal from './components/PlacementTestModal';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
@@ -29,6 +30,11 @@ export default function LeadsPage() {
   // Trial Invite Modal State
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [trialLead, setTrialLead] = useState(null);
+  
+  // Placement Test Modal State
+  const [showPlacementModal, setShowPlacementModal] = useState(false);
+  const [placementLead, setPlacementLead] = useState(null);
+
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -428,6 +434,14 @@ export default function LeadsPage() {
                           </button>
                         )}
                         <button 
+                            className="action-btn" 
+                            style={{ color: '#4c1d95', background: '#ede9fe', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                            title="Báo kết quả test năng lực" 
+                            onClick={() => { setPlacementLead(lead); setShowPlacementModal(true); }}
+                          >
+                            📝 Báo KQ Test
+                          </button>
+                        <button 
                           className="action-btn" 
                           style={{ color: '#0068ff', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
                           title="Soạn tin Zalo với AI" 
@@ -691,6 +705,12 @@ export default function LeadsPage() {
         isOpen={showTrialModal} 
         onClose={() => { setShowTrialModal(false); setTrialLead(null); }} 
         lead={trialLead} 
+      />
+
+      <PlacementTestModal 
+        isOpen={showPlacementModal} 
+        onClose={() => { setShowPlacementModal(false); setPlacementLead(null); }} 
+        lead={placementLead} 
       />
 
       <style>{`
