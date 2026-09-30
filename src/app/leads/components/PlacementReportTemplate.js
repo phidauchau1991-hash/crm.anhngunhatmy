@@ -51,8 +51,8 @@ const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiR
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #0d88c4', paddingBottom: '16px' }}>
         <img src="/logo.png" alt="Logo" style={{ height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color: '#0d88c4', fontSize: '20px', textTransform: 'uppercase', fontWeight: '800', fontFamily: font }}>
-            Kết Quả Đánh Giá Năng Lực
+          <div style={{ color: '#0d88c4', fontSize: '20px', fontWeight: '800', fontFamily: font, letterSpacing: '0.5px' }}>
+            KẾT QUẢ ĐÁNH GIÁ NĂNG LỰC
           </div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', fontFamily: font }}>
             Placement Test Report
