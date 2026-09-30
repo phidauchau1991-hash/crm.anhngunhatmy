@@ -26,9 +26,7 @@ const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiR
     <div
       ref={ref}
       style={{
-        position: 'absolute',
-        top: '-9999px',
-        left: '-9999px',
+        
         width: '800px',
         background: '#ffffff',
         fontFamily: "'Inter', sans-serif",

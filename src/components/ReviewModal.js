@@ -118,6 +118,23 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
     }
   };
 
+  const handleCopy = async () => {
+    const el = document.getElementById('report-template-capture');
+    if (!el) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(el, { quality: 1, pixelRatio: 2, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const item = new ClipboardItem({ 'image/png': blob });
+      await navigator.clipboard.write([item]);
+      alert('Đã copy ảnh vào bộ nhớ tạm. Có thể dán (Ctrl+V) vào Zalo ngay!');
+    } catch (err) {
+      console.error('Error copying image:', err);
+      alert('Lỗi copy ảnh hoặc trình duyệt không hỗ trợ.');
+    }
+  };
+
+
   return (
     <div className="modal-overlay">
       <div className="modal-content glass-panel animated-scale" style={{ maxWidth: step === 2 ? '1200px' : '850px', width: '95%', maxHeight: '90vh', overflowY: 'auto', zIndex: 9999 }}>

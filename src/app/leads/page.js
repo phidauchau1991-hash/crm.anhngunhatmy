@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import TrialInviteModal from './TrialInviteModal';
 import PlacementTestModal from './components/PlacementTestModal';
+import ReviewModal from '@/components/ReviewModal';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
@@ -27,6 +28,10 @@ export default function LeadsPage() {
   const [currentLead, setCurrentLead] = useState(null);
   const [leadToDelete, setLeadToDelete] = useState(null);
   
+  // Review Modal State
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewLead, setReviewLead] = useState(null);
+
   // Trial Invite Modal State
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [trialLead, setTrialLead] = useState(null);
@@ -441,6 +446,14 @@ export default function LeadsPage() {
                           >
                             📝 Báo KQ Test
                           </button>
+                          <button 
+                            className="action-btn" 
+                            style={{ color: '#047857', background: '#d1fae5', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                            title="Nhận xét học thử" 
+                            onClick={() => { setReviewLead(lead); setShowReviewModal(true); }}
+                          >
+                            <i className="fa-solid fa-star"></i> NX Học thử
+                          </button>
                         <button 
                           className="action-btn" 
                           style={{ color: '#0068ff', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
@@ -706,6 +719,16 @@ export default function LeadsPage() {
         onClose={() => { setShowTrialModal(false); setTrialLead(null); }} 
         lead={trialLead} 
       />
+
+      
+      {showReviewModal && reviewLead && (
+        <ReviewModal 
+          isOpen={showReviewModal}
+          onClose={() => { setShowReviewModal(false); setReviewLead(null); }}
+          initialType="trial"
+          defaultStudent={{ name: reviewLead?.name, classCode: reviewLead?.trialClassCode || '' }}
+        />
+      )}
 
       <PlacementTestModal 
         isOpen={showPlacementModal} 
