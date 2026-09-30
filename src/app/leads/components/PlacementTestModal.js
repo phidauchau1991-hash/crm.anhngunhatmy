@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import PlacementReportTemplate from './PlacementReportTemplate';
 
 const DEFAULT_WEIGHTS = { listening: 30, speaking: 30, rw: 40 };
@@ -11,13 +11,13 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
     speaking:  { score: '', max: '', weight: DEFAULT_WEIGHTS.speaking  },
     rw:        { score: '', max: '', weight: DEFAULT_WEIGHTS.rw        },
   });
-  const [testDate, setTestDate]     = useState('');
-  const [lsKeywords, setLsKeywords] = useState('');
-  const [rwKeywords, setRwKeywords] = useState('');
+  const [testDate, setTestDate]       = useState('');
+  const [lsKeywords, setLsKeywords]   = useState('');
+  const [rwKeywords, setRwKeywords]   = useState('');
   const [devKeywords, setDevKeywords] = useState('');
-  const [aiResult, setAiResult]     = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
+  const [aiResult, setAiResult]       = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
   const [downloading, setDownloading] = useState(false);
   const templateRef = useRef(null);
 
@@ -35,10 +35,11 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
     }
   }, [isOpen, lead]);
 
-  const handleScoreChange = (skill, field, value) => {
+  const handleScoreChange = (skill, field, value) =>
     setScores(prev => ({ ...prev, [skill]: { ...prev[skill], [field]: value } }));
-  };
-  const handleAIResultChange = (field, value) => setAiResult(prev => ({ ...prev, [field]: value }));
+
+  const handleAIResultChange = (field, value) =>
+    setAiResult(prev => ({ ...prev, [field]: value }));
 
   const generateAI = async () => {
     if (!lead) return;
@@ -55,47 +56,58 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
     setLoading(false);
   };
 
-  const captureCanvas = async () => html2canvas(templateRef.current, {
-    scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, allowTaint: false,
-  });
+  // ✅ ROOT FIX: Use html-to-image instead of html2canvas
+  // html2canvas has a known bug duplicating Vietnamese Unicode diacritics
+  // html-to-image handles Unicode correctly (same library ReviewModal uses)
+  const getDataUrl = async () => {
+    const el = templateRef.current;
+    if (!el) throw new Error('Template element not found');
+    return await htmlToImage.toPng(el, { quality: 1, pixelRatio: 2 });
+  };
 
   const handleCopyImage = async () => {
     setDownloading(true);
     try {
-      const canvas = await captureCanvas();
-      canvas.toBlob(async blob => {
-        try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); alert('Đã copy ảnh! Dán Ctrl+V vào Zalo nhé!'); }
-        catch { alert('Trình duyệt không hỗ trợ copy ảnh trực tiếp. Dùng nút Tải Ảnh.'); }
-      });
-    } catch { alert('Có lỗi khi tạo ảnh'); }
+      const dataUrl = await getDataUrl();
+      const res   = await fetch(dataUrl);
+      const blob  = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      alert('Đã copy ảnh! Dán Ctrl+V vào Zalo nhé!');
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi copy ảnh: ' + err.message + '. Hãy thử nút Tải Ảnh Xuống.');
+    }
     setDownloading(false);
   };
 
   const handleDownloadImage = async () => {
     setDownloading(true);
     try {
-      const canvas = await captureCanvas();
+      const dataUrl = await getDataUrl();
       const link = document.createElement('a');
       link.download = `KQ_Test_${lead?.name || 'HocVien'}.png`;
-      link.href = canvas.toDataURL('image/png'); link.click();
-    } catch { alert('Có lỗi khi tạo ảnh'); }
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi khi tạo ảnh: ' + err.message);
+    }
     setDownloading(false);
   };
 
   if (!isOpen) return null;
 
-  // Live % calculations
-  const getPct = (score, max) => (!max || max <= 0) ? 0 : Math.round((Number(score) / Number(max)) * 100);
-  const getContrib = (score, max, weight) => (!max || max <= 0) ? 0 : Math.round((Number(score) / Number(max)) * Number(weight) * 100) / 100;
+  const getPct     = (s, m) => (!m || m <= 0) ? 0 : Math.round((Number(s) / Number(m)) * 100);
+  const getContrib = (s, m, w) => (!m || m <= 0) ? 0 : Math.round((Number(s) / Number(m)) * Number(w) * 100) / 100;
 
   const lsPct = getPct(scores.listening.score, scores.listening.max);
   const spPct = getPct(scores.speaking.score,  scores.speaking.max);
   const rwPct = getPct(scores.rw.score,        scores.rw.max);
-  const lsContrib = getContrib(scores.listening.score, scores.listening.max, scores.listening.weight);
-  const spContrib = getContrib(scores.speaking.score,  scores.speaking.max,  scores.speaking.weight);
-  const rwContrib = getContrib(scores.rw.score,        scores.rw.max,        scores.rw.weight);
-  const totalContrib = Math.round((lsContrib + spContrib + rwContrib) * 100) / 100;
-  const totalWeight  = Number(scores.listening.weight||0) + Number(scores.speaking.weight||0) + Number(scores.rw.weight||0);
+  const lsC   = getContrib(scores.listening.score, scores.listening.max, scores.listening.weight);
+  const spC   = getContrib(scores.speaking.score,  scores.speaking.max,  scores.speaking.weight);
+  const rwC   = getContrib(scores.rw.score,        scores.rw.max,        scores.rw.weight);
+  const totalC = Math.round((lsC + spC + rwC) * 100) / 100;
+  const totalW = Number(scores.listening.weight||0) + Number(scores.speaking.weight||0) + Number(scores.rw.weight||0);
 
   const pctBadge = (p) => ({
     display: 'inline-block', padding: '2px 9px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '700', marginLeft: '6px',
@@ -104,6 +116,18 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
   });
 
   const inputSm = { width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', boxSizing: 'border-box' };
+
+  const skillRows = [
+    { key: 'listening', label: 'Nghe (Listening)',           pct: lsPct, contrib: lsC },
+    { key: 'speaking',  label: 'Nói (Speaking)',             pct: spPct, contrib: spC },
+    { key: 'rw',        label: 'Đọc & Viết (Reading & Writing)', pct: rwPct, contrib: rwC },
+  ];
+
+  const editFields = [
+    { field: 'ls_comments', label: 'Nghe & Nói',               color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+    { field: 'rw_comments', label: 'Đọc & Viết',               color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    { field: 'conclusion',  label: 'Định Hướng & Lộ Trình',    color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  ];
 
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -119,11 +143,11 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: '34px', height: '34px', borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
         </div>
 
-        {/* STEP 1 */}
+        {/* STEP 1: INPUT FORM */}
         {step === 1 && (
           <div style={{ padding: '24px 26px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
 
-            {/* Left: Score table */}
+            {/* Left: Scores */}
             <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '22px', border: '1px solid #e2e8f0' }}>
               <h3 style={{ margin: '0 0 18px 0', fontSize: '1.05rem', color: '#0d88c4', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <i className="fa-solid fa-chart-bar"></i> Bảng Điểm Kỹ Năng
@@ -134,13 +158,8 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                 <input type="text" value={testDate} onChange={e => setTestDate(e.target.value)} placeholder="VD: 30/09/2026" style={inputSm} />
               </div>
 
-              {/* Score rows */}
-              {[
-                { key: 'listening', label: 'Nghe (Listening)', pct: lsPct, contrib: lsContrib },
-                { key: 'speaking',  label: 'Nói (Speaking)',   pct: spPct, contrib: spContrib },
-                { key: 'rw',        label: 'Đọc & Viết (R&W)', pct: rwPct, contrib: rwContrib },
-              ].map(({ key, label, pct, contrib }) => (
-                <div key={key} style={{ marginBottom: '16px', background: '#fff', borderRadius: '10px', padding: '12px 14px', border: '1px solid #e2e8f0' }}>
+              {skillRows.map(({ key, label, pct, contrib }) => (
+                <div key={key} style={{ marginBottom: '14px', background: '#fff', borderRadius: '10px', padding: '12px 14px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontWeight: '700', color: '#374151', fontSize: '0.88rem' }}>{label}</span>
                     <span style={pctBadge(pct)}>{pct}%</span>
@@ -149,21 +168,20 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                     <input type="number" placeholder="Điểm đạt" style={{ ...inputSm, textAlign: 'center' }} value={scores[key].score} onChange={e => handleScoreChange(key, 'score', e.target.value)} />
                     <span style={{ color: '#94a3b8', fontWeight: 'bold' }}>/</span>
                     <input type="number" placeholder="Tối đa" style={{ ...inputSm, textAlign: 'center' }} value={scores[key].max} onChange={e => handleScoreChange(key, 'max', e.target.value)} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', borderRadius: '8px', padding: '4px 10px', border: '1px solid #bae6fd', whiteSpace: 'nowrap' }}>
-                      <input type="number" min="1" max="100" style={{ width: '40px', border: 'none', background: 'transparent', fontSize: '0.88rem', fontWeight: '700', color: '#0284c7', textAlign: 'center', outline: 'none' }} value={scores[key].weight} onChange={e => handleScoreChange(key, 'weight', e.target.value)} />
-                      <span style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: '600' }}>% trọng số</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#f0f9ff', borderRadius: '8px', padding: '4px 8px', border: '1px solid #bae6fd', whiteSpace: 'nowrap' }}>
+                      <input type="number" min="1" max="100" style={{ width: '36px', border: 'none', background: 'transparent', fontSize: '0.88rem', fontWeight: '700', color: '#0284c7', textAlign: 'center', outline: 'none' }} value={scores[key].weight} onChange={e => handleScoreChange(key, 'weight', e.target.value)} />
+                      <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: '600' }}>% TrS</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#64748b', textAlign: 'right' }}>
+                  <div style={{ marginTop: '5px', fontSize: '0.78rem', color: '#64748b', textAlign: 'right' }}>
                     Điểm đóng góp: <strong style={{ color: '#0284c7' }}>{contrib} / {scores[key].weight}</strong>
                   </div>
                 </div>
               ))}
 
-              {/* Total */}
               <div style={{ background: '#dbeafe', borderRadius: '10px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #93c5fd' }}>
                 <span style={{ fontWeight: '800', color: '#1e40af', fontSize: '0.95rem' }}>TỔNG KẾT (100 điểm)</span>
-                <span style={{ fontWeight: '800', color: '#1e40af', fontSize: '1.2rem' }}>{totalContrib} / 100</span>
+                <span style={{ fontWeight: '800', color: '#1e40af', fontSize: '1.2rem' }}>{totalC} / 100</span>
               </div>
             </div>
 
@@ -174,16 +192,15 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
                 {[
-                  { label: 'Nhận xét Nghe & Nói', placeholder: 'VD: Phát âm chuẩn, nghe tốt, thiếu từ vựng, phản xạ còn chậm...', value: lsKeywords, onChange: setLsKeywords, color: '#1d4ed8', icon: 'fa-headphones' },
-                  { label: 'Nhận xét Đọc & Viết',  placeholder: 'VD: Ngữ pháp khá, đọc chậm, viết sai chính tả...', value: rwKeywords,  onChange: setRwKeywords,  color: '#b45309', icon: 'fa-book-open' },
-                  { label: 'Định hướng & Phát triển', placeholder: 'VD: Nên vào lớp Kids 1, tập trung kỹ năng nói...', value: devKeywords, onChange: setDevKeywords, color: '#15803d', icon: 'fa-road' },
-                ].map(({ label, placeholder, value, onChange, color, icon }) => (
+                  { label: 'Nhận xét Nghe & Nói',       val: lsKeywords,  set: setLsKeywords,  color: '#1d4ed8', ph: 'VD: Phát âm chuẩn, nghe tốt, thiếu từ vựng...', icon: 'fa-headphones' },
+                  { label: 'Nhận xét Đọc & Viết',        val: rwKeywords,  set: setRwKeywords,  color: '#b45309', ph: 'VD: Ngữ pháp khá, đọc chậm, viết sai chính tả...', icon: 'fa-book-open' },
+                  { label: 'Định hướng & Phát triển',    val: devKeywords, set: setDevKeywords, color: '#15803d', ph: 'VD: Nên vào lớp Kids 1, tập trung kỹ năng nói...', icon: 'fa-road' },
+                ].map(({ label, val, set, color, ph, icon }) => (
                   <div key={icon}>
                     <label style={{ fontWeight: '700', color, fontSize: '0.88rem', display: 'block', marginBottom: '5px' }}>
                       <i className={`fa-solid ${icon}`} style={{ marginRight: '6px' }}></i>{label}
                     </label>
-                    <textarea rows={3} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
-                      style={{ ...inputSm, resize: 'vertical', minHeight: '76px', lineHeight: '1.5' }} />
+                    <textarea rows={3} placeholder={ph} value={val} onChange={e => set(e.target.value)} style={{ ...inputSm, resize: 'vertical', minHeight: '76px', lineHeight: '1.5' }} />
                   </div>
                 ))}
               </div>
@@ -199,7 +216,7 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
           </div>
         )}
 
-        {/* STEP 2: PREVIEW */}
+        {/* STEP 2: PREVIEW + EDIT */}
         {step === 2 && (
           <div style={{ padding: '18px 26px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '18px', background: '#f8fafc', borderRadius: '10px', padding: '11px 14px', border: '1px solid #e2e8f0' }}>
@@ -208,10 +225,10 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
               </button>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={handleCopyImage} disabled={downloading} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: downloading ? 'not-allowed' : 'pointer', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
-                  <i className="fa-solid fa-copy"></i> Copy Ảnh (Zalo)
+                  <i className="fa-solid fa-copy"></i> {downloading ? 'Đang xử lý...' : 'Copy Ảnh (Zalo)'}
                 </button>
                 <button onClick={handleDownloadImage} disabled={downloading} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: downloading ? 'not-allowed' : 'pointer', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
-                  <i className="fa-solid fa-download"></i> Tải Ảnh Xuống
+                  <i className="fa-solid fa-download"></i> {downloading ? 'Đang xử lý...' : 'Tải Ảnh Xuống'}
                 </button>
               </div>
             </div>
@@ -222,11 +239,7 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                 <h3 style={{ fontSize: '0.95rem', color: '#0d88c4', margin: '0 0 4px 0', textAlign: 'center', fontWeight: '700' }}>
                   <i className="fa-solid fa-pen-to-square"></i> Chỉnh sửa Nội dung
                 </h3>
-                {[
-                  { field: 'ls_comments', label: 'Nghe & Nói', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-                  { field: 'rw_comments', label: 'Đọc & Viết',  color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-                  { field: 'conclusion',  label: 'Định Hướng & Lộ Trình', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
-                ].map(({ field, label, color, bg, border }) => (
+                {editFields.map(({ field, label, color, bg, border }) => (
                   <div key={field} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: '700', color, marginBottom: '4px' }}>{label}</label>
                     <textarea value={aiResult?.[field] || ''} onChange={e => handleAIResultChange(field, e.target.value)}
