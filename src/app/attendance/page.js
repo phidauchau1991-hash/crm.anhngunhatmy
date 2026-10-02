@@ -360,7 +360,7 @@ export default function AttendancePage() {
       if (lessonContent.hwWbPages) report += `\n• Hoàn thành Workbook: ${lessonContent.hwWbPages}`;
       if (lessonContent.hwCopyLines) report += `\n• Copy: ${lessonContent.hwCopyLines}`;
       if (lessonContent.hwVideoDeadline) report += `\n• Nộp Video trước: ${lessonContent.hwVideoDeadline}`;
-      if (lessonContent.hwOther) report += `\n• Khác: ${lessonContent.hwOther}`;
+      if (lessonContent.hwOther) report += `\n• Yêu cầu khác: ${lessonContent.hwOther}`;
     }
 
     report += `\n\nCô chân thành cảm ơn Quý Phụ huynh đã luôn đồng hành và hỗ trợ các con! ❤️\nAnh ngữ Nhật Mỹ`;
@@ -462,7 +462,7 @@ export default function AttendancePage() {
       if (lessonContent.hwWbPages) msg += `\n  • WB: ${lessonContent.hwWbPages}`;
       if (lessonContent.hwCopyLines) msg += `\n  • Copy: ${lessonContent.hwCopyLines}`;
       if (lessonContent.hwVideoDeadline) msg += `\n  • Nộp Video trước: ${lessonContent.hwVideoDeadline}`;
-      if (lessonContent.hwOther) msg += `\n  • Khác: ${lessonContent.hwOther}`;
+      if (lessonContent.hwOther) msg += `\n  • Yêu cầu khác: ${lessonContent.hwOther}`;
     }
 
     msg += `\n\nCảm ơn Ba/Mẹ luôn đồng hành cùng con ạ! 🌟\nAnh ngữ Nhật Mỹ ❤️`;
