@@ -342,7 +342,7 @@ export default function AttendancePage() {
           lines.forEach(line => { report += `\n- ${line.trim()}`; });
         });
       }
-      report += `\n\n👉 *Ba Mẹ nhắc các bé hoàn thành đầy đủ và kiểm tra sách trước khi đi học giúp cô ạ.*`;
+      report += `\n\n👉 *Ba Mẹ nhắc các bé hoàn thành bài tập đầy đủ, học thuộc bài trước khi đi học và kiểm tra đầy đủ sách, dụng cụ học tập trước khi đi học ạ.*`;
     }
 
     // KHỐI 2: Nội dung bài học
