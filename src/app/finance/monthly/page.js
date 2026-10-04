@@ -778,13 +778,21 @@ export default function MonthlyBillingPage() {
       });
       if (res.ok) {
         setMessage({ type: 'success', text: 'Thu tiền thành công!' });
+                let displayMonthYear = monthYear;
+        if (payInvoice.billingType === 'MONTHLY_PREPAID' && monthYear.includes('/')) {
+          const [m, y] = monthYear.split('/');
+          let nextM = parseInt(m, 10) + 1;
+          let nextY = parseInt(y, 10);
+          if (nextM > 12) { nextM = 1; nextY++; }
+          displayMonthYear = `${nextM.toString().padStart(2, '0')}/${nextY}`;
+        }
         setEReceiptData({
           studentName: payInvoice.studentName,
           totalPaid: payInvoice.totalToPay,
           oldDebt: payInvoice.previousDebt || 0,
           tuitionPaid: payInvoice.currentFee || payInvoice.totalToPay,
           remainingDebt: 0,
-          monthYear,
+          monthYear: displayMonthYear,
           paymentMethod: payMethod,
           date: new Date().toLocaleDateString('vi-VN'),
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
