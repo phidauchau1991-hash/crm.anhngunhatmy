@@ -23,6 +23,27 @@ export default function DashboardPage() {
   // Review Alerts - Cảnh báo Học thử & Nhận xét Định kỳ (Sprint 6)
   const [reviewAlerts, setReviewAlerts] = useState({ trialAlerts: [], reviewAlerts: [] });
 
+  // Đánh dấu cảnh báo "Đã xử lý": ẩn ngay trên màn hình + lưu lại để không hiện lại
+  const dismissAlerts = async (keys) => {
+    const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
+    if (list.length === 0) return;
+    const set = new Set(list);
+    setAttendanceAlerts((prev) => prev.filter((x) => !(x.alerts || []).every((al) => set.has(al.key))));
+    setReviewAlerts((prev) => ({
+      trialAlerts: prev.trialAlerts.filter((x) => !set.has(x.key)),
+      reviewAlerts: prev.reviewAlerts.filter((x) => !set.has(x.key)),
+    }));
+    try {
+      await fetch('/api/dashboard/alerts/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: list }),
+      });
+    } catch (err) {
+      console.error('Lỗi lưu trạng thái đã xử lý:', err);
+    }
+  };
+
   // AI Modal State (Sprint 3 Dashboard)
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -702,7 +723,11 @@ export default function DashboardPage() {
                         <strong style={{ display: 'block', fontSize: '0.9rem' }}>{t.leadName}</strong>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Lớp {t.classCode} • Đã học <strong style={{ color: '#6d28d9' }}>{t.totalSessions} buổi</strong></span>
                       </div>
-                      <Link href={`/?action=review_trial&name=${encodeURIComponent(t.leadName || '')}&classCode=${encodeURIComponent(t.classCode || '')}&sessions=${t.totalSessions}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link>
+                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}><button
+                        onClick={() => dismissAlerts(t.key)}
+                        title="Đánh dấu đã xử lý - cảnh báo sẽ ẩn đi"
+                        style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >✓ Đã xử lý</button><Link href={`/?action=review_trial&name=${encodeURIComponent(t.leadName || '')}&classCode=${encodeURIComponent(t.classCode || '')}&sessions=${t.totalSessions}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link></div>
                     </div>
                   ))}
                 </div>
@@ -727,7 +752,11 @@ export default function DashboardPage() {
                         <strong style={{ display: 'block', fontSize: '0.9rem' }}>{r.studentName}</strong>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Lớp {r.classCode} • Đã học <strong style={{ color: '#0e7490' }}>{r.sessionCount} buổi</strong> (Mốc {r.milestone})</span>
                       </div>
-                      <Link href={`/students/${r.studentId}?action=review&type=periodic&milestone=${r.milestone}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#06b6d4', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link>
+                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}><button
+                        onClick={() => dismissAlerts(r.key)}
+                        title="Đánh dấu đã xử lý - cảnh báo sẽ ẩn đi"
+                        style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >✓ Đã xử lý</button><Link href={`/students/${r.studentId}?action=review&type=periodic&milestone=${r.milestone}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#06b6d4', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link></div>
                     </div>
                   ))}
                 </div>
@@ -886,6 +915,11 @@ export default function DashboardPage() {
                             <i className="fa-solid fa-wand-magic-sparkles"></i> AI Nhắc nhở
                           </button>
 
+                          <button
+                        onClick={() => dismissAlerts(alertData.alerts.map((al) => al.key))}
+                        title="Đánh dấu đã xử lý - cảnh báo sẽ ẩn đi"
+                        style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >✓ Đã xử lý</button>
                           <Link 
                             href={`/attendance?classCode=${alertData.classCode}`} 
                             className="btn btn-secondary"

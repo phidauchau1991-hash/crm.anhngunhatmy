@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getDismissedKeys } from '@/lib/alertDismissals';
 
 export async function GET() {
   try {
@@ -28,6 +29,8 @@ export async function GET() {
     });
 
     const alertsResult = [];
+    const dismissed = await getDismissedKeys();
+    const AUTO_HIDE_MS = 7 * 24 * 60 * 60 * 1000; // Tự ẩn sau 7 ngày nếu không có vi phạm mới
 
     // 4. Tính toán cho từng học viên trong từng lớp
     for (const enrollment of enrollments) {
@@ -101,6 +104,17 @@ export async function GET() {
       if (consecutiveCopyError >= config.copyErrorLimit) {
         studentAlerts.push({ type: 'copyError', value: consecutiveCopyError, limit: config.copyErrorLimit, message: `Lỗi Copy ${consecutiveCopyError} buổi liên tiếp` });
       }
+
+      // Buổi điểm danh gần nhất (bỏ qua buổi chưa điểm danh) -> mốc để tự ẩn sau 7 ngày
+      const headRec = studentAttendances.find((x) => x.status !== 'Chưa điểm danh');
+      const expired = headRec ? Date.now() - new Date(headRec.date).getTime() > AUTO_HIDE_MS : true;
+      // Gắn khóa (kèm giá trị) -> vi phạm mới làm giá trị tăng sẽ hiện lại dù trước đó đã bấm "Đã xử lý"
+      const visibleAlerts = studentAlerts
+        .map((al) => ({ ...al, key: `att|${studentId}|${classCode}|${al.type}|${al.value}` }))
+        // "Tổng nghỉ" cộng dồn cả khóa: không tự ẩn theo ngày, chỉ ẩn khi bấm "Đã xử lý"
+        .filter((al) => (al.type === 'totalAbsences' || !expired) && !dismissed.has(al.key));
+      studentAlerts.length = 0;
+      studentAlerts.push(...visibleAlerts);
 
       if (studentAlerts.length > 0) {
         alertsResult.push({

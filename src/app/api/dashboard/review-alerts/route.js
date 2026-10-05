@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getDismissedKeys } from '@/lib/alertDismissals';
 
 export async function GET() {
   try {
@@ -36,6 +37,7 @@ export async function GET() {
 
     // Lọc ra những học viên có đúng 2 hoặc 4 buổi học
     const trialAlerts = [];
+    const dismissed = await getDismissedKeys();
     for (const key in trialCounts) {
       const { count, lead, classCode } = trialCounts[key];
       if (count === 2 || count === 4) {
@@ -47,6 +49,7 @@ export async function GET() {
           trialClassCode: lead?.trialClassCode,
           totalSessions: count,
           milestone: `${count}_sessions`,
+          key: `trial|${lead?.id}|${classCode}|${count}`,
         });
       }
     }
@@ -99,6 +102,7 @@ export async function GET() {
           classCode: enr.classCode,
           sessionCount: count,
           milestone: count,
+          key: `review|${enr.studentId}|${enr.classCode}|${count}`,
         });
       }
     });
@@ -107,8 +111,8 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        trialAlerts,
-        reviewAlerts,
+        trialAlerts: trialAlerts.filter((t) => !dismissed.has(t.key)),
+        reviewAlerts: reviewAlerts.filter((x) => !dismissed.has(x.key)),
       },
     });
 
