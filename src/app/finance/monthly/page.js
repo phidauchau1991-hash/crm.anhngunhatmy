@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 
 // Helper parse Ngày học và Giờ học từ ClassCode & Schedule
@@ -694,53 +694,46 @@ export default function MonthlyBillingPage() {
     if (!el) return;
     setCopyingPreview(true);
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 1000,
-      });
-      canvas.toBlob(async (blob) => {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          alert('Đã copy Ảnh Thư Báo vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
-        } catch (err) {
-          handleDownloadPreviewImage(canvas);
-        } finally {
-          setCopyingPreview(false);
-        }
-      });
+      const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+      if (!blob) throw new Error('Không tạo được ảnh (blob rỗng)');
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        alert('Đã copy ảnh Thư Báo vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
+      } catch (err) {
+        // Fallback cho điện thoại hoặc thiết bị không hỗ trợ ghi ảnh vào clipboard
+        handleDownloadPreviewImage();
+      }
     } catch (err) {
       console.error(err);
       alert('Có lỗi khi tạo ảnh thư báo: ' + err.message);
+    } finally {
       setCopyingPreview(false);
     }
   };
 
-  const handleDownloadPreviewImage = async (existingCanvas = null) => {
-    if (existingCanvas) {
-      const link = document.createElement('a');
-      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${targetNoticeMonth.replace('/', '_')}.png`;
-      link.href = existingCanvas.toDataURL('image/png');
-      link.click();
-      return;
-    }
+  const handleDownloadPreviewImage = async () => {
     const el = hiddenPrintRef.current || previewTemplateRef.current;
     if (!el) return;
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 1000,
-      });
+      const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+      const filename = `ThuBao_${activeRecord?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${targetNoticeMonth?.replace('/', '_') || 'NA'}.png`;
+      
+      // Hỗ trợ chia sẻ trực tiếp (Share) trên điện thoại (đặc biệt là iPhone, Zalo)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+        const file = new File([blob], filename, { type: 'image/png' });
+        await navigator.share({
+          files: [file],
+          title: 'Thư báo học phí',
+          text: 'Gửi phụ huynh thư báo học phí'
+        });
+        return;
+      }
+      
+      // Fallback: Tải xuống bình thường
+      const dataUrl = await htmlToImage.toPng(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
       const link = document.createElement('a');
-      link.download = `ThuBao_${activeRecord.studentName.replace(/\s+/g, '_')}_Thang_${targetNoticeMonth.replace('/', '_')}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      link.href = dataUrl;
       link.click();
     } catch (err) {
       console.error(err);
@@ -748,7 +741,6 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Copy Tin Nhắn Zalo
   const handleCopyZaloMessage = async () => {
     const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev);
     setCopyingZaloText(true);
@@ -830,10 +822,25 @@ export default function MonthlyBillingPage() {
   const downloadReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
+      const blob = await htmlToImage.toBlob(receiptRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+      const filename = `PhieuThu_${eReceiptData?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${monthYear?.replace('/', '_') || 'NA'}.png`;
+      
+      // Hỗ trợ chia sẻ trực tiếp (Share) trên điện thoại
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+        const file = new File([blob], filename, { type: 'image/png' });
+        await navigator.share({
+          files: [file],
+          title: 'Phiếu thu điện tử',
+          text: 'Gửi phụ huynh phiếu thu'
+        });
+        return;
+      }
+      
+      // Fallback tải xuống
+      const dataUrl = await htmlToImage.toPng(receiptRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
       const link = document.createElement('a');
-      link.download = `PhieuThu_${eReceiptData.studentName.replace(/\s+/g, '_')}_Thang_${monthYear.replace('/', '_')}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      link.href = dataUrl;
       link.click();
     } catch (err) {
       console.error(err);
@@ -1095,7 +1102,8 @@ export default function MonthlyBillingPage() {
                 </button>
               </div>
             ) : (
-              <table className="custom-table">
+              <div style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+<table className="custom-table">
                 <thead>
                   <tr>
                     <th style={{ width: '45px', textAlign: 'center' }}>STT</th>
@@ -1174,6 +1182,7 @@ export default function MonthlyBillingPage() {
                   })}
                 </tbody>
               </table>
+</div>
             )}
           </div>
         </div>
@@ -1261,7 +1270,8 @@ export default function MonthlyBillingPage() {
                 </div>
               </div>
 
-              <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.95rem' }}>
+              <div style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+<table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.95rem' }}>
                 <thead>
                   <tr>
                     <th
@@ -1446,6 +1456,7 @@ export default function MonthlyBillingPage() {
                   ))}
                 </tbody>
               </table>
+</div>
             </>
           )}
         </div>
@@ -1467,7 +1478,8 @@ export default function MonthlyBillingPage() {
             </div>
           ) : (
             <>
-              <table className="custom-table">
+              <div style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+<table className="custom-table">
                 <thead>
                   <tr>
                     <th style={{ width: '40px', textAlign: 'center' }}>
@@ -1610,6 +1622,7 @@ export default function MonthlyBillingPage() {
                   })}
                 </tbody>
               </table>
+</div>
 
               {/* Thanh hành động khi tick chọn nhiều học viên */}
               {selectedRows.length > 0 && (
