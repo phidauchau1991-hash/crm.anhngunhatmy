@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getDismissedKeys } from '@/lib/alertDismissals';
 
 export async function GET(request) {
   try {
@@ -55,8 +56,12 @@ export async function GET(request) {
       }
     });
 
-    const tuitionAlerts = unpaidOrders.filter(order => {
+    const tuitionAlerts = unpaidOrders.map(order => ({
+      ...order,
+      key: `tuition|${order.id}`
+    })).filter(order => {
       if (!order.class || !order.class.startDate) return false;
+      if (dismissed.has(order.key)) return false;
       const startDate = new Date(order.class.startDate);
       return startDate <= twentyDaysAgo;
     });

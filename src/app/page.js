@@ -33,6 +33,10 @@ export default function DashboardPage() {
       trialAlerts: prev.trialAlerts.filter((x) => !set.has(x.key)),
       reviewAlerts: prev.reviewAlerts.filter((x) => !set.has(x.key)),
     }));
+    setCrmAlerts((prev) => ({
+      ...prev,
+      tuition: prev.tuition.filter((x) => !set.has(x.key)),
+    }));
     try {
       await fetch('/api/dashboard/alerts/dismiss', {
         method: 'POST',
@@ -673,7 +677,14 @@ export default function DashboardPage() {
                         <strong style={{ display: 'block', fontSize: '0.9rem' }}>{order.student?.name}</strong>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Lớp {order.class?.code} - {((order.feeToPay || 0) - (order.amountPaid || 0)).toLocaleString('vi-VN')}đ</span>
                       </div>
-                      <button onClick={() => openAiAlertModal(order, 'tuition')} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', border: 'none', cursor: 'pointer' }}>AI Nhắc</button>
+                      <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                        <button
+                          onClick={() => dismissAlerts(order.key)}
+                          title="Đánh dấu đã nhắc - cảnh báo sẽ ẩn đi"
+                          style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >✓ Đã nhắc</button>
+                        <button onClick={() => { openAiAlertModal(order, 'tuition'); dismissAlerts(order.key); }} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', border: 'none', cursor: 'pointer', borderRadius: '6px' }}>AI Nhắc</button>
+                      </div>
                     </div>
                   ))}
                 </div>
