@@ -5,11 +5,28 @@ export async function POST(request) {
   try {
     const { invoiceId, paymentMethod, amountPaid } = await request.json();
     
+    // Get existing invoice
+    const existing = await prisma.monthlyInvoice.findUnique({
+      where: { id: invoiceId }
+    });
+    
+    if (!existing) {
+      return NextResponse.json({ error: 'Không tìm thấy hóa đơn' }, { status: 404 });
+    }
+
+    const currentAmountPaid = existing.amountPaid || 0;
+    const newAmountPaid = currentAmountPaid + Number(amountPaid || 0);
+    const isFullyPaid = newAmountPaid >= existing.totalToPay;
+    
+    const oldNotes = existing.notes ? existing.notes + '\n' : '';
+    const newNotes = oldNotes + `+ Đã thu ${Number(amountPaid).toLocaleString('vi-VN')}đ qua ${paymentMethod} (ngày ${new Date().toLocaleDateString('vi-VN')})`;
+
     const invoice = await prisma.monthlyInvoice.update({
       where: { id: invoiceId },
       data: {
-        status: 'PAID',
-        notes: `Đã thu ${amountPaid} qua ${paymentMethod}`,
+        status: isFullyPaid ? 'PAID' : 'UNPAID',
+        amountPaid: newAmountPaid,
+        notes: newNotes,
       },
       include: {
         student: true,

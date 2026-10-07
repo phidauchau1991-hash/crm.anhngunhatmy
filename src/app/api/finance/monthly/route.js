@@ -80,7 +80,7 @@ export async function GET(request) {
       let previousDebt = 0;
       if (prevInvoice) {
         if (prevInvoice.status === 'UNPAID') {
-          previousDebt += prevInvoice.totalToPay;
+          previousDebt += (prevInvoice.totalToPay - (prevInvoice.amountPaid || 0));
         }
         if (enr.billingType === 'MONTHLY_PREPAID') {
           previousDebt += prevInvoice.excessMissing;
@@ -111,6 +111,8 @@ export async function GET(request) {
       let liveCurrentFee = 0;
       let liveExcessMissing = 0;
       let liveTotalToPay = 0;
+      let livePreviousDebt = previousDebt;
+      let liveAmountPaid = 0;
 
       if (enr.billingType === 'MONTHLY_PREPAID') {
         liveCurrentFee = monthlyRate;
@@ -129,6 +131,7 @@ export async function GET(request) {
         excessMissing = currentInvoice.excessMissing;
         previousDebt = currentInvoice.previousDebt;
         totalToPay = currentInvoice.totalToPay;
+        let amountPaid = currentInvoice.amountPaid || 0;
 
         // KIỂM TRA LỆCH DỮ LIỆU (Chỉ khi chưa thanh toán)
         if (currentInvoice.status === 'UNPAID') {
@@ -137,10 +140,10 @@ export async function GET(request) {
             currentInvoice.totalToPay !== liveTotalToPay
           ) {
             needsUpdate = true;
-            // Bơm dữ liệu live ra UI để hiển thị đúng và user có thể bấm "Cập nhật"
             currentFee = liveCurrentFee;
             excessMissing = liveExcessMissing;
             totalToPay = liveTotalToPay;
+            previousDebt = livePreviousDebt;
           }
         }
       } else {
@@ -168,6 +171,7 @@ export async function GET(request) {
         excessMissing,
         previousDebt,
         totalToPay,
+        amountPaid: currentInvoice ? (currentInvoice.amountPaid || 0) : 0,
         monthYear,
         status: currentInvoice ? currentInvoice.status : 'NOT_GENERATED',
         invoiceId: currentInvoice?.id || null,
@@ -197,6 +201,7 @@ export async function POST(request) {
       currentFee,
       excessMissing,
       totalToPay,
+      amountPaid,
     } = body;
 
     const existing = await prisma.monthlyInvoice.findUnique({
@@ -221,6 +226,7 @@ export async function POST(request) {
           currentFee: currentFee !== undefined && currentFee !== null ? parseFloat(currentFee) : existing.currentFee,
           excessMissing: excessMissing !== undefined && excessMissing !== null ? parseFloat(excessMissing) : existing.excessMissing,
           totalToPay: totalToPay !== undefined && totalToPay !== null ? parseFloat(totalToPay) : existing.totalToPay,
+          amountPaid: amountPaid !== undefined && amountPaid !== null ? parseFloat(amountPaid) : existing.amountPaid,
         },
       });
       return NextResponse.json({ success: true, invoice: updated });
@@ -243,6 +249,7 @@ export async function POST(request) {
         currentFee: parseFloat(currentFee) || 0,
         excessMissing: parseFloat(excessMissing) || 0,
         totalToPay: parseFloat(totalToPay) || 0,
+        amountPaid: parseFloat(amountPaid) || 0,
         paymentCode,
         status: 'UNPAID',
       },

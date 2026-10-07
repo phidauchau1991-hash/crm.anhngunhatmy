@@ -414,6 +414,7 @@ model MonthlyInvoice {
   excessMissing Float @default(0) // Tiền dư/thiếu (PREPAID)
 
   totalToPay Float // Tổng cần thu
+  amountPaid Float @default(0) // Số tiền đã thu
 
   paymentCode String? @unique // Mã hóa đơn duy nhất (vd: HP0926HV123)
 

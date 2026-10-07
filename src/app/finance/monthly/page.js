@@ -187,6 +187,7 @@ export default function MonthlyBillingPage() {
   // Pay Modal & E-Receipt
   const [showPayModal, setShowPayModal] = useState(false);
   const [payInvoice, setPayInvoice] = useState(null);
+  const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState('Chuyển khoản');
   const [eReceiptData, setEReceiptData] = useState(null);
   const receiptRef = useRef(null);
@@ -1609,6 +1610,7 @@ export default function MonthlyBillingPage() {
                                 style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: '700' }}
                                 onClick={() => {
                                   setPayInvoice(row);
+                                  setPayAmount((row.totalToPay || 0) - (row.amountPaid || 0));
                                   setShowPayModal(true);
                                 }}
                               >
@@ -2678,10 +2680,35 @@ export default function MonthlyBillingPage() {
                       textAlign: 'center',
                     }}
                   >
-                    <p style={{ margin: '0 0 0.25rem 0', color: '#64748b' }}>Số tiền cần thu đợt này:</p>
-                    <strong style={{ fontSize: '1.6rem', color: '#085E8A', fontWeight: '900' }}>
-                      {Number(payInvoice.totalToPay || 0).toLocaleString('vi-VN')}đ
-                    </strong>
+                    <p style={{ margin: '0 0 0.25rem 0', color: '#64748b' }}>Số tiền thu thực tế đợt này:</p>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={Number(payAmount || 0).toLocaleString('vi-VN')}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setPayAmount(Number(val));
+                        }}
+                        style={{
+                          fontSize: '1.6rem',
+                          color: '#085E8A',
+                          fontWeight: '900',
+                          border: 'none',
+                          borderBottom: '2px dashed #085E8A',
+                          background: 'transparent',
+                          width: '180px',
+                          textAlign: 'center',
+                          outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: '1.6rem', color: '#085E8A', fontWeight: '900', marginLeft: '4px' }}>đ</span>
+                    </div>
+                    <p style={{ margin: '0.5rem 0 0 0', color: '#dc2626', fontSize: '0.85rem', fontWeight: '600' }}>
+                      Tổng cần thanh toán: {Number((payInvoice.totalToPay || 0) - (payInvoice.amountPaid || 0)).toLocaleString('vi-VN')}đ
+                    </p>
+                    <p style={{ margin: '0.2rem 0 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                      *(Số tiền chưa đóng sẽ được lưu làm nợ cũ tháng sau)
+                    </p>
                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
                       Học viên: <strong>{payInvoice.studentName}</strong> | Lớp: {payInvoice.classCode}
                     </div>
