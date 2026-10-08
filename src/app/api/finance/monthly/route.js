@@ -2,31 +2,29 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const monthYear = searchParams.get('monthYear');
-
-  if (!monthYear) {
-    return NextResponse.json({ error: 'Thiếu tham số monthYear' }, { status: 400 });
-  }
-
-  // monthYear format: "09/2026"
-  const [mm, yyyy] = monthYear.split('/');
-  const month = parseInt(mm, 10);
-  const year = parseInt(yyyy, 10);
-
-  // Tính tháng trước
-  let prevMonth = month - 1;
-  let prevYear = year;
-  if (prevMonth === 0) {
-    prevMonth = 12;
-    prevYear -= 1;
-  }
-  const prevMonthYear = `${prevMonth.toString().padStart(2, '0')}/${prevYear}`;
-
   try {
+    const { searchParams } = new URL(request.url);
+    const monthYear = searchParams.get('monthYear'); // VD: "09/2026"
+
+    if (!monthYear) {
+      return NextResponse.json({ error: 'Thiếu tham số monthYear' }, { status: 400 });
+    }
+
+    const [month, year] = monthYear.split('/');
+    if (!month || !year) {
+      return NextResponse.json({ error: 'Định dạng monthYear không hợp lệ (MM/YYYY)' }, { status: 400 });
+    }
+
+    // Xác định khoảng thời gian của tháng được chọn
+    const startDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+    const endDate = new Date(parseInt(year, 10), parseInt(month, 10), 1);
+
+    // Lấy tất cả học viên có billingType là MONTHLY_PREPAID hoặc MONTHLY_POSTPAID
     const enrollments = await prisma.enrollment.findMany({
       where: {
-        billingType: { in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'] },
+        billingType: {
+          in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'],
+        },
       },
       include: {
         student: true,
@@ -36,11 +34,17 @@ export async function GET(request) {
 
     const data = [];
 
-    for (const enr of enrollments) {
-      // Tính số buổi đi học thực tế trong tháng
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 1);
+    // Tìm tháng trước để kế thừa nợ cũ
+    let prevM = parseInt(month, 10) - 1;
+    let prevY = parseInt(year, 10);
+    if (prevM === 0) {
+      prevM = 12;
+      prevY -= 1;
+    }
+    const prevMonthYear = `${prevM.toString().padStart(2, '0')}/${prevY}`;
 
+    for (const enr of enrollments) {
+      // Đếm số buổi học thực tế trong tháng
       const attendances = await prisma.attendance.findMany({
         where: {
           studentId: enr.studentId,
@@ -66,7 +70,7 @@ export async function GET(request) {
 
       const actualSessions = datesPresent.length;
 
-      // Lấy hóa đơn tháng trước để tính nợ cũ
+      // 1. TÌM HÓA ĐƠN THÁNG TRƯỚC ĐỂ LẤY NỢ CŨ CHUYỂN SANG
       const prevInvoice = await prisma.monthlyInvoice.findUnique({
         where: {
           studentId_classCode_monthYear: {
@@ -77,17 +81,18 @@ export async function GET(request) {
         },
       });
 
-      let previousDebt = 0;
+      let autoCarryDebt = 0;
       if (prevInvoice) {
-        if (prevInvoice.status === 'UNPAID') {
-          previousDebt += (prevInvoice.totalToPay - (prevInvoice.amountPaid || 0));
-        }
+        // Nợ còn lại của tháng trước = totalToPay - amountPaid
+        const remaining = Math.max(0, (prevInvoice.totalToPay || 0) - (prevInvoice.amountPaid || 0));
+        autoCarryDebt += remaining;
+
         if (enr.billingType === 'MONTHLY_PREPAID') {
-          previousDebt += prevInvoice.excessMissing;
+          autoCarryDebt += (prevInvoice.excessMissing || 0);
         }
       }
 
-      // Kiểm tra xem đã tạo hóa đơn tháng này chưa
+      // 2. TÌM HÓA ĐƠN THÁNG HIỆN TẠI TRONG DB
       const currentInvoice = await prisma.monthlyInvoice.findUnique({
         where: {
           studentId_classCode_monthYear: {
@@ -102,39 +107,53 @@ export async function GET(request) {
       const monthlyRate = enr.monthlyRate || 0;
       const feePerSession = (monthlyRate && monthlySessions) ? monthlyRate / monthlySessions : 0;
 
-      let excessMissing = 0;
-      let currentFee = 0;
-      let totalToPay = 0;
-      let needsUpdate = false;
+      // 🔒 NGUYÊN TẮC BẢO VỆ NỢ CŨ (ANTI-OVERWRITE):
+      // Nếu hóa đơn hiện tại đã được khóa (previousDebtLocked = true) hoặc có nợ cũ > 0 mà tháng trước chưa có invoice,
+      // TUYỆT ĐỐI KHÔNG ghi đè về 0! Giữ nguyên previousDebt đã lưu.
+      let effectivePreviousDebt = autoCarryDebt;
+      if (currentInvoice) {
+        if (currentInvoice.previousDebtLocked || (currentInvoice.previousDebt > 0 && !prevInvoice)) {
+          effectivePreviousDebt = currentInvoice.previousDebt;
+        }
+      }
 
-      // LUÔN TÍNH TOÁN DỮ LIỆU ĐỘNG THEO ĐIỂM DANH HIỆN TẠI
+      // TÍNH TOÁN CÁC THÔNG SỐ LIVE THEO ĐIỂM DANH
       let liveCurrentFee = 0;
       let liveExcessMissing = 0;
       let liveTotalToPay = 0;
-      let livePreviousDebt = previousDebt;
-      let liveAmountPaid = 0;
 
       if (enr.billingType === 'MONTHLY_PREPAID') {
         liveCurrentFee = monthlyRate;
         liveExcessMissing = (actualSessions - monthlySessions) * feePerSession;
-        liveTotalToPay = liveCurrentFee + previousDebt + liveExcessMissing;
+        liveTotalToPay = liveCurrentFee + effectivePreviousDebt + liveExcessMissing;
       } else {
-        // POSTPAID
+        // POSTPAID (Đóng sau)
         liveCurrentFee = actualSessions * feePerSession;
         liveExcessMissing = 0;
-        liveTotalToPay = liveCurrentFee + previousDebt;
+        liveTotalToPay = liveCurrentFee + effectivePreviousDebt;
       }
 
-      // Nếu đã có hóa đơn trong DB, lấy các số liệu đã chốt
+      let currentFee = 0;
+      let excessMissing = 0;
+      let previousDebt = effectivePreviousDebt;
+      let totalToPay = 0;
+      let amountPaid = 0;
+      let status = 'NOT_GENERATED';
+      let needsUpdate = false;
+
       if (currentInvoice) {
         currentFee = currentInvoice.currentFee;
         excessMissing = currentInvoice.excessMissing;
         previousDebt = currentInvoice.previousDebt;
         totalToPay = currentInvoice.totalToPay;
-        let amountPaid = currentInvoice.amountPaid || 0;
+        amountPaid = currentInvoice.amountPaid || 0;
+        status = currentInvoice.status;
 
-        // KIỂM TRA LỆCH DỮ LIỆU (Chỉ khi chưa thanh toán)
-        if (currentInvoice.status === 'UNPAID') {
+        // CHỈ KIỂM TRA LỆCH VÀ BÁO CẬP NHẬT KHI:
+        // - Hóa đơn chưa khóa (isLocked = false)
+        // - Chưa từng đóng tiền (amountPaid === 0)
+        // - Trạng thái UNPAID
+        if (currentInvoice.status === 'UNPAID' && amountPaid === 0 && !currentInvoice.isLocked) {
           if (
             currentInvoice.actualSessions !== actualSessions ||
             currentInvoice.totalToPay !== liveTotalToPay
@@ -143,14 +162,15 @@ export async function GET(request) {
             currentFee = liveCurrentFee;
             excessMissing = liveExcessMissing;
             totalToPay = liveTotalToPay;
-            previousDebt = livePreviousDebt;
+            previousDebt = effectivePreviousDebt;
           }
         }
       } else {
-        // Nếu chưa chốt, dùng luôn live
+        // Chưa chốt sổ -> Dùng luôn thông số live
         currentFee = liveCurrentFee;
         excessMissing = liveExcessMissing;
         totalToPay = liveTotalToPay;
+        previousDebt = effectivePreviousDebt;
       }
 
       data.push({
@@ -170,11 +190,14 @@ export async function GET(request) {
         currentFee,
         excessMissing,
         previousDebt,
+        previousDebtLocked: currentInvoice?.previousDebtLocked || false,
+        isLocked: currentInvoice?.isLocked || false,
         totalToPay,
-        amountPaid: currentInvoice ? (currentInvoice.amountPaid || 0) : 0,
+        amountPaid,
         monthYear,
-        status: currentInvoice ? currentInvoice.status : 'NOT_GENERATED',
+        status,
         invoiceId: currentInvoice?.id || null,
+        notes: currentInvoice?.notes || null,
         needsUpdate,
       });
     }
@@ -202,6 +225,9 @@ export async function POST(request) {
       excessMissing,
       totalToPay,
       amountPaid,
+      previousDebtLocked,
+      isLocked,
+      notes,
     } = body;
 
     const existing = await prisma.monthlyInvoice.findUnique({
@@ -214,6 +240,15 @@ export async function POST(request) {
       },
     });
 
+    const pDebt = parseFloat(previousDebt) || 0;
+    const cFee = parseFloat(currentFee) || 0;
+    const eMissing = parseFloat(excessMissing) || 0;
+    const calculatedTotal = cFee + pDebt + eMissing;
+    const finalTotalToPay = (totalToPay !== undefined && totalToPay !== null) ? parseFloat(totalToPay) : calculatedTotal;
+
+    // Tự động khóa nợ cũ nếu có nhập nợ cũ > 0 hoặc yêu cầu khóa
+    const shouldLockDebt = (previousDebtLocked !== undefined) ? !!previousDebtLocked : (pDebt > 0);
+
     // Nếu đã có hóa đơn -> Cho phép cập nhật số tiền / nợ cũ
     if (existing) {
       const updated = await prisma.monthlyInvoice.update({
@@ -222,11 +257,14 @@ export async function POST(request) {
           committedSessions: committedSessions !== undefined && committedSessions !== null ? parseInt(committedSessions, 10) : existing.committedSessions,
           actualSessions: actualSessions !== undefined && actualSessions !== null ? parseInt(actualSessions, 10) : existing.actualSessions,
           feePerSession: feePerSession !== undefined && feePerSession !== null ? parseFloat(feePerSession) : existing.feePerSession,
-          previousDebt: previousDebt !== undefined && previousDebt !== null ? parseFloat(previousDebt) : existing.previousDebt,
-          currentFee: currentFee !== undefined && currentFee !== null ? parseFloat(currentFee) : existing.currentFee,
-          excessMissing: excessMissing !== undefined && excessMissing !== null ? parseFloat(excessMissing) : existing.excessMissing,
-          totalToPay: totalToPay !== undefined && totalToPay !== null ? parseFloat(totalToPay) : existing.totalToPay,
+          previousDebt: pDebt,
+          currentFee: cFee,
+          excessMissing: eMissing,
+          totalToPay: finalTotalToPay,
           amountPaid: amountPaid !== undefined && amountPaid !== null ? parseFloat(amountPaid) : existing.amountPaid,
+          previousDebtLocked: shouldLockDebt,
+          isLocked: isLocked !== undefined ? !!isLocked : existing.isLocked,
+          notes: notes !== undefined ? notes : existing.notes,
         },
       });
       return NextResponse.json({ success: true, invoice: updated });
@@ -245,13 +283,16 @@ export async function POST(request) {
         committedSessions: parseInt(committedSessions, 10) || 0,
         actualSessions: parseInt(actualSessions, 10) || 0,
         feePerSession: parseFloat(feePerSession) || 0,
-        previousDebt: parseFloat(previousDebt) || 0,
-        currentFee: parseFloat(currentFee) || 0,
-        excessMissing: parseFloat(excessMissing) || 0,
-        totalToPay: parseFloat(totalToPay) || 0,
+        previousDebt: pDebt,
+        currentFee: cFee,
+        excessMissing: eMissing,
+        totalToPay: finalTotalToPay,
         amountPaid: parseFloat(amountPaid) || 0,
+        previousDebtLocked: shouldLockDebt,
+        isLocked: !!isLocked,
         paymentCode,
         status: 'UNPAID',
+        notes: notes || null,
       },
     });
 
