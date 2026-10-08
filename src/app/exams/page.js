@@ -30,6 +30,7 @@ export default function ExamsPage() {
   // --- Notice State (For Image 3 & 4) ---
   const [noticeType, setNoticeType] = useState('exam'); // 'exam' or 'promotion'
   const [noticeForm, setNoticeForm] = useState({
+    examStage: 'final',
     speakingDate: '',
     rwDate: '',
     notes: 'Ba mẹ nhắc bé mang đầy đủ bút chì, tẩy và sáp màu nhé ạ!',
@@ -934,6 +935,19 @@ export default function ExamsPage() {
             {noticeType === 'exam' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Loại kỳ thi</label>
+                  <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: '500', color: '#1e293b' }}>
+                      <input type="radio" name="examStage" value="midterm" checked={noticeForm.examStage === 'midterm'} onChange={() => setNoticeForm({...noticeForm, examStage: 'midterm'})} style={{ accentColor: '#0D88C4', width: '1.2rem', height: '1.2rem' }} />
+                      Đánh giá Giữa khóa
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: '500', color: '#1e293b' }}>
+                      <input type="radio" name="examStage" value="final" checked={noticeForm.examStage === 'final'} onChange={() => setNoticeForm({...noticeForm, examStage: 'final'})} style={{ accentColor: '#0D88C4', width: '1.2rem', height: '1.2rem' }} />
+                      Đánh giá Cuối khóa
+                    </label>
+                  </div>
+                </div>
+                <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Ngày thi Nói (Speaking)</label>
                   <input type="text" value={noticeForm.speakingDate} onChange={e => setNoticeForm({...noticeForm, speakingDate: e.target.value})} placeholder="VD: Thứ Bảy, 25/07/2026" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                 </div>
@@ -1117,6 +1131,7 @@ export default function ExamsPage() {
                 {noticeType === 'exam' ? (
                   <ExamNoticeTemplate 
                     className={classes.find(c => c.code === selectedClass)?.code} 
+                    examStage={noticeForm.examStage}
                     examDates={{ speaking: noticeForm.speakingDate, rw: noticeForm.rwDate }} 
                     notes={noticeForm.notes} 
                   />

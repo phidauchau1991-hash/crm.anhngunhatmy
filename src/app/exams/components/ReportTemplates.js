@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useRef } from 'react';
 import * as htmlToImage from 'html-to-image';
 
@@ -442,8 +442,10 @@ export const ExportImageWrapper = ({ children, targetId, filename }) => {
 // ==========================================
 // ẢNH 3: THƯ THÔNG BÁO LỊCH THI
 // ==========================================
-export const ExamNoticeTemplate = ({ className, examDates, notes }) => {
+export const ExamNoticeTemplate = ({ className, examStage = 'final', examDates, notes }) => {
   const displayClassCode = formatClassCodeForParent(className || "");
+  const isMidterm = examStage === 'midterm';
+  
   return (
     <div style={styles.container} id="exam-notice-report">
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
@@ -453,7 +455,7 @@ export const ExamNoticeTemplate = ({ className, examDates, notes }) => {
         </div>
         <div>
           <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>THƯ THÔNG BÁO</h1>
-          <h2 style={{ color: '#64748b', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>V/v: Đánh giá cuối khóa học lớp {displayClassCode}</h2>
+          <h2 style={{ color: '#64748b', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>V/v: Đánh giá {isMidterm ? 'giữa' : 'cuối'} khóa học lớp {displayClassCode}</h2>
         </div>
       </div>
       <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '30px' }} />
@@ -461,7 +463,11 @@ export const ExamNoticeTemplate = ({ className, examDates, notes }) => {
       <p style={{ fontSize: '18px', lineHeight: '1.6' }}>Kính gửi Quý Phụ huynh,</p>
       <p style={{ fontSize: '18px', lineHeight: '1.6' }}>
         Trung tâm Anh ngữ Nhật Mỹ xin chân thành cảm ơn sự đồng hành của Quý Phụ huynh và sự cố gắng của các con trong suốt khóa học vừa qua.
-        Khóa học của lớp <b>{displayClassCode}</b> sắp kết thúc, Trung tâm xin thông báo lịch kiểm tra cuối khóa để đánh giá năng lực của các con như sau:
+        {isMidterm ? (
+          <> Khóa học của lớp <b>{displayClassCode}</b> đã đi được nửa chặng đường, Trung tâm xin thông báo lịch kiểm tra giữa khóa để đánh giá năng lực của các con như sau:</>
+        ) : (
+          <> Khóa học của lớp <b>{displayClassCode}</b> sắp kết thúc, Trung tâm xin thông báo lịch kiểm tra cuối khóa để đánh giá năng lực của các con như sau:</>
+        )}
       </p>
 
       <table style={{ ...styles.table, marginTop: '20px', marginBottom: '30px' }}>
