@@ -766,7 +766,7 @@ export default function MonthlyBillingPage() {
         body: JSON.stringify({
           invoiceId: payInvoice.invoiceId,
           paymentMethod: payMethod,
-          amountPaid: payInvoice.totalToPay,
+          amountPaid: payAmount,
         }),
       });
       if (res.ok) {
@@ -779,18 +779,21 @@ export default function MonthlyBillingPage() {
           if (nextM > 12) { nextM = 1; nextY++; }
           displayMonthYear = `${nextM.toString().padStart(2, '0')}/${nextY}`;
         }
-        setEReceiptData({
-          studentName: payInvoice.studentName,
-          totalPaid: payInvoice.totalToPay,
-          oldDebt: payInvoice.previousDebt || 0,
-          tuitionPaid: payInvoice.currentFee || payInvoice.totalToPay,
-          remainingDebt: 0,
-          monthYear: displayMonthYear,
-          paymentMethod: payMethod,
-          date: new Date().toLocaleDateString('vi-VN'),
-          time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          cashier: 'Admin',
-        });
+        const realAmountPaid = Number(payAmount || 0);
+          const debtBeforeThis = Number(payInvoice.totalToPay || 0) - Number(payInvoice.amountPaid || 0);
+          const newRemaining = debtBeforeThis - realAmountPaid;
+          setEReceiptData({
+            studentName: payInvoice.studentName,
+            totalPaid: realAmountPaid,
+            oldDebt: debtBeforeThis,
+            tuitionPaid: realAmountPaid,
+            remainingDebt: newRemaining > 0 ? newRemaining : 0,
+            monthYear: displayMonthYear,
+            paymentMethod: payMethod,
+            date: new Date().toLocaleDateString('vi-VN'),
+            time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            cashier: 'Admin',
+          });
         fetchNoticesData();
       }
     } catch (err) {
