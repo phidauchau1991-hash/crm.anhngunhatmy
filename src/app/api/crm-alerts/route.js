@@ -44,6 +44,8 @@ export async function GET(request) {
     });
 
     // 3. Tuition alerts (Classes started >= 20 days ago, unpaid orders)
+    const dismissed = getDismissedKeys();
+    
     const unpaidOrders = await prisma.orderFinance.findMany({
       where: {
         paymentStatus: {
