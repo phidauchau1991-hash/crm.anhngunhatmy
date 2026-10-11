@@ -192,6 +192,7 @@ export default function MonthlyBillingPage() {
   const [eReceiptData, setEReceiptData] = useState(null);
   const receiptRef = useRef(null);
   const [copyingReceipt, setCopyingReceipt] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
 
   // Nấc thang lọc thời gian: Năm -> 6 Tháng (Kỳ 1 / Kỳ 2) -> Tháng
   const [currentMStr, currentYStr] = monthYear.split('/');
@@ -759,13 +760,48 @@ export default function MonthlyBillingPage() {
 
   // Xác nhận Thu tiền -> In Phiếu thu
   const handlePayInvoice = async () => {
-    if (!payInvoice) return;
+    if (!payInvoice || isPaying) return;
+    setIsPaying(true);
     try {
+      let invoiceId = payInvoice.invoiceId;
+
+      // ===================================================================
+      // BƯỚC 1: NẾU CHƯA CÓ HÓA ĐƠN (chưa chốt sổ) → TỰ ĐỘNG CHỐT SỔ TRƯỚC
+      // ===================================================================
+      if (!invoiceId) {
+        const genRes = await fetch('/api/finance/monthly', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: payInvoice.studentId,
+            classCode: payInvoice.classCode,
+            monthYear,
+            billingType: payInvoice.billingType,
+            committedSessions: payInvoice.committedSessions,
+            actualSessions: payInvoice.actualSessions,
+            feePerSession: payInvoice.feePerSession,
+            previousDebt: payInvoice.previousDebt,
+            currentFee: payInvoice.currentFee,
+            excessMissing: payInvoice.excessMissing,
+            totalToPay: payInvoice.totalToPay,
+          }),
+        });
+        const genJson = await genRes.json();
+        invoiceId = genJson?.invoice?.id;
+        if (!genRes.ok || !invoiceId) {
+          alert('Không thể tạo hóa đơn tháng: ' + (genJson?.error || 'Lỗi không xác định'));
+          return;
+        }
+      }
+
+      // ===================================================================
+      // BƯỚC 2: GHI NHẬN THANH TOÁN
+      // ===================================================================
       const res = await fetch('/api/finance/monthly/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          invoiceId: payInvoice.invoiceId,
+          invoiceId: parseInt(invoiceId, 10),
           paymentMethod: payMethod,
           amountPaid: payAmount,
         }),
@@ -805,57 +841,72 @@ export default function MonthlyBillingPage() {
         alert(resJson?.error || 'Có lỗi khi thu tiền');
       }
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi handlePayInvoice:', err);
+      alert('Lỗi kết nối máy chủ: ' + err.message);
+    } finally {
+      setIsPaying(false);
     }
   };
 
-  // Copy Ảnh Phiếu thu
+  // Copy Ảnh Phiếu thu - dùng htmlToImage
   const copyReceiptImage = async () => {
-    if (!receiptRef.current) return;
+    if (!receiptRef.current || copyingReceipt) return;
     setCopyingReceipt(true);
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
-      canvas.toBlob(async (blob) => {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          alert('Đã copy Phiếu thu điện tử vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay.');
-        } catch (err) {
-          downloadReceiptImage();
-        } finally {
-          setCopyingReceipt(false);
-        }
+      if (document.fonts?.ready) await document.fonts.ready;
+      const blob = await htmlToImage.toBlob(receiptRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#ffffff'
       });
+      if (!blob) throw new Error('Không tạo được ảnh');
+
+      if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
+        throw new Error('Trình duyệt không hỗ trợ copy ảnh vào clipboard. Vui lòng bấm nút Tải Ảnh.');
+      }
+
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      alert('Đã copy Phiếu thu điện tử vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay.');
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi copy phiếu thu:', err);
+      alert(err.message || 'Có lỗi khi tạo ảnh phiếu thu.');
+    } finally {
       setCopyingReceipt(false);
     }
   };
 
+  // Tải Ảnh Phiếu thu trực tiếp về máy tính (bỏ navigator.share để không mở popup Share Charm trên Windows)
   const downloadReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const blob = await htmlToImage.toBlob(receiptRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
-      const filename = `PhieuThu_${eReceiptData?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${monthYear?.replace('/', '_') || 'NA'}.png`;
-      
-      // Hỗ trợ chia sẻ trực tiếp (Share) trên điện thoại
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
-        const file = new File([blob], filename, { type: 'image/png' });
-        await navigator.share({
-          files: [file],
-          title: 'Phiếu thu điện tử',
-          text: 'Gửi phụ huynh phiếu thu'
-        });
-        return;
-      }
-      
-      // Fallback tải xuống
-      const dataUrl = await htmlToImage.toPng(receiptRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+      if (document.fonts?.ready) await document.fonts.ready;
+      const blob = await htmlToImage.toBlob(receiptRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#ffffff'
+      });
+      if (!blob) throw new Error('Không tạo được ảnh');
+
+      const studentNameClean = (eReceiptData?.studentName || 'HocVien')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .replace(/\s+/g, '_');
+      const filename = `PhieuThu_${studentNameClean}_Thang_${(eReceiptData?.monthYear || monthYear)?.replace('/', '_')}.png`;
+
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = filename;
-      link.href = dataUrl;
+      link.href = url;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi tải phiếu thu:', err);
+      alert('Có lỗi khi tải ảnh phiếu thu. Vui lòng thử lại!');
     }
   };
 
@@ -1622,6 +1673,7 @@ export default function MonthlyBillingPage() {
                                 onClick={() => {
                                   setPayInvoice(row);
                                   setPayAmount((row.totalToPay || 0) - (row.amountPaid || 0));
+                                  setEReceiptData(null);
                                   setShowPayModal(true);
                                 }}
                               >
@@ -2790,11 +2842,28 @@ export default function MonthlyBillingPage() {
                   </div>
 
                   <button
+                    type="button"
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.85rem', fontWeight: '800', fontSize: '1.05rem' }}
+                    disabled={isPaying}
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem',
+                      fontWeight: '800',
+                      fontSize: '1.05rem',
+                      cursor: isPaying ? 'not-allowed' : 'pointer',
+                      opacity: isPaying ? 0.75 : 1,
+                    }}
                     onClick={handlePayInvoice}
                   >
-                    <i className="fa-solid fa-circle-check"></i> Xác Nhận Thu Tiền & In Biên Lai
+                    {isPaying ? (
+                      <>
+                        <i className="fa-solid fa-spinner fa-spin"></i> Đang xử lý thu tiền...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-circle-check"></i> Xác Nhận Thu Tiền & In Biên Lai
+                      </>
+                    )}
                   </button>
                 </div>
               ) : (
@@ -2964,6 +3033,7 @@ export default function MonthlyBillingPage() {
 
                   <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                     <button
+                      type="button"
                       className="btn"
                       style={{
                         background: '#085E8A',
@@ -2987,6 +3057,7 @@ export default function MonthlyBillingPage() {
                       )}
                     </button>
                     <button
+                      type="button"
                       className="btn btn-secondary"
                       style={{ padding: '0.75rem 1.25rem', fontWeight: '700' }}
                       onClick={downloadReceiptImage}

@@ -5,9 +5,14 @@ export async function POST(request) {
   try {
     const { invoiceId, paymentMethod, amountPaid } = await request.json();
     
+    const id = parseInt(invoiceId, 10);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'Mã hóa đơn không hợp lệ' }, { status: 400 });
+    }
+
     // Lấy hóa đơn hiện tại
     const existing = await prisma.monthlyInvoice.findUnique({
-      where: { id: invoiceId },
+      where: { id },
       include: {
         student: true,
         class: true,
@@ -32,7 +37,7 @@ export async function POST(request) {
     const newNotes = oldNotes + `+ Đã thu ${payAmount.toLocaleString('vi-VN')}đ qua ${paymentMethod} (ngày ${new Date().toLocaleDateString('vi-VN')})`;
 
     const updated = await prisma.monthlyInvoice.update({
-      where: { id: invoiceId },
+      where: { id },
       data: {
         status: newStatus,
         amountPaid: newAmountPaid,
@@ -51,7 +56,7 @@ export async function POST(request) {
       success: true,
       invoice: updated,
       snapshot: {
-        studentName: existing.student.name,
+        studentName: existing.student?.name || 'Học viên',
         monthYear: existing.monthYear,
         classCode: existing.classCode,
         currentFee: existing.currentFee,
@@ -70,6 +75,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Lỗi API thanh toán học phí tháng:', error);
-    return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
+    return NextResponse.json({ error: 'Lỗi hệ thống: ' + error.message }, { status: 500 });
   }
 }
