@@ -72,7 +72,16 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
         });
         const data = await res.json();
         if (data.success) {
-          setGeneratedResult(data.data);
+          const raw = data.data || {};
+          const normalized = {
+            ...raw,
+            attitude: raw.attitude ?? '',
+            skills: raw.skills ?? '',
+            potential: raw.potential ?? '',
+            recommendation: raw.recommendation ?? raw.advice ?? '',
+            advice: raw.recommendation ?? raw.advice ?? '',
+          };
+          setGeneratedResult(normalized);
           setStep(2);
         } else {
           alert('Lỗi: ' + data.error);
@@ -108,29 +117,39 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
     const el = document.getElementById('review-preview-card');
     if (!el) return;
     try {
-      const dataUrl = await htmlToImage.toPng(el, { quality: 1, backgroundColor: '#fff' });
+      if (document.fonts?.ready) await document.fonts.ready;
+      const blob = await htmlToImage.toBlob(el, { quality: 1, pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+      if (!blob) throw new Error('Không tạo được ảnh');
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = `NhanXet_${studentName.replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
-      link.href = dataUrl;
+      link.href = url;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (error) {
       alert('Lỗi khi tạo ảnh: ' + error.message);
     }
   };
 
   const handleCopy = async () => {
-    const el = document.getElementById('report-template-capture');
+    const el = document.getElementById('review-preview-card');
     if (!el) return;
     try {
-      const dataUrl = await htmlToImage.toPng(el, { quality: 1, pixelRatio: 2, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
+      if (document.fonts?.ready) await document.fonts.ready;
+      const blob = await htmlToImage.toBlob(el, { quality: 1, pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+      if (!blob) throw new Error('Không tạo được ảnh');
+      if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
+        throw new Error('Trình duyệt không hỗ trợ copy ảnh. Vui lòng bấm Tải Ảnh.');
+      }
       const item = new ClipboardItem({ 'image/png': blob });
       await navigator.clipboard.write([item]);
       alert('Đã copy ảnh vào bộ nhớ tạm. Có thể dán (Ctrl+V) vào Zalo ngay!');
     } catch (err) {
       console.error('Error copying image:', err);
-      alert('Lỗi copy ảnh hoặc trình duyệt không hỗ trợ.');
+      alert('Lỗi copy ảnh: ' + (err.message || 'Vui lòng bấm Tải Ảnh.'));
     }
   };
 
@@ -212,13 +231,18 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
 
         {step === 2 && generatedResult && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <button onClick={() => setStep(1)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
                 <i className="fa-solid fa-arrow-left"></i> Nhập lại từ khóa
               </button>
-              <button onClick={handleDownload} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                <i className="fa-solid fa-download"></i> Tải Ảnh Nhận Xét
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button onClick={handleCopy} style={{ background: '#0D88C4', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  <i className="fa-solid fa-copy"></i> Copy Ảnh (Dán Zalo)
+                </button>
+                <button onClick={handleDownload} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  <i className="fa-solid fa-download"></i> Tải Ảnh Nhận Xét
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
@@ -232,38 +256,70 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
                   <>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Thái độ & Hòa nhập</label>
-                      <textarea value={generatedResult.attitude || ''} onChange={e => setGeneratedResult({...generatedResult, attitude: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.attitude || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, attitude: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Ngôn ngữ</label>
-                      <textarea value={generatedResult.skills || ''} onChange={e => setGeneratedResult({...generatedResult, skills: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.skills || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, skills: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Tiềm năng & Định hướng</label>
-                      <textarea value={generatedResult.potential || ''} onChange={e => setGeneratedResult({...generatedResult, potential: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.potential || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, potential: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Lời khuyên cho Phụ huynh</label>
-                      <textarea value={generatedResult.advice || ''} onChange={e => setGeneratedResult({...generatedResult, advice: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.recommendation ?? generatedResult?.advice ?? ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, recommendation: e.target.value, advice: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                   </>
                 ) : (
                   <>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nói (Speaking)</label>
-                      <textarea value={generatedResult.speaking || ''} onChange={e => setGeneratedResult({...generatedResult, speaking: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.speaking || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, speaking: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nghe (Listening)</label>
-                      <textarea value={generatedResult.listening || ''} onChange={e => setGeneratedResult({...generatedResult, listening: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.listening || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, listening: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Đọc & Viết (Read/Write)</label>
-                      <textarea value={generatedResult.rw || ''} onChange={e => setGeneratedResult({...generatedResult, rw: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.rw || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, rw: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                     <div>
                       <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Định hướng phát triển</label>
-                      <textarea value={generatedResult.dev || ''} onChange={e => setGeneratedResult({...generatedResult, dev: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={generatedResult?.dev || ''}
+                        onChange={e => setGeneratedResult(prev => ({ ...prev, dev: e.target.value }))}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
                     </div>
                   </>
                 )}

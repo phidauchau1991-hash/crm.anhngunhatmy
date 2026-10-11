@@ -660,25 +660,46 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
   );
 };
 
+// Helper hiển thị nhận xét bullet linh hoạt: chấp nhận cả văn bản tự do, có gạch đầu dòng hoặc không có gạch đầu dòng
+const renderBulletComments = (text) => {
+  const normalized = typeof text === 'string' ? text : '';
+  const lines = normalized
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .map(line => line.replace(/^[-*•]\s*/, '').trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return (
+      <li style={{ textAlign: 'left', listStyleType: 'disc' }}>
+        Không có dữ liệu
+      </li>
+    );
+  }
+
+  return lines.map((line, idx) => (
+    <li
+      key={idx}
+      style={{
+        marginBottom: '8px',
+        lineHeight: '1.6',
+        textAlign: 'left',
+        listStyleType: 'disc',
+        listStylePosition: 'outside',
+      }}
+    >
+      {line}
+    </li>
+  ));
+};
+
+const getRecommendationText = (result) => result?.recommendation ?? result?.advice ?? '';
+
 // ==========================================
 // ẢNH 5: NHẬN XÉT ĐỊNH KỲ (PERIODIC REPORT)
 // ==========================================
 export const PeriodicReportTemplate = ({ student, result }) => {
-  const parseComment = (text) => {
-    if (!text) return <li style={{ textAlign: 'left', listStyleType: 'disc' }}>Không có dữ liệu</li>;
-    return text.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.startsWith('-') || line.startsWith('*') || line.startsWith('•'))
-      .map((line, idx) => {
-        const cleanText = line.replace(/^[-*•]\s*/, '').trim();
-        return (
-          <li key={idx} style={{ marginBottom: '8px', lineHeight: '1.6', textAlign: 'left', listStyleType: 'disc', listStylePosition: 'outside' }}>
-            {cleanText}
-          </li>
-        );
-      });
-  };
-
   return (
     <div style={styles.container} id="review-preview-card">
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
@@ -687,7 +708,7 @@ export const PeriodicReportTemplate = ({ student, result }) => {
           <img src="/logo.png" alt="Logo" style={styles.logoImage} />
         </div>
         <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student.name}</h1>
+          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student?.name}</h1>
           <h2 style={{ color: '#0D88C4', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>NHẬN XÉT ĐỊNH KỲ</h2>
         </div>
       </div>
@@ -696,32 +717,32 @@ export const PeriodicReportTemplate = ({ student, result }) => {
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Speaking (Nói)</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.speaking)}
-          {result.speaking_en && parseComment(result.speaking_en)}
+          {renderBulletComments(result?.speaking)}
+          {result?.speaking_en && renderBulletComments(result.speaking_en)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Listening (Nghe)</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.listening)}
-          {result.listening_en && parseComment(result.listening_en)}
+          {renderBulletComments(result?.listening)}
+          {result?.listening_en && renderBulletComments(result.listening_en)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Reading & Writing (Đọc & Viết)</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.rw)}
-          {result.rw_en && parseComment(result.rw_en)}
+          {renderBulletComments(result?.rw)}
+          {result?.rw_en && renderBulletComments(result.rw_en)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Thái độ & Định hướng</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.dev)}
-          {result.dev_en && parseComment(result.dev_en)}
+          {renderBulletComments(result?.dev)}
+          {result?.dev_en && renderBulletComments(result.dev_en)}
         </ul>
       </div>
     </div>
@@ -732,21 +753,6 @@ export const PeriodicReportTemplate = ({ student, result }) => {
 // ẢNH 6: NHẬN XÉT HỌC THỬ (TRIAL REPORT)
 // ==========================================
 export const TrialReportTemplate = ({ student, result, sessions }) => {
-  const parseComment = (text) => {
-    if (!text) return <li style={{ textAlign: 'left', listStyleType: 'disc' }}>Không có dữ liệu</li>;
-    return text.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.startsWith('-') || line.startsWith('*') || line.startsWith('•'))
-      .map((line, idx) => {
-        const cleanText = line.replace(/^[-*•]\s*/, '').trim();
-        return (
-          <li key={idx} style={{ marginBottom: '8px', lineHeight: '1.6', textAlign: 'left', listStyleType: 'disc', listStylePosition: 'outside' }}>
-            {cleanText}
-          </li>
-        );
-      });
-  };
-
   return (
     <div style={styles.container} id="review-preview-card">
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
@@ -755,7 +761,7 @@ export const TrialReportTemplate = ({ student, result, sessions }) => {
           <img src="/logo.png" alt="Logo" style={styles.logoImage} />
         </div>
         <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student.name}</h1>
+          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student?.name}</h1>
           <h2 style={{ color: '#0D88C4', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>NHẬN XÉT HỌC THỬ ({sessions} BUỔI)</h2>
         </div>
       </div>
@@ -764,28 +770,28 @@ export const TrialReportTemplate = ({ student, result, sessions }) => {
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Thái độ & Hòa nhập</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.attitude)}
+          {renderBulletComments(result?.attitude)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Kỹ năng Ngôn ngữ</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.skills)}
+          {renderBulletComments(result?.skills)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Tiềm năng & Định hướng</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.potential)}
+          {renderBulletComments(result?.potential)}
         </ul>
       </div>
 
       <div style={styles.commentBox}>
         <div style={styles.commentTitle}>Lời khuyên cho Phụ huynh</div>
         <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.recommendation)}
+          {renderBulletComments(getRecommendationText(result))}
         </ul>
       </div>
     </div>
