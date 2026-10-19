@@ -516,3 +516,9 @@ model TutoringAlertDismissal {
   @@unique([studentId, alertKey])
 }
 
+model AlertDismissal {
+  alertKey    String   @id
+  dismissedAt DateTime @default(now())
+}
+
+
