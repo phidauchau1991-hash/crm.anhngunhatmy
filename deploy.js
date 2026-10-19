@@ -48,6 +48,14 @@ async function deploy() {
     console.log('=== KẾT QUẢ TRIỂN KHAI ===');
     console.log(result.stdout);
     if (result.stderr) console.error(result.stderr);
+
+    console.log('4. Đang đồng bộ cấu trúc bảng CSDL an toàn (Additive push)...');
+    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npx prisma db push --skip-generate');
+    console.log(dbPushResult.stdout);
+    if (dbPushResult.stderr) console.error(dbPushResult.stderr);
+
+    console.log('5. Đang tải lại tiến trình PM2 nhat-my-crm...');
+    await ssh.execCommand('pm2 reload nhat-my-crm');
     
     console.log('🚀 HOÀN TẤT! Hệ thống CRM đã được cập nhật thành công!');
     

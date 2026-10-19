@@ -26,6 +26,7 @@ model User {
   // Quan há»‡
   classes     Class[]             @relation("ClassTeacher")
   attendances AttendanceSummary[] @relation("AttendanceTeacher")
+  tutoringPlansAsTeacher TutoringPlan[] @relation("TutoringPlanTeacher")
 }
 
 model CourseConfig {
@@ -60,6 +61,7 @@ model Class {
   attendanceSummaries AttendanceSummary[]
   examResults         ExamResult[] // Káº¿t quáº£ thi
   monthlyInvoices     MonthlyInvoice[]
+  tutoringPlans       TutoringPlan[]
 }
 
 model Student {
@@ -94,6 +96,7 @@ model Student {
   inventoryLogs   InventoryLog[] // LiÃªn káº¿t tá»›i báº£ng Quáº£n lÃ½ Kho (Cáº¥p phÃ¡t váº­t tÆ°)
   examResults     ExamResult[] // LiÃªn káº¿t tá»›i báº£ng Káº¿t quáº£ thi (Sprint 4)
   monthlyInvoices MonthlyInvoice[]
+  tutoringPlans   TutoringPlan[]
 }
 
 model Enrollment {
@@ -429,3 +432,87 @@ model MonthlyInvoice {
 
   @@unique([studentId, classCode, monthYear])
 }
+
+// ============================================
+// PHỤ ĐẠO & BÙ BÀI (TUTORING & MAKEUP SESSIONS)
+// ============================================
+
+model TutoringPlan {
+  id               String   @id @default(uuid())
+  planCode         String   @unique // Mã đợt, vd: PD2610_001
+  
+  // Học viên & Lớp học
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  classCode        String?
+  class            Class?   @relation(fields: [classCode], references: [code], onDelete: SetNull)
+
+  // Giáo viên phụ trách
+  teacherId        String?
+  teacher          User?    @relation("TutoringPlanTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  tutorName        String?  // Tên giáo viên/trợ giảng kèm hiển thị
+
+  // Phân loại & Kỹ năng
+  sessionType      String   @default("Bù bài học viên vắng (Makeup)")
+  focusSkills      String   @default("Tổng hợp / Toàn diện")
+  
+  // Nội dung & Dặn dò
+  content          String?  // Nội dung bài học & mục tiêu bù bài
+  instructions     String?  // Dặn dò học viên / Phụ huynh (Đồ dùng mang theo)
+  totalSessions    Int      @default(1) // Tổng số buổi dự kiến
+  
+  // Trạng thái tổng quát: SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  status           String   @default("SCHEDULED")
+  createdById      String?  // User tạo lịch
+  letterExportedAt DateTime? // Thời điểm xuất/copy thư gửi phụ huynh
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sessions         TutoringSession[]
+
+  @@index([studentId, status])
+  @@index([teacherId])
+  @@index([classCode])
+}
+
+model TutoringSession {
+  id               String   @id @default(uuid())
+  planId           String
+  plan             TutoringPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  sessionNumber    Int      @default(1) // Buổi số 1, 2, 3...
+  teachingDate     String   // YYYY-MM-DD
+  startTimeText    String?  // Nhập tự do (vd: 16:30, 04:30 CH, 17h)
+  endTimeText      String?  // Nhập tự do (vd: 17:30, 05:30 CH, 18h30)
+  roomName         String   @default("Phòng học tại trung tâm") // Dạy trực tiếp tại cơ sở
+
+  notes            String?  // Ghi chú riêng cho buổi
+  status           String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  
+  // Điểm danh & Đánh giá tiếp thu sau buổi học
+  attendanceStatus String?  // Có mặt, Đi trễ, Vắng mặt
+  evaluation       String?  // Xuất sắc, Tốt, Trung bình, Cần cố gắng
+  evaluationNotes  String?  // Nhận xét của giáo viên
+  homeworkAssigned String?  // Bài tập về nhà giao thêm
+  completedAt      DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([planId])
+  @@index([teachingDate, status])
+  @@index([roomName, teachingDate])
+}
+
+model TutoringAlertDismissal {
+  id          Int      @id @default(autoincrement())
+  studentId   String
+  alertKey    String   // Key định danh cảnh báo
+  reason      String?  // Lý do bỏ qua
+  dismissedBy String?  // Tên người bấm bỏ qua
+  createdAt   DateTime @default(now())
+
+  @@unique([studentId, alertKey])
+}
+

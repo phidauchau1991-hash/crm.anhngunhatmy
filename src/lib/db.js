@@ -12,7 +12,7 @@ const createPrismaClient = () => {
 if (process.env.NODE_ENV === 'production') {
   prisma = createPrismaClient();
 } else {
-  const SCHEMA_VERSION = "sprint7_v3_followup";
+  const SCHEMA_VERSION = "sprint8_tutoring";
   if (!global.prisma || global.prismaSchemaVersion !== SCHEMA_VERSION) {
     global.prisma = createPrismaClient();
     global.prismaSchemaVersion = SCHEMA_VERSION;
