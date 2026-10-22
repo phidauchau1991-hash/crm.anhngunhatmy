@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import TutoringScheduleModal from './components/TutoringScheduleModal';
 import TutoringLetterModal from './components/TutoringLetterModal';
 import TutoringCompleteModal from './components/TutoringCompleteModal';
@@ -152,422 +152,371 @@ export default function TutoringPage() {
   };
 
   // Lọc danh sách theo Tab, Giáo viên và Tìm kiếm
-  const filteredPlans = plans.filter((plan) => {
-    // 1. Lọc theo tab
-    if (activeTab === 'SCHEDULED' && plan.status !== 'SCHEDULED' && plan.status !== 'IN_PROGRESS') return false;
-    if (activeTab === 'COMPLETED' && plan.status !== 'COMPLETED') return false;
-    if (activeTab === 'CANCELLED' && plan.status !== 'CANCELLED') return false;
+  const filteredPlans = useMemo(() => {
+    return plans.filter((plan) => {
+      // 1. Lọc theo tab
+      if (activeTab === 'SCHEDULED' && plan.status !== 'SCHEDULED' && plan.status !== 'IN_PROGRESS') return false;
+      if (activeTab === 'COMPLETED' && plan.status !== 'COMPLETED') return false;
+      if (activeTab === 'CANCELLED' && plan.status !== 'CANCELLED') return false;
 
-    // 2. Lọc theo giáo viên
-    if (teacherFilter && plan.teacherId !== teacherFilter) return false;
+      // 2. Lọc theo giáo viên
+      if (teacherFilter && plan.teacherId !== teacherFilter) return false;
 
-    // 3. Tìm kiếm từ khóa
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const stName = (plan.student?.name || '').toLowerCase();
-      const stPhone = (plan.student?.phone || '').toLowerCase();
-      const code = (plan.planCode || '').toLowerCase();
-      const cls = (plan.classCode || '').toLowerCase();
-      const tutor = (plan.tutorName || '').toLowerCase();
-      const hasRoom = (plan.sessions || []).some((s) => (s.roomName || '').toLowerCase().includes(q));
+      // 3. Tìm kiếm từ khóa
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const stName = (plan.student?.name || '').toLowerCase();
+        const stPhone = (plan.student?.phone || '').toLowerCase();
+        const code = (plan.planCode || '').toLowerCase();
+        const cls = (plan.classCode || '').toLowerCase();
+        const tutor = (plan.tutorName || '').toLowerCase();
+        const hasRoom = (plan.sessions || []).some((s) => (s.roomName || '').toLowerCase().includes(q));
 
-      if (!stName.includes(q) && !stPhone.includes(q) && !code.includes(q) && !cls.includes(q) && !tutor.includes(q) && !hasRoom) {
-        return false;
+        if (!stName.includes(q) && !stPhone.includes(q) && !code.includes(q) && !cls.includes(q) && !tutor.includes(q) && !hasRoom) {
+          return false;
+        }
       }
-    }
 
-    return true;
-  });
+      return true;
+    });
+  }, [plans, activeTab, teacherFilter, searchQuery]);
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto min-h-screen text-slate-800">
-      {/* Tiêu đề trang */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
-              <i className="fa-solid fa-book-open-reader"></i>
-            </span>
-            Quản Lý Phụ Đạo & Bù Bài
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Hệ thống tự động phát hiện học viên vắng học / hổng kiến thức, điều phối lịch kèm và xuất thư báo phụ huynh
-          </p>
-        </div>
+    <div className="tutoring-page">
+      <div className="page-container">
 
-        <button
-          onClick={handleOpenScheduleNew}
-          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/25 flex items-center gap-2 self-start md:self-auto transition-all"
-        >
-          <i className="fa-solid fa-plus"></i>
-          Tạo Buổi Phụ Đạo Mới
-        </button>
-      </div>
+        {/* ============ HEADER ============ */}
+        <header className="page-header">
+          <div className="header-icon">
+            <i className="fa-solid fa-book-open-reader"></i>
+          </div>
+          <div className="header-text">
+            <h1>Quản Lý Phụ Đạo & Bù Bài</h1>
+            <p>Tự động phát hiện học viên vắng học / hổng kiến thức, điều phối lịch kèm trực tiếp và xuất thư báo phụ huynh</p>
+          </div>
+          <div className="header-actions">
+            <button className="btn-primary-action" onClick={handleOpenScheduleNew}>
+              <i className="fa-solid fa-plus"></i> Tạo Buổi Phụ Đạo Mới
+            </button>
+          </div>
+        </header>
 
-      {/* 4 Thẻ Thống Kê (Stat Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Cảnh báo Cần Phụ Đạo */}
-        <div className="bg-white rounded-2xl p-5 border border-red-100 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Cảnh báo Cần Phụ Đạo</span>
-            <span className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm">
+        {/* ============ STAT CARDS ============ */}
+        <div className="stats-grid">
+          <div className="stat-card danger">
+            <div className="stat-icon">
               <i className="fa-solid fa-triangle-exclamation"></i>
-            </span>
-          </div>
-          <div className="text-3xl font-black text-red-600 mt-3">{stats.alertCount}</div>
-          <p className="text-xs text-gray-500 mt-1">
-            {stats.scheduledStudentsCount} học viên đã được lên lịch
-          </p>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-        </div>
-
-        {/* Card 2: Đang Lên Lịch */}
-        <div className="bg-white rounded-2xl p-5 border border-blue-100 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Đang Lên Lịch (Chờ học)</span>
-            <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">
-              <i className="fa-solid fa-calendar-days"></i>
-            </span>
-          </div>
-          <div className="text-3xl font-black text-blue-600 mt-3">{stats.scheduledCount}</div>
-          <p className="text-xs text-gray-500 mt-1">{stats.scheduledCount} Buổi học sắp tới</p>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-        </div>
-
-        {/* Card 3: Đã Hoàn Thành */}
-        <div className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Đã Hoàn Thành</span>
-            <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm">
-              <i className="fa-solid fa-circle-check"></i>
-            </span>
-          </div>
-          <div className="text-3xl font-black text-emerald-600 mt-3">{stats.completedCount}</div>
-          <p className="text-xs text-gray-500 mt-1">Đã điểm danh & đánh giá tiếp thu</p>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-        </div>
-
-        {/* Card 4: Tổng Số Buổi Tổ Chức */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Tổng Số Buổi Tổ Chức</span>
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center text-sm">
-              <i className="fa-solid fa-chart-pie"></i>
-            </span>
-          </div>
-          <div className="text-3xl font-black text-gray-900 mt-3">{stats.totalCount}</div>
-          <p className="text-xs text-gray-500 mt-1">{stats.cancelledCount} buổi đã hủy</p>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gray-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-        </div>
-      </div>
-
-      {/* Hàng Đợi Cảnh Báo Học Viên Cần Phụ Đạo & Bù Bài */}
-      <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 bg-red-50/70 border-b border-red-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
-            <div>
-              <h2 className="text-sm font-bold text-red-900 flex items-center gap-2">
-                <i className="fa-solid fa-bell text-red-600"></i>
-                Hàng Đợi Cảnh Báo Học Viên Cần Phụ Đạo & Bù Bài ({alerts.length})
-              </h2>
-              <p className="text-xs text-red-700/80">
-                Tự động quét từ hệ thống Điểm danh: Học viên vắng liên tiếp hoặc hổng kỹ năng cần bổ trợ
-              </p>
+            </div>
+            <div className="stat-info">
+              <div className="stat-label">Cảnh báo Cần Phụ Đạo</div>
+              <div className="stat-value text-danger">{stats.alertCount}</div>
+              <div className="stat-sub">{stats.scheduledStudentsCount} học viên đã lên lịch</div>
             </div>
           </div>
 
-          <button
-            onClick={handleOpenScheduleNew}
-            className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5 self-start md:self-auto transition-colors"
-          >
-            <i className="fa-solid fa-plus"></i>
-            Tạo buổi phụ đạo mới
-          </button>
+          <div className="stat-card primary">
+            <div className="stat-icon">
+              <i className="fa-solid fa-calendar-days"></i>
+            </div>
+            <div className="stat-info">
+              <div className="stat-label">Đang Lên Lịch (Chờ học)</div>
+              <div className="stat-value text-primary">{stats.scheduledCount}</div>
+              <div className="stat-sub">{stats.scheduledCount} buổi học sắp tới</div>
+            </div>
+          </div>
+
+          <div className="stat-card success">
+            <div className="stat-icon">
+              <i className="fa-solid fa-circle-check"></i>
+            </div>
+            <div className="stat-info">
+              <div className="stat-label">Đã Hoàn Thành</div>
+              <div className="stat-value text-success">{stats.completedCount}</div>
+              <div className="stat-sub">Đã điểm danh & đánh giá</div>
+            </div>
+          </div>
+
+          <div className="stat-card navy">
+            <div className="stat-icon">
+              <i className="fa-solid fa-chart-pie"></i>
+            </div>
+            <div className="stat-info">
+              <div className="stat-label">Tổng Số Buổi Tổ Chức</div>
+              <div className="stat-value text-navy">{stats.totalCount}</div>
+              <div className="stat-sub">{stats.cancelledCount} buổi đã hủy</div>
+            </div>
+          </div>
         </div>
 
-        <div className="p-6">
-          {alerts.length === 0 ? (
-            <div className="py-8 text-center flex flex-col items-center justify-center text-gray-500">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mb-2">
-                <i className="fa-solid fa-check"></i>
+        {/* ============ HÀNG ĐỢI CẢNH BÁO ============ */}
+        <section className="warning-panel">
+          <div className="warning-header">
+            <div className="warning-title">
+              <div className="warning-pulse">
+                <span className="pulse-dot"></span>
               </div>
-              <p className="font-semibold text-sm text-gray-700">Tuyệt vời! Hiện không có cảnh báo mới.</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Không có học viên nào vắng từ 2 buổi liên tiếp hoặc hổng kiến thức chưa được xử lý.
-              </p>
+              <div>
+                <h2>
+                  <i className="fa-solid fa-bell"></i> Hàng Đợi Cảnh Báo Học Viên Cần Phụ Đạo & Bù Bài ({alerts.length})
+                </h2>
+                <p>Tự động quét từ hệ thống Điểm danh: Học viên vắng từ 2 buổi liên tiếp hoặc hổng kỹ năng cần bổ trợ</p>
+              </div>
+            </div>
+            <button className="btn-create-alert" onClick={handleOpenScheduleNew}>
+              <i className="fa-solid fa-plus"></i> Tạo buổi mới
+            </button>
+          </div>
+
+          {alerts.length === 0 ? (
+            <div className="empty-warning-state">
+              <div className="empty-check-icon">
+                <i className="fa-solid fa-circle-check"></i>
+              </div>
+              <div className="empty-text">
+                <h3>Tuyệt vời! Hiện không có cảnh báo mới.</h3>
+                <p>Không có học viên nào vắng từ 2 buổi liên tiếp hoặc hổng kiến thức chưa được xử lý.</p>
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="warning-grid">
               {alerts.map((cand, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white rounded-xl border border-red-100 p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-3 relative overflow-hidden"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <strong className="text-sm font-bold text-gray-900">{cand.studentName}</strong>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 whitespace-nowrap">
+                <div key={idx} className="warning-card">
+                  <div className="warning-card-body">
+                    <div className="warning-top-row">
+                      <strong className="student-name">{cand.studentName}</strong>
+                      <span className="badge-absent">
                         Vắng {cand.consecutiveAbsences} buổi
                       </span>
                     </div>
 
-                    <div className="text-xs text-gray-500 space-y-0.5">
-                      <div>
-                        Lớp: <span className="font-semibold text-gray-700">{cand.classCode}</span>
-                      </div>
-                      <div>
-                        SĐT: <span className="text-gray-700">{cand.phone}</span>
-                      </div>
-                      <div>
-                        GV chủ nhiệm: <span className="text-indigo-900 font-medium">{cand.teacherName}</span>
-                      </div>
+                    <div className="student-meta">
+                      <div>Lớp: <span className="meta-strong">{cand.classCode}</span></div>
+                      <div>SĐT: <span className="meta-phone">{cand.phone || 'Chưa có SĐT'}</span></div>
+                      <div>GV chủ nhiệm: <span className="meta-teacher">{cand.teacherName}</span></div>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-red-50 text-[11px] text-red-800 leading-snug">
-                      <i className="fa-solid fa-clock-rotate-left mr-1"></i>
-                      {cand.reason}
+                    <div className="warning-reason-box">
+                      <i className="fa-solid fa-clock-rotate-left"></i>
+                      <span>{cand.reason}</span>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-2 text-xs">
+                  <div className="warning-card-footer">
                     <button
+                      className="btn-dismiss"
                       onClick={() => handleDismissAlert(cand)}
-                      className="px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+                      title="Ẩn cảnh báo này"
                     >
                       Bỏ qua
                     </button>
                     <button
+                      className="btn-schedule-now"
                       onClick={() => handleOpenScheduleFromAlert(cand)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
                     >
-                      <i className="fa-solid fa-calendar-plus"></i>
-                      Xếp lịch ngay
+                      <i className="fa-solid fa-calendar-plus"></i> Xếp lịch ngay
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </section>
 
-      {/* Bộ Lọc & Tìm Kiếm */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Tabs Trạng thái */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl self-start text-xs font-bold">
-          {[
-            { id: 'ALL', label: 'Tất cả' },
-            { id: 'SCHEDULED', label: 'Đã lên lịch' },
-            { id: 'COMPLETED', label: 'Đã hoàn thành' },
-            { id: 'CANCELLED', label: 'Đã hủy' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3.5 py-2 rounded-lg transition-all ${
-                activeTab === tab.id
-                  ? 'bg-white text-indigo-700 shadow-sm font-black'
-                  : 'text-gray-600 hover:text-gray-900 font-semibold'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Lọc theo giáo viên & Ô tìm kiếm */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <select
-            value={teacherFilter}
-            onChange={(e) => setTeacherFilter(e.target.value)}
-            className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-gray-300 text-xs font-medium focus:ring-2 focus:ring-indigo-500/20 bg-white"
-          >
-            <option value="">-- Tất cả giáo viên --</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.fullName} {t.shortName ? `(${t.shortName})` : ''}
-              </option>
+        {/* ============ TOOLBAR (TABS + FILTERS) ============ */}
+        <div className="toolbar-panel">
+          <div className="status-tabs">
+            {[
+              { id: 'ALL', label: 'Tất cả' },
+              { id: 'SCHEDULED', label: 'Đã lên lịch' },
+              { id: 'COMPLETED', label: 'Đã hoàn thành' },
+              { id: 'CANCELLED', label: 'Đã hủy' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
             ))}
-          </select>
+          </div>
 
-          <div className="relative w-full sm:w-64">
-            <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tên học viên, mã buổi..."
-              className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-indigo-500/20"
-            />
+          <div className="filter-controls">
+            <div className="teacher-select-wrap">
+              <select
+                value={teacherFilter}
+                onChange={(e) => setTeacherFilter(e.target.value)}
+                className="select-custom"
+              >
+                <option value="">-- Tất cả giáo viên --</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.fullName} {t.shortName ? `(${t.shortName})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="search-input-wrap">
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm tên học viên, mã đợt, phòng..."
+                className="input-search"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Bảng Danh Sách Buổi Phụ Đạo & Bù Bài */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        {/* ============ BẢNG DANH SÁCH ============ */}
+        <div className="table-wrapper">
+          <table className="custom-table">
             <thead>
-              <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 font-bold uppercase text-[11px] tracking-wider">
-                <th className="px-4 py-3.5">Mã Đợt / Buổi</th>
-                <th className="px-4 py-3.5">Học Viên & Lớp</th>
-                <th className="px-4 py-3.5">Loại Buổi & Kỹ Năng</th>
-                <th className="px-4 py-3.5">Lịch Học & Phòng Học (Trực tiếp)</th>
-                <th className="px-4 py-3.5">Giáo Viên Kèm</th>
-                <th className="px-4 py-3.5">Trạng Thái</th>
-                <th className="px-4 py-3.5 text-right">Thao Tác</th>
+              <tr>
+                <th style={{ width: '13%' }}>Mã Đợt / Buổi</th>
+                <th style={{ width: '18%' }}>Học Viên & Lớp</th>
+                <th style={{ width: '18%' }}>Loại Buổi & Kỹ Năng</th>
+                <th style={{ width: '25%' }}>Lịch Học & Phòng Học (Trực tiếp)</th>
+                <th style={{ width: '12%' }}>Giáo Viên Kèm</th>
+                <th style={{ width: '14%' }}>Trạng Thái</th>
+                <th style={{ width: '12%', textAlign: 'right' }}>Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
-                    <i className="fa-solid fa-spinner fa-spin text-xl mb-2 block"></i>
-                    Đang tải danh sách phụ đạo & bù bài...
+                  <td colSpan="7" className="table-loading">
+                    <i className="fa-solid fa-spinner fa-spin"></i>
+                    <span>Đang tải danh sách phụ đạo & bù bài...</span>
                   </td>
                 </tr>
               ) : filteredPlans.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
-                    <i className="fa-regular fa-folder-open text-2xl mb-2 block"></i>
-                    Chưa có buổi phụ đạo nào phù hợp với bộ lọc.
+                  <td colSpan="7" className="table-empty">
+                    <i className="fa-regular fa-folder-open"></i>
+                    <p>Chưa có buổi phụ đạo nào phù hợp với bộ lọc.</p>
                   </td>
                 </tr>
               ) : (
                 filteredPlans.map((plan) => (
-                  <tr key={plan.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr key={plan.id} className="table-row">
                     {/* 1. Mã đợt */}
-                    <td className="px-4 py-3.5 align-top">
-                      <span className="font-bold text-indigo-900 block">{plan.planCode}</span>
-                      <span className="text-[10px] text-gray-400">
+                    <td className="cell-top">
+                      <span className="plan-code">{plan.planCode}</span>
+                      <span className="session-count-badge">
                         {plan.sessions?.length || 1} buổi học
                       </span>
                     </td>
 
                     {/* 2. Học viên & Lớp */}
-                    <td className="px-4 py-3.5 align-top">
-                      <strong className="text-gray-900 block font-bold text-sm">
-                        {plan.student?.name}
-                      </strong>
-                      <span className="text-gray-500 text-[11px] block">
-                        {plan.student?.phone || 'Chưa có SĐT'}
+                    <td className="cell-top">
+                      <strong className="student-name-main">{plan.student?.name}</strong>
+                      <span className="student-phone-sub">
+                        <i className="fa-solid fa-phone"></i> {plan.student?.phone || 'Chưa có SĐT'}
                       </span>
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-semibold">
+                      <span className="class-badge">
                         {plan.classCode || 'Lớp riêng'}
                       </span>
                     </td>
 
                     {/* 3. Loại buổi & Kỹ năng */}
-                    <td className="px-4 py-3.5 align-top space-y-1">
-                      <span className="font-semibold text-gray-800 block text-[11px]">
-                        {plan.sessionType}
-                      </span>
-                      <span className="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">
-                        {plan.focusSkills}
-                      </span>
+                    <td className="cell-top">
+                      <span className="session-type-text">{plan.sessionType}</span>
+                      <span className="focus-skill-pill">{plan.focusSkills}</span>
                       {plan.content && (
-                        <p className="text-[11px] text-gray-500 line-clamp-1 italic">{plan.content}</p>
+                        <p className="plan-content-preview" title={plan.content}>
+                          {plan.content}
+                        </p>
                       )}
                     </td>
 
                     {/* 4. Lịch học & Phòng học */}
-                    <td className="px-4 py-3.5 align-top space-y-1.5">
-                      {(plan.sessions || []).map((s, sIdx) => (
-                        <div
-                          key={s.id || sIdx}
-                          className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px]"
-                        >
-                          <div>
-                            <span className="font-bold text-indigo-900 mr-2">
-                              Buổi {s.sessionNumber}:
-                            </span>
-                            <span className="font-semibold text-gray-800 mr-1.5">{s.teachingDate}</span>
-                            <span className="text-amber-800 font-bold">
-                              ({s.startTimeText || '16:30'} – {s.endTimeText || '17:30'})
-                            </span>
-                            <span className="text-gray-500 block text-[10px]">
-                              📍 {s.roomName || 'Phòng học tại trung tâm'}
-                            </span>
-                          </div>
+                    <td className="cell-top">
+                      <div className="sessions-list">
+                        {(plan.sessions || []).map((s, sIdx) => (
+                          <div key={s.id || sIdx} className="session-slot-item">
+                            <div className="slot-info">
+                              <span className="slot-num">B.{s.sessionNumber}:</span>
+                              <span className="slot-date">{s.teachingDate}</span>
+                              <span className="slot-time">({s.startTimeText || '16:30'} – {s.endTimeText || '17:30'})</span>
+                              <span className="slot-room">📍 {s.roomName || 'Phòng học tại trung tâm'}</span>
+                            </div>
 
-                          <div>
-                            {s.status === 'COMPLETED' ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                                {s.attendanceStatus || 'Có mặt'} ({s.evaluation || 'Tốt'})
-                              </span>
-                            ) : s.status === 'CANCELLED' ? (
-                              <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-bold text-[10px]">
-                                Đã hủy
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleOpenCompleteModal(s, plan)}
-                                className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm flex items-center gap-1 transition-colors whitespace-nowrap"
-                              >
-                                <i className="fa-solid fa-check"></i>
-                                Điểm danh
-                              </button>
-                            )}
+                            <div className="slot-action">
+                              {s.status === 'COMPLETED' ? (
+                                <span className="badge-completed">
+                                  <i className="fa-solid fa-check"></i> {s.attendanceStatus || 'Có mặt'} ({s.evaluation || 'Tốt'})
+                                </span>
+                              ) : s.status === 'CANCELLED' ? (
+                                <span className="badge-cancelled">Đã hủy</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenCompleteModal(s, plan)}
+                                  className="btn-attend-mini"
+                                  title="Điểm danh & đánh giá buổi này"
+                                >
+                                  <i className="fa-solid fa-check"></i> Điểm danh
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </td>
 
                     {/* 5. Giáo viên kèm */}
-                    <td className="px-4 py-3.5 align-top">
-                      <span className="font-bold text-gray-800 block text-xs">
-                        {plan.tutorName || 'Chưa phân công'}
-                      </span>
+                    <td className="cell-top">
+                      <strong className="tutor-name">{plan.tutorName || 'Chưa phân công'}</strong>
                     </td>
 
-                    {/* 6. Trạng thái đợt */}
-                    <td className="px-4 py-3.5 align-top">
+                    {/* 6. Trạng thái */}
+                    <td className="cell-top">
                       {plan.status === 'COMPLETED' ? (
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] inline-flex items-center gap-1">
-                          <i className="fa-solid fa-circle-check"></i> Đã hoàn thành
+                        <span className="status-pill status-completed">
+                          <span className="dot dot-completed"></span> Đã hoàn thành
                         </span>
                       ) : plan.status === 'IN_PROGRESS' ? (
-                        <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] inline-flex items-center gap-1">
-                          <i className="fa-solid fa-spinner fa-spin"></i> Đang phụ đạo
+                        <span className="status-pill status-in-progress">
+                          <span className="dot dot-in-progress"></span> Đang phụ đạo
                         </span>
                       ) : plan.status === 'CANCELLED' ? (
-                        <span className="px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 font-bold text-[10px] inline-flex items-center gap-1">
-                          <i className="fa-solid fa-ban"></i> Đã hủy
+                        <span className="status-pill status-cancelled">
+                          <span className="dot dot-cancelled"></span> Đã hủy
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold text-[10px] inline-flex items-center gap-1">
-                          <i className="fa-regular fa-clock"></i> Đã lên lịch
+                        <span className="status-pill status-scheduled">
+                          <span className="dot dot-scheduled"></span> Đã lên lịch
                         </span>
                       )}
 
                       {plan.letterExportedAt && (
-                        <span className="block text-[10px] text-emerald-600 font-semibold mt-1">
-                          ✓ Đã gửi thư PH
+                        <span className="letter-exported-tag">
+                          <i className="fa-solid fa-check"></i> Đã gửi thư PH
                         </span>
                       )}
                     </td>
 
                     {/* 7. Thao tác */}
-                    <td className="px-4 py-3.5 align-top text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="cell-top text-right">
+                      <div className="action-row">
                         <button
                           onClick={() => {
                             setLetterPlan(plan);
                             setIsLetterOpen(true);
                           }}
+                          className="btn-export-letter"
                           title="Xuất thư hẹn phụ huynh (gửi Zalo)"
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs flex items-center gap-1 transition-colors"
                         >
-                          <i className="fa-solid fa-envelope-open-text"></i>
-                          Xuất Thư
+                          <i className="fa-solid fa-envelope-open-text"></i> Xuất Thư
                         </button>
 
                         {plan.status !== 'CANCELLED' && (
                           <button
                             onClick={() => handleCancelPlan(plan)}
+                            className="btn-cancel-plan"
                             title="Hủy đợt phụ đạo này"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                           >
                             <i className="fa-regular fa-trash-can"></i>
                           </button>
@@ -580,9 +529,10 @@ export default function TutoringPage() {
             </tbody>
           </table>
         </div>
+
       </div>
 
-      {/* Modal 1: Lên lịch phụ đạo */}
+      {/* ============ MODALS ============ */}
       <TutoringScheduleModal
         isOpen={isScheduleOpen}
         onClose={() => {
@@ -596,7 +546,6 @@ export default function TutoringPage() {
         teachers={teachers}
       />
 
-      {/* Modal 2: Thư hẹn phụ huynh (Xuất ảnh Zalo) */}
       <TutoringLetterModal
         isOpen={isLetterOpen}
         onClose={() => {
@@ -607,7 +556,6 @@ export default function TutoringPage() {
         plan={letterPlan}
       />
 
-      {/* Modal 3: Điểm danh & Đánh giá tiếp thu sau buổi học */}
       <TutoringCompleteModal
         isOpen={isCompleteOpen}
         onClose={() => {
@@ -622,6 +570,786 @@ export default function TutoringPage() {
         session={completeTarget.session}
         plan={completeTarget.plan}
       />
+
+      {/* ============ SCOPED CSS ============ */}
+      <style jsx>{`
+        .tutoring-page {
+          min-height: 100vh;
+          background: #f8fafc;
+          padding: 24px 32px;
+          color: #1e293b;
+          font-family: inherit;
+        }
+        .page-container {
+          max-width: 1600px;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        /* Header */
+        .page-header {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 4px 0 8px 0;
+        }
+        .header-icon {
+          width: 52px;
+          height: 52px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #0D88C4 0%, #085e8a 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-size: 24px;
+          flex-shrink: 0;
+          box-shadow: 0 8px 20px -6px rgba(13, 136, 196, 0.45);
+        }
+        .header-text {
+          flex: 1;
+        }
+        .header-text h1 {
+          font-size: 24px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0 0 4px 0;
+          letter-spacing: -0.02em;
+        }
+        .header-text p {
+          font-size: 13.5px;
+          color: #64748b;
+          margin: 0;
+        }
+        .header-actions {
+          display: flex;
+          gap: 10px;
+        }
+        .btn-primary-action {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: linear-gradient(135deg, #0D88C4 0%, #085e8a 100%);
+          color: #ffffff;
+          border: none;
+          padding: 10px 18px;
+          border-radius: 10px;
+          font-size: 13.5px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 4px 14px -2px rgba(13, 136, 196, 0.4);
+          transition: all 0.2s ease;
+        }
+        .btn-primary-action:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px -2px rgba(13, 136, 196, 0.55);
+        }
+
+        /* Stat Cards */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+        }
+        .stat-card {
+          position: relative;
+          background: #ffffff;
+          border-radius: 14px;
+          padding: 18px 20px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          border: 1px solid #e2e8f0;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+          transition: all 0.2s ease;
+        }
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.1);
+        }
+        .stat-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 4px;
+          height: 100%;
+        }
+        .stat-card.danger::before { background: #ef4444; }
+        .stat-card.primary::before { background: #0D88C4; }
+        .stat-card.success::before { background: #10b981; }
+        .stat-card.navy::before { background: #085e8a; }
+
+        .stat-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          flex-shrink: 0;
+        }
+        .stat-card.danger .stat-icon { background: #fee2e2; color: #ef4444; }
+        .stat-card.primary .stat-icon { background: #e0f2fe; color: #0D88C4; }
+        .stat-card.success .stat-icon { background: #d1fae5; color: #10b981; }
+        .stat-card.navy .stat-icon { background: #f1f5f9; color: #085e8a; }
+
+        .stat-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .stat-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 4px;
+        }
+        .stat-value {
+          font-size: 28px;
+          font-weight: 800;
+          line-height: 1.1;
+          margin-bottom: 4px;
+        }
+        .text-danger { color: #dc2626; }
+        .text-primary { color: #0D88C4; }
+        .text-success { color: #059669; }
+        .text-navy { color: #0f172a; }
+        .stat-sub {
+          font-size: 12px;
+          color: #94a3b8;
+        }
+
+        /* Warning Panel */
+        .warning-panel {
+          background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+          border: 1px solid #fecaca;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.06);
+        }
+        .warning-header {
+          padding: 14px 20px;
+          background: #fee2e2;
+          border-bottom: 1px solid #fecaca;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .warning-title {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .warning-pulse {
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .pulse-dot {
+          width: 10px;
+          height: 10px;
+          background: #ef4444;
+          border-radius: 50%;
+          box-shadow: 0 0 0 rgba(239, 68, 68, 0.7);
+          animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .warning-title h2 {
+          font-size: 14px;
+          font-weight: 700;
+          color: #7f1d1d;
+          margin: 0 0 2px 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .warning-title p {
+          font-size: 12px;
+          color: #991b1b;
+          margin: 0;
+        }
+        .btn-create-alert {
+          background: #ef4444;
+          color: #ffffff;
+          border: none;
+          padding: 7px 14px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          transition: background 0.15s ease;
+        }
+        .btn-create-alert:hover {
+          background: #dc2626;
+        }
+
+        /* Empty state */
+        .empty-warning-state {
+          padding: 32px 20px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+        .empty-check-icon {
+          font-size: 36px;
+          color: #10b981;
+        }
+        .empty-text h3 {
+          font-size: 14px;
+          font-weight: 700;
+          color: #065f46;
+          margin: 0 0 4px 0;
+        }
+        .empty-text p {
+          font-size: 12.5px;
+          color: #64748b;
+          margin: 0;
+        }
+
+        /* Warning Grid */
+        .warning-grid {
+          padding: 16px 20px;
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 14px;
+        }
+        .warning-card {
+          background: #ffffff;
+          border: 1px solid #fee2e2;
+          border-radius: 12px;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 12px;
+          transition: all 0.2s ease;
+        }
+        .warning-card:hover {
+          border-color: #fca5a5;
+          box-shadow: 0 4px 14px -4px rgba(239, 68, 68, 0.2);
+        }
+        .warning-top-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        .student-name {
+          font-size: 14px;
+          font-weight: 800;
+          color: #0f172a;
+        }
+        .badge-absent {
+          background: #fee2e2;
+          color: #b91c1c;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 2px 8px;
+          border-radius: 6px;
+          white-space: nowrap;
+        }
+        .student-meta {
+          font-size: 12px;
+          color: #64748b;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .meta-strong { font-weight: 700; color: #1e293b; }
+        .meta-phone { color: #334155; }
+        .meta-teacher { font-weight: 600; color: #085e8a; }
+
+        .warning-reason-box {
+          background: #fff5f5;
+          border: 1px solid #fee2e2;
+          border-radius: 8px;
+          padding: 8px 10px;
+          font-size: 11.5px;
+          color: #991b1b;
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          line-height: 1.4;
+          margin-top: 8px;
+        }
+        .warning-reason-box i {
+          margin-top: 2px;
+          color: #ef4444;
+        }
+        .warning-card-footer {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 8px;
+          padding-top: 8px;
+          border-top: 1px solid #f1f5f9;
+        }
+        .btn-dismiss {
+          background: transparent;
+          border: none;
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-dismiss:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+        .btn-schedule-now {
+          background: #0D88C4;
+          color: #ffffff;
+          border: none;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          box-shadow: 0 2px 6px rgba(13, 136, 196, 0.25);
+          transition: background 0.15s ease;
+        }
+        .btn-schedule-now:hover {
+          background: #085e8a;
+        }
+
+        /* Toolbar */
+        .toolbar-panel {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          padding: 12px 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        }
+        .status-tabs {
+          display: flex;
+          gap: 4px;
+          background: #f1f5f9;
+          padding: 4px;
+          border-radius: 10px;
+        }
+        .tab-btn {
+          border: none;
+          background: transparent;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #64748b;
+          padding: 6px 14px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .tab-btn:hover {
+          color: #0f172a;
+        }
+        .tab-btn.active {
+          background: #ffffff;
+          color: #0D88C4;
+          font-weight: 800;
+          box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+        }
+
+        .filter-controls {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .select-custom {
+          padding: 8px 12px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #334155;
+          background: #ffffff;
+          outline: none;
+          cursor: pointer;
+        }
+        .select-custom:focus {
+          border-color: #0D88C4;
+          box-shadow: 0 0 0 3px rgba(13, 136, 196, 0.15);
+        }
+        .search-input-wrap {
+          position: relative;
+          width: 280px;
+        }
+        .search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #94a3b8;
+          font-size: 13px;
+        }
+        .input-search {
+          width: 100%;
+          padding: 8px 12px 8px 32px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          font-size: 12.5px;
+          color: #1e293b;
+          outline: none;
+          background: #ffffff;
+        }
+        .input-search:focus {
+          border-color: #0D88C4;
+          box-shadow: 0 0 0 3px rgba(13, 136, 196, 0.15);
+        }
+
+        /* Table */
+        .table-wrapper {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          overflow-x: auto;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        }
+        .custom-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12.5px;
+          text-align: left;
+        }
+        .custom-table thead {
+          background: #f8fafc;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        .custom-table th {
+          padding: 12px 14px;
+          font-weight: 700;
+          font-size: 11.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #475569;
+          white-space: nowrap;
+        }
+        .custom-table tbody tr {
+          border-bottom: 1px solid #f1f5f9;
+          transition: background 0.15s ease;
+        }
+        .custom-table tbody tr:hover {
+          background: #f8fafc;
+        }
+        .cell-top {
+          padding: 12px 14px;
+          vertical-align: top;
+        }
+        .text-right { text-align: right; }
+
+        .table-loading, .table-empty {
+          text-align: center;
+          padding: 40px 20px;
+          color: #94a3b8;
+        }
+        .table-loading i {
+          font-size: 24px;
+          color: #0D88C4;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .table-empty i {
+          font-size: 32px;
+          color: #cbd5e1;
+          display: block;
+          margin-bottom: 8px;
+        }
+
+        /* Cell Details */
+        .plan-code {
+          font-weight: 800;
+          color: #085e8a;
+          display: block;
+          font-family: monospace;
+          font-size: 13px;
+        }
+        .session-count-badge {
+          display: inline-block;
+          font-size: 10.5px;
+          color: #64748b;
+          background: #f1f5f9;
+          padding: 2px 6px;
+          border-radius: 4px;
+          margin-top: 3px;
+        }
+
+        .student-name-main {
+          display: block;
+          font-size: 13.5px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 2px;
+        }
+        .student-phone-sub {
+          display: block;
+          font-size: 11.5px;
+          color: #64748b;
+          margin-bottom: 4px;
+        }
+        .student-phone-sub i {
+          font-size: 10px;
+          color: #94a3b8;
+        }
+        .class-badge {
+          display: inline-block;
+          background: #e0f2fe;
+          color: #0369a1;
+          font-weight: 700;
+          font-size: 10.5px;
+          padding: 2px 7px;
+          border-radius: 5px;
+        }
+
+        .session-type-text {
+          display: block;
+          font-weight: 700;
+          color: #334155;
+          margin-bottom: 3px;
+        }
+        .focus-skill-pill {
+          display: inline-block;
+          background: #ede9fe;
+          color: #6d28d9;
+          font-weight: 700;
+          font-size: 10.5px;
+          padding: 2px 7px;
+          border-radius: 5px;
+          margin-bottom: 3px;
+        }
+        .plan-content-preview {
+          font-size: 11px;
+          color: #64748b;
+          font-style: italic;
+          margin: 2px 0 0 0;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        /* Sessions list */
+        .sessions-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .session-slot-item {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 6px 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          font-size: 11.5px;
+        }
+        .slot-info {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+        .slot-num {
+          font-weight: 800;
+          color: #085e8a;
+          margin-right: 4px;
+        }
+        .slot-date {
+          font-weight: 700;
+          color: #1e293b;
+          margin-right: 4px;
+        }
+        .slot-time {
+          font-weight: 700;
+          color: #b45309;
+        }
+        .slot-room {
+          font-size: 10.5px;
+          color: #64748b;
+        }
+        .slot-action {
+          flex-shrink: 0;
+        }
+        .badge-completed {
+          background: #d1fae5;
+          color: #065f46;
+          font-weight: 700;
+          font-size: 10.5px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+        }
+        .badge-cancelled {
+          background: #f1f5f9;
+          color: #64748b;
+          font-weight: 700;
+          font-size: 10.5px;
+          padding: 3px 8px;
+          border-radius: 6px;
+        }
+        .btn-attend-mini {
+          background: #10b981;
+          color: #ffffff;
+          border: none;
+          font-size: 10.5px;
+          font-weight: 700;
+          padding: 4px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          transition: background 0.15s ease;
+        }
+        .btn-attend-mini:hover {
+          background: #059669;
+        }
+
+        .tutor-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #1e293b;
+        }
+
+        /* Status Pill */
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 4px 10px;
+          border-radius: 999px;
+          white-space: nowrap;
+        }
+        .dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+        }
+        .status-scheduled {
+          background: #e0f2fe;
+          color: #0369a1;
+        }
+        .dot-scheduled { background: #0D88C4; }
+
+        .status-in-progress {
+          background: #dbeafe;
+          color: #1d4ed8;
+        }
+        .dot-in-progress { background: #2563eb; }
+
+        .status-completed {
+          background: #d1fae5;
+          color: #065f46;
+        }
+        .dot-completed { background: #10b981; }
+
+        .status-cancelled {
+          background: #f1f5f9;
+          color: #64748b;
+        }
+        .dot-cancelled { background: #94a3b8; }
+
+        .letter-exported-tag {
+          display: block;
+          font-size: 10.5px;
+          font-weight: 700;
+          color: #059669;
+          margin-top: 4px;
+        }
+
+        /* Actions */
+        .action-row {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn-export-letter {
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          color: #15803d;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 6px 10px;
+          border-radius: 7px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          transition: all 0.15s ease;
+          white-space: nowrap;
+        }
+        .btn-export-letter:hover {
+          background: #dcfce7;
+          border-color: #86efac;
+        }
+        .btn-cancel-plan {
+          background: transparent;
+          border: 1px solid #e2e8f0;
+          color: #94a3b8;
+          width: 30px;
+          height: 30px;
+          border-radius: 7px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-cancel-plan:hover {
+          background: #fee2e2;
+          border-color: #fca5a5;
+          color: #ef4444;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+          .tutoring-page { padding: 16px; }
+          .stats-grid { grid-template-columns: 1fr; }
+          .page-header { flex-direction: column; align-items: flex-start; }
+          .toolbar-panel { flex-direction: column; align-items: stretch; }
+          .filter-controls { flex-direction: column; }
+          .search-input-wrap { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

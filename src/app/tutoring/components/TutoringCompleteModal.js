@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function TutoringCompleteModal({ isOpen, onClose, onSuccess, session, plan }) {
   const [attendanceStatus, setAttendanceStatus] = useState(session?.attendanceStatus || 'Có mặt');
@@ -9,6 +9,16 @@ export default function TutoringCompleteModal({ isOpen, onClose, onSuccess, sess
   const [homeworkAssigned, setHomeworkAssigned] = useState(session?.homeworkAssigned || '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (session) {
+      setAttendanceStatus(session.attendanceStatus || 'Có mặt');
+      setEvaluation(session.evaluation || 'Tốt');
+      setEvaluationNotes(session.evaluationNotes || '');
+      setHomeworkAssigned(session.homeworkAssigned || '');
+      setErrorMsg('');
+    }
+  }, [session, isOpen]);
 
   if (!isOpen || !session) return null;
 
@@ -46,157 +56,436 @@ export default function TutoringCompleteModal({ isOpen, onClose, onSuccess, sess
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+    <div className="tcm-overlay" onClick={onClose}>
+      <div className="tcm-modal" onClick={(e) => e.stopPropagation()}>
+
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-emerald-50/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+        <div className="tcm-header">
+          <div className="tcm-header-left">
+            <div className="tcm-icon-badge">
               <i className="fa-solid fa-clipboard-check"></i>
             </div>
             <div>
-              <h3 className="text-base font-bold text-gray-800">Điểm Danh & Đánh Giá Buổi Kèm</h3>
-              <p className="text-xs text-gray-500">
+              <h3>Điểm Danh & Đánh Giá Buổi Kèm</h3>
+              <p>
                 Buổi {session.sessionNumber} ({session.teachingDate} • {session.startTimeText || '16:30'})
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-          >
-            <i className="fa-solid fa-xmark text-lg"></i>
+          <button className="tcm-close-btn" onClick={onClose} aria-label="Đóng">
+            <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
 
-        {/* Nội dung form */}
-        <div className="p-6 space-y-4 text-sm">
+        {/* Form Body */}
+        <div className="tcm-body">
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs flex items-center gap-2">
+            <div className="tcm-error-alert">
               <i className="fa-solid fa-circle-exclamation"></i>
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Thông tin học viên tóm tắt */}
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+          {/* Thẻ tóm tắt học viên */}
+          <div className="student-summary-card">
             <div>
-              <span className="text-gray-500 block">Học viên:</span>
-              <strong className="text-gray-900 text-sm">{studentName}</strong>
+              <span className="summary-label">Học viên phụ đạo:</span>
+              <strong className="summary-student-name">{studentName}</strong>
             </div>
             <div className="text-right">
-              <span className="text-gray-500 block">Lớp:</span>
-              <strong className="text-gray-800">{classCode}</strong>
+              <span className="summary-label">Lớp học:</span>
+              <strong className="summary-class-code">{classCode}</strong>
             </div>
           </div>
 
           {/* 1. Trạng thái tham gia */}
-          <div>
-            <label className="block font-semibold text-gray-700 mb-2">Trạng thái tham gia</label>
-            <div className="grid grid-cols-3 gap-2">
-              {['Có mặt', 'Đi trễ', 'Vắng mặt'].map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setAttendanceStatus(status)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
-                    attendanceStatus === status
-                      ? status === 'Có mặt'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : status === 'Đi trễ'
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                        : 'bg-red-600 text-white border-red-600 shadow-sm'
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {status === 'Có mặt' && <i className="fa-solid fa-check mr-1.5"></i>}
-                  {status === 'Đi trễ' && <i className="fa-regular fa-clock mr-1.5"></i>}
-                  {status === 'Vắng mặt' && <i className="fa-solid fa-xmark mr-1.5"></i>}
-                  {status}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. Mức độ tiếp thu */}
-          <div>
-            <label className="block font-semibold text-gray-700 mb-2">Mức độ tiếp thu bài học</label>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="form-group">
+            <label className="group-label">1. Tình trạng tham gia buổi học</label>
+            <div className="status-button-grid">
               {[
-                { label: 'Xuất sắc', star: '⭐⭐⭐⭐' },
-                { label: 'Tốt', star: '⭐⭐⭐' },
-                { label: 'Trung bình', star: '⭐⭐' },
-                { label: 'Cần cố gắng', star: '⭐' }
+                { id: 'Có mặt', label: 'Có mặt', icon: 'fa-check', activeClass: 'active-present' },
+                { id: 'Đi trễ', label: 'Đi trễ', icon: 'fa-clock', activeClass: 'active-late' },
+                { id: 'Vắng mặt', label: 'Vắng mặt', icon: 'fa-xmark', activeClass: 'active-absent' }
               ].map((item) => (
                 <button
-                  key={item.label}
+                  key={item.id}
                   type="button"
-                  onClick={() => setEvaluation(item.label)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${
-                    evaluation === item.label
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                  }`}
+                  onClick={() => setAttendanceStatus(item.id)}
+                  className={`status-btn ${attendanceStatus === item.id ? item.activeClass : ''}`}
                 >
-                  <div className="flex justify-between items-center">
-                    <span>{item.label}</span>
-                    <span className="text-[11px]">{item.star}</span>
-                  </div>
+                  <i className={`fa-solid ${item.icon}`}></i> {item.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 3. Nhận xét của giáo viên */}
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Nhận xét chi tiết của giáo viên</label>
+          {/* 2. Đánh giá mức độ tiếp thu */}
+          <div className="form-group">
+            <label className="group-label">2. Mức độ tiếp thu & tiến bộ của học viên</label>
+            <div className="rating-button-grid">
+              {[
+                { id: 'Xuất sắc', label: 'Xuất sắc', stars: '⭐⭐⭐' },
+                { id: 'Tốt', label: 'Tốt', stars: '⭐⭐' },
+                { id: 'Trung bình', label: 'Trung bình', stars: '⭐' },
+                { id: 'Cần cố gắng', label: 'Cần cố gắng', stars: '⚠️' }
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setEvaluation(item.id)}
+                  className={`rating-btn ${evaluation === item.id ? 'active-rating' : ''}`}
+                >
+                  <span className="rating-label">{item.label}</span>
+                  <span className="rating-stars">{item.stars}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Nhận xét chi tiết */}
+          <div className="form-group">
+            <label className="group-label">3. Nhận xét của giáo viên phụ trách kèm</label>
             <textarea
-              rows={2}
+              rows={3}
               value={evaluationNotes}
               onChange={(e) => setEvaluationNotes(e.target.value)}
-              placeholder="VD: Bé nắm từ vựng nhanh, hiểu ngữ pháp bài vắng, tự tin phát âm..."
-              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-xs"
+              placeholder="Nhận xét sự tiến bộ, phần bài đã giải quyết, lỗ hổng cần củng cố thêm..."
+              className="tcm-textarea"
             />
           </div>
 
-          {/* 4. Bài tập về nhà bổ sung */}
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Bài tập về nhà bổ sung (nếu có)</label>
-            <input
-              type="text"
+          {/* 4. Bài tập về nhà / Hướng dẫn thêm */}
+          <div className="form-group">
+            <label className="group-label">4. Bài tập về nhà / Yêu cầu rèn luyện thêm (nếu có)</label>
+            <textarea
+              rows={2}
               value={homeworkAssigned}
               onChange={(e) => setHomeworkAssigned(e.target.value)}
-              placeholder="VD: Hoàn thành 5 câu bài tập trang 24 Workbook..."
-              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-xs"
+              placeholder="Ví dụ: Làm bài tập trang 24 sách Workbook, quay video đọc từ vựng..."
+              className="tcm-textarea"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs hover:bg-gray-100 transition-colors"
-          >
-            Hủy
+        <div className="tcm-footer">
+          <button type="button" className="btn-cancel" onClick={onClose} disabled={submitting}>
+            Hủy bỏ
           </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
-          >
+          <button type="button" className="btn-submit" onClick={handleSubmit} disabled={submitting}>
             {submitting ? (
-              <i className="fa-solid fa-spinner fa-spin"></i>
+              <>
+                <i className="fa-solid fa-spinner fa-spin"></i> Đang lưu...
+              </>
             ) : (
-              <i className="fa-solid fa-check-double"></i>
+              <>
+                <i className="fa-solid fa-check"></i> Hoàn Tất & Điểm Danh
+              </>
             )}
-            Lưu Đánh Giá & Hoàn Thành
           </button>
         </div>
+
       </div>
+
+      {/* Scoped CSS */}
+      <style jsx>{`
+        .tcm-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          animation: tcmFade 0.2s ease;
+        }
+        @keyframes tcmFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .tcm-modal {
+          background: #ffffff;
+          border-radius: 16px;
+          max-width: 540px;
+          width: 100%;
+          max-height: 92vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 20px 60px -12px rgba(15, 23, 42, 0.35);
+          animation: tcmSlide 0.25s ease;
+        }
+        @keyframes tcmSlide {
+          from { opacity: 0; transform: translateY(16px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Header */
+        .tcm-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+          color: #ffffff;
+        }
+        .tcm-header-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .tcm-icon-badge {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          color: #ffffff;
+          flex-shrink: 0;
+        }
+        .tcm-header h3 {
+          font-size: 16px;
+          font-weight: 800;
+          margin: 0 0 2px 0;
+        }
+        .tcm-header p {
+          font-size: 12px;
+          margin: 0;
+          color: #d1fae5;
+        }
+        .tcm-close-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.15);
+          border: none;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 16px;
+          transition: background 0.15s ease;
+        }
+        .tcm-close-btn:hover {
+          background: rgba(255, 255, 255, 0.28);
+        }
+
+        /* Body */
+        .tcm-body {
+          padding: 20px;
+          overflow-y: auto;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          background: #f8fafc;
+        }
+        .tcm-error-alert {
+          background: #fee2e2;
+          border: 1px solid #fecaca;
+          color: #dc2626;
+          padding: 10px 14px;
+          border-radius: 10px;
+          font-size: 12.5px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .student-summary-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 12px 14px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .summary-label {
+          display: block;
+          font-size: 11px;
+          color: #64748b;
+        }
+        .summary-student-name {
+          font-size: 14px;
+          font-weight: 800;
+          color: #085e8a;
+        }
+        .summary-class-code {
+          font-size: 13px;
+          font-weight: 700;
+          color: #1e293b;
+        }
+        .text-right { text-align: right; }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .group-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #334155;
+        }
+
+        /* Status Buttons */
+        .status-button-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+        .status-btn {
+          background: #ffffff;
+          border: 1.5px solid #cbd5e1;
+          color: #475569;
+          padding: 10px 8px;
+          border-radius: 9px;
+          font-size: 12.5px;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: all 0.15s ease;
+        }
+        .status-btn:hover {
+          border-color: #94a3b8;
+          background: #f1f5f9;
+        }
+        .active-present {
+          background: #d1fae5 !important;
+          border-color: #10b981 !important;
+          color: #065f46 !important;
+        }
+        .active-late {
+          background: #fef3c7 !important;
+          border-color: #f59e0b !important;
+          color: #92400e !important;
+        }
+        .active-absent {
+          background: #fee2e2 !important;
+          border-color: #ef4444 !important;
+          color: #991b1b !important;
+        }
+
+        /* Rating Buttons */
+        .rating-button-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
+        }
+        .rating-btn {
+          background: #ffffff;
+          border: 1.5px solid #cbd5e1;
+          color: #475569;
+          padding: 8px 6px;
+          border-radius: 9px;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          transition: all 0.15s ease;
+        }
+        .rating-btn:hover {
+          border-color: #94a3b8;
+          background: #f1f5f9;
+        }
+        .active-rating {
+          background: #e0f2fe !important;
+          border-color: #0D88C4 !important;
+          color: #0369a1 !important;
+        }
+        .rating-label {
+          font-size: 11.5px;
+          font-weight: 800;
+        }
+        .rating-stars {
+          font-size: 11px;
+        }
+
+        .tcm-textarea {
+          width: 100%;
+          padding: 10px 12px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          font-size: 13px;
+          color: #1e293b;
+          background: #ffffff;
+          outline: none;
+          font-family: inherit;
+          resize: vertical;
+          box-sizing: border-box;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .tcm-textarea:focus {
+          border-color: #10b981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        /* Footer */
+        .tcm-footer {
+          padding: 14px 20px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 10px;
+        }
+        .btn-cancel {
+          background: transparent;
+          border: none;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+          padding: 8px 14px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background 0.15s ease;
+        }
+        .btn-cancel:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+        .btn-submit {
+          background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+          border: none;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 700;
+          padding: 9px 18px;
+          border-radius: 8px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.4);
+          transition: all 0.15s ease;
+        }
+        .btn-submit:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px -2px rgba(16, 185, 129, 0.55);
+        }
+        .btn-submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 480px) {
+          .rating-button-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+      `}</style>
     </div>
   );
 }
