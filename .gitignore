@@ -48,6 +48,8 @@ next-env.d.ts
 *.db*
 *.sqlite
 *.sqlite3
+scratch/
+deploy.bundle
 
 # Archives
 *.zip

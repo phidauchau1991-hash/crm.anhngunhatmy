@@ -69,7 +69,7 @@ export default function ExamsPage() {
 
   useEffect(() => {
     if (selectedClass) {
-      fetch(`/api/students?classCode=${selectedClass}`)
+      fetch(`/api/students?classCode=${selectedClass}&includeHistorical=true`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
@@ -152,8 +152,8 @@ export default function ExamsPage() {
   const handleLoadClass = async () => {
     if (!selectedClass || !selectedConfig) return;
     try {
-      // Get students for class
-      const clsRes = await fetch(`/api/students?classCode=${selectedClass}`);
+      // Get students for class (including historical/transferred students)
+      const clsRes = await fetch(`/api/students?classCode=${selectedClass}&includeHistorical=true`);
       const clsData = await clsRes.json();
       
       // Get existing results
@@ -426,6 +426,8 @@ export default function ExamsPage() {
   };
 
   const activeConfig = configs.find(c => c.id === parseInt(selectedConfig));
+  const selectedClassObj = classes.find(c => c.code === selectedClass);
+  const isLevelMismatch = activeConfig && selectedClassObj && activeConfig.level !== selectedClassObj.level;
 
   return (
     <div className="page-container" style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
@@ -612,6 +614,27 @@ export default function ExamsPage() {
             </div>
           </div>
 
+          {isLevelMismatch && (
+            <div style={{
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '10px',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              color: '#1e40af'
+            }}>
+              <i className="fa-solid fa-circle-info" style={{ fontSize: '1.25rem', color: '#2563eb' }}></i>
+              <div style={{ fontSize: '0.95rem', lineHeight: '1.5' }}>
+                <strong>💡 Lưu ý về cấp độ đề thi:</strong> Đề thi đang chọn thuộc cấp độ <strong>{activeConfig.level}</strong>, trong khi lớp đang chọn là <strong>{selectedClassObj.name} ({selectedClassObj.level})</strong>.
+                <br />
+                Hệ thống kích hoạt chế độ thông minh: Sẽ <strong>tự động lưu và cập nhật điểm vào đúng lớp {activeConfig.level}</strong> đã học của học viên để đảm bảo học bạ và Sổ Đầu Bài chính xác 100%.
+              </div>
+            </div>
+          )}
+
           {students.length > 0 && activeConfig && (
             <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
               <div style={{ overflowX: 'auto' }}>
@@ -630,9 +653,26 @@ export default function ExamsPage() {
                       {students.map(student => {
                         const r = results.find(res => res.studentId === student.id);
                         if (!r) return null;
+                        const currentEnr = student.enrollments?.find(e => e.classCode === selectedClass);
                         return (
                           <tr key={student.id} style={{ borderBottom: '1px solid #e2e8f0', '&:hover': { background: '#f8fafc' } }}>
-                            <td style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>{student.name}</td>
+                            <td style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>
+                              <div>{student.name}</div>
+                              {currentEnr && currentEnr.status !== 'Đang học' && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  marginTop: '0.25rem',
+                                  fontSize: '0.75rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px',
+                                  background: '#f1f5f9',
+                                  color: '#64748b',
+                                  fontWeight: 'normal'
+                                }}>
+                                  {currentEnr.status}
+                                </span>
+                              )}
+                            </td>
                             
                             {/* Process Scores Stacked */}
                             <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0' }}>

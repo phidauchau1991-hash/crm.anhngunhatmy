@@ -22,6 +22,7 @@ export async function GET(request) {
     const birthdayMonth = searchParams.get('birthdayMonth') || 'all';
 
     const classCode = searchParams.get('classCode') || '';
+    const includeHistorical = searchParams.get('includeHistorical') === 'true' || searchParams.get('includeTransferred') === 'true';
 
     const { startDate, endDate } = getDateRangeFromPreset(preset, customStart, customEnd);
 
@@ -35,13 +36,17 @@ export async function GET(request) {
     };
 
     if (classCode && classCode !== 'all') {
+      const allowedStatuses = includeHistorical 
+        ? ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã hoàn thành', 'Tạm nghỉ']
+        : ['Đang học', 'Bảo lưu'];
+
       where.AND = [
         ...(where.AND || []),
         {
           enrollments: { 
             some: { 
               classCode: classCode,
-              status: { in: ['Đang học', 'Bảo lưu'] }
+              status: { in: allowedStatuses }
             } 
           }
         }
@@ -75,12 +80,16 @@ export async function GET(request) {
       if (endDate) where.createdAt.lte = endDate;
     }
 
+    const enrollmentWhere = includeHistorical
+      ? { status: { in: ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã hoàn thành', 'Tạm nghỉ'] } }
+      : { status: 'Đang học' };
+
     // Lấy danh sách học viên
     const students = await prisma.student.findMany({
       where,
       include: {
         enrollments: {
-          where: { status: 'Đang học' },
+          where: enrollmentWhere,
           include: {
             class: true,
           },

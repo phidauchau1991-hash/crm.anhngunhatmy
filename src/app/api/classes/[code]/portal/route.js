@@ -60,11 +60,27 @@ export async function GET(request, { params }) {
         historicalIds.add(a.studentId);
       }
     });
+
+    const classStudentIds = Array.from(new Set([
+      ...enrollments.map(e => e.student.id),
+      ...historicalEnrollments.map(e => e.student.id)
+    ]));
     
     // For exam grades (from ExamResult table Sprint 4)
+    // Find results recorded directly under this classCode OR
+    // results belonging to students of this class matching this class's level
     const examResults = await prisma.examResult.findMany({
-      where: { classCode },
-      include: { config: true }
+      where: {
+        OR: [
+          { classCode: classCode },
+          {
+            studentId: { in: classStudentIds },
+            config: { level: classInfo.level }
+          }
+        ]
+      },
+      include: { config: true },
+      orderBy: { createdAt: 'desc' }
     });
 
     examResults.forEach(e => {
