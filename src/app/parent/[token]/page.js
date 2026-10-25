@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { getClassScheduleDetails } from '@/lib/classHelper';
 
 export default function ParentPortalPage() {
   const { token } = useParams();
@@ -210,8 +211,10 @@ export default function ParentPortalPage() {
                 <div className="p-detail">
                   <i className="fa-solid fa-calendar-days"></i>
                   <div>
-                    <label>Lịch học</label>
-                    <p>Thứ {currentEnrollment.schedule.split('').join(' & ')}</p>
+                    <label>Lịch & Khung giờ học</label>
+                    <p style={{ fontWeight: '600', color: 'var(--color-primary-dark)' }}>
+                      {getClassScheduleDetails(currentEnrollment.classCode, currentEnrollment.schedule).fullDisplay}
+                    </p>
                   </div>
                 </div>
               </>

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { getClassScheduleDetails } from '@/lib/classHelper';
 
 export default function ClassPortalPage() {
   const params = useParams();
@@ -116,6 +117,9 @@ export default function ClassPortalPage() {
             <span style={{margin: '0 10px'}}>|</span>
             <i className="fa-regular fa-calendar" style={{marginRight: '5px'}}></i> 
             Ngày bắt đầu: <strong>{formatDateFull(classInfo?.startDate)}</strong>
+            <span style={{margin: '0 10px'}}>|</span>
+            <i className="fa-regular fa-clock" style={{marginRight: '5px', color: '#0284c7'}}></i> 
+            Lịch & Giờ học: <strong style={{ color: 'var(--color-primary-dark)' }}>{getClassScheduleDetails(classCode, classInfo?.schedule).fullDisplay}</strong>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>

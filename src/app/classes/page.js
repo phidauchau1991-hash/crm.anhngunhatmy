@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { formatClassCode, extractClassShiftCode } from '@/lib/classHelper';
+import { 
+  formatClassCode, 
+  extractClassShiftCode, 
+  getAvailableShifts, 
+  getShiftTime, 
+  formatScheduleDisplay, 
+  getClassScheduleDetails 
+} from '@/lib/classHelper';
 
 const parseScheduleString = (str) => {
   if (!str) return [];
@@ -586,7 +593,21 @@ export default function ClassesPage() {
                   <td className="teacher-name">{cls.teacherName}</td>
                   <td className="teacher-name" style={{ color: '#0ea5e9' }}>{cls.careStaff}</td>
                   <td>{cls.startDate}</td>
-                  <td>{cls.schedule}</td>
+                  <td>
+                    <div style={{ fontWeight: '600', color: 'var(--color-text)' }}>{formatScheduleDisplay(cls.schedule)}</div>
+                    {(() => {
+                      const details = getClassScheduleDetails(cls.code, cls.schedule);
+                      if (details.hours) {
+                        return (
+                          <div style={{ fontSize: '0.78rem', color: '#0284c7', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <i className="fa-regular fa-clock" style={{ fontSize: '0.72rem' }}></i>
+                            <span>{details.hours} ({details.shiftName})</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </td>
                   <td style={{ fontWeight: '600', color: 'var(--color-primary-dark)' }}>{cls.expectedEndDate}</td>
                   <td style={{ textAlign: 'center' }}>
                     <span className={`student-count-badge ${cls.studentCount === 0 ? 'zero-students' : ''}`}>
@@ -759,12 +780,9 @@ export default function ClassesPage() {
                   onChange={handleInputChange}
                   required
                 >
-                  <option value="Ca1">Ca 1 (K1 - Ví dụ: 17h30 - 19h00)</option>
-                  <option value="Ca2">Ca 2 (K2 - Ví dụ: 19h15 - 20h45)</option>
-                  <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
-                  <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
-                  <option value="Ca5">Ca 5 (K5)</option>
-                  <option value="Ca6">Ca 6 (K6)</option>
+                  {getAvailableShifts(formData.schedule).map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -824,19 +842,30 @@ export default function ClassesPage() {
                     value={editFormData.shift || extractClassShiftCode(editFormData.code)}
                     onChange={(e) => handleEditShiftChange(e.target.value)}
                   >
-                    <option value="Ca1">Ca 1 (K1 - 17h30 - 19h00)</option>
-                    <option value="Ca2">Ca 2 (K2 - 19h15 - 20h45)</option>
-                    <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
-                    <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
-                    <option value="Ca5">Ca 5 (K5)</option>
-                    <option value="Ca6">Ca 6 (K6)</option>
+                    {getAvailableShifts(editFormData.schedule).map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Tên hiển thị chuẩn hệ thống</label>
-                  <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(13, 136, 196, 0.08)', borderRadius: '6px', border: '1px solid rgba(13, 136, 196, 0.2)', fontWeight: '600', color: 'var(--color-primary-dark)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', height: '38px' }}>
-                    <i className="fa-solid fa-tag" style={{ marginRight: '6px', fontSize: '0.8rem', color: '#0ea5e9' }}></i>
-                    {formatClassCode(editFormData.code)}
+                  <label>Tên hiển thị & Khung giờ chuẩn</label>
+                  <div style={{ padding: '0.4rem 0.8rem', background: 'rgba(13, 136, 196, 0.08)', borderRadius: '6px', border: '1px solid rgba(13, 136, 196, 0.2)', fontWeight: '600', color: 'var(--color-primary-dark)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '38px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="fa-solid fa-tag" style={{ fontSize: '0.75rem', color: '#0ea5e9' }}></i>
+                      <span>{formatClassCode(editFormData.code)}</span>
+                    </div>
+                    {(() => {
+                      const time = getShiftTime(editFormData.schedule, editFormData.shift || extractClassShiftCode(editFormData.code));
+                      if (time) {
+                        return (
+                          <div style={{ fontSize: '0.75rem', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                            <i className="fa-regular fa-clock" style={{ fontSize: '0.7rem' }}></i>
+                            <span>Khung giờ: <strong>{time}</strong></span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1038,12 +1067,9 @@ export default function ClassesPage() {
                     value={upgradeForm.shift} 
                     onChange={(e) => setUpgradeForm(prev => ({ ...prev, shift: e.target.value }))}
                   >
-                    <option value="Ca1">Ca 1 (K1 - 17h30 - 19h00)</option>
-                    <option value="Ca2">Ca 2 (K2 - 19h15 - 20h45)</option>
-                    <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
-                    <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
-                    <option value="Ca5">Ca 5 (K5)</option>
-                    <option value="Ca6">Ca 6 (K6)</option>
+                    {getAvailableShifts(upgradeForm.schedule).map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                   <span style={{ fontSize: '0.75rem', color: '#047857', marginTop: '4px', fontWeight: '500' }}>
                     ✨ Tự động giữ nguyên ca học của lớp cũ ({extractClassShiftCode(upgradeClass?.code || '')})
@@ -1051,7 +1077,7 @@ export default function ClassesPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>Mã lớp dự kiến tạo mới</label>
+                  <label>Mã lớp & Giờ học dự kiến tạo mới</label>
                   <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)', fontWeight: '700', color: '#047857', fontFamily: 'monospace', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '38px', justifyContent: 'center' }}>
                     <div>
                       {(() => {
@@ -1062,6 +1088,10 @@ export default function ClassesPage() {
                     <div style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: '600' }}>
                       <i className="fa-solid fa-tag" style={{ marginRight: '4px' }}></i>
                       {formatClassCode(`CN1_${upgradeForm.newLevel || 'LVL'}_${upgradeForm.teacherName ? upgradeForm.teacherName.replace(/\\s+/g, '') : 'GV'}_${upgradeForm.schedule || '35'}_${upgradeForm.shift || 'Ca1'}`)}
+                      {(() => {
+                        const time = getShiftTime(upgradeForm.schedule, upgradeForm.shift);
+                        return time ? ` | ⏰ ${time}` : '';
+                      })()}
                     </div>
                   </div>
                 </div>

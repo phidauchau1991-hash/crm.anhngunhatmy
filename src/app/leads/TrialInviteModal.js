@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import TrialInviteTemplate from '../components/TrialInviteTemplate';
+import { getClassScheduleDetails } from '@/lib/classHelper';
 
 export default function TrialInviteModal({ isOpen, onClose, lead }) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -34,25 +35,21 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
       }
       setStartDate(formattedDate);
       
-      let guessedTime = '';
-      if (lead.trialClassCode) {
-         if (lead.trialClassCode.includes('T7') || lead.trialClassCode.includes('CN') || lead.trialClassCode.includes('7CN')) {
-             guessedTime = 'Thứ 7, Chủ Nhật';
-         } else if (lead.trialClassCode.includes('246') || lead.trialClassCode.includes('24')) {
-             guessedTime = 'Thứ 2, Thứ 4, Thứ 6';
-         } else if (lead.trialClassCode.includes('35') || lead.trialClassCode.includes('357')) {
-             guessedTime = 'Thứ 3, Thứ 5';
-         }
-      }
-      setStudyDays(guessedTime);
-      setStudyHours('');
-      
-      if (inviteType === 'ASSESSMENT') {
-        setEndDate('45 phút');
-        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời Đánh giá năng lực của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch đánh giá của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
-      } else {
+      if (inviteType === 'TRIAL') {
+        if (lead.trialClassCode) {
+          const details = getClassScheduleDetails(lead.trialClassCode);
+          setStudyDays(details.daysDisplay || '');
+          setStudyHours(details.hours || '');
+        } else {
+          setStudyDays('');
+          setStudyHours('');
+        }
         setEndDate('');
         setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời học thử của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch học của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
+      } else {
+        // Đánh giá năng lực / Tư vấn: Cho phép nhập tự do thời gian hẹn
+        setEndDate('45 phút');
+        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời Đánh giá năng lực của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch đánh giá của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
       }
     }
   }, [lead, inviteType]);
@@ -170,7 +167,15 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
                 <input 
                   type="text" 
                   value={className} 
-                  onChange={e => setClassName(e.target.value)}
+                  onChange={e => {
+                    const newClass = e.target.value;
+                    setClassName(newClass);
+                    if (inviteType === 'TRIAL' && newClass) {
+                      const details = getClassScheduleDetails(newClass);
+                      if (details.daysDisplay) setStudyDays(details.daysDisplay);
+                      if (details.hours) setStudyHours(details.hours);
+                    }
+                  }}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>
