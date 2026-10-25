@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatClassCode, extractClassShiftCode } from '@/lib/classHelper';
 
 const parseScheduleString = (str) => {
   if (!str) return [];
@@ -60,6 +61,7 @@ export default function ClassesPage() {
     careStaff: '',
     startDateStr: '',
     schedule: '35', // Mặc định thứ 3-5
+    shift: 'Ca1',
   });
 
   const [previewEndDate, setPreviewEndDate] = useState('');
@@ -69,6 +71,8 @@ export default function ClassesPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [editFormData, setEditFormData] = useState({
+    code: '',
+    shift: 'Ca1',
     startDateStr: '',
     schedule: '',
     teacherName: '',
@@ -85,6 +89,8 @@ export default function ClassesPage() {
     newStartDateStr: '',
     teacherName: '',
     schedule: '',
+    shift: 'Ca1',
+    customNewClassCode: '',
   });
 
   const openUpgradeModal = (cls) => {
@@ -94,11 +100,16 @@ export default function ClassesPage() {
     const currentCfgIdx = courseConfigs.findIndex(c => c.level === cls.level);
     const nextCfg = currentCfgIdx !== -1 && currentCfgIdx + 1 < courseConfigs.length ? courseConfigs[currentCfgIdx + 1] : null;
 
+    // Tự động nhận diện và bảo lưu Ca học (K) của lớp cũ
+    const detectedShift = extractClassShiftCode(cls.code);
+
     setUpgradeForm({
       newLevel: nextCfg ? nextCfg.level : '',
       newStartDateStr: '',
       teacherName: cls.teacherName || '',
       schedule: cls.scheduleRaw || '35',
+      shift: detectedShift,
+      customNewClassCode: '',
     });
     setIsUpgradeModalOpen(true);
     setMessage({ type: '', text: '' });
@@ -113,8 +124,12 @@ export default function ClassesPage() {
     if (parts.length === 3) {
       formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     }
+
+    const detectedShift = extractClassShiftCode(cls.code);
     
     setEditFormData({
+      code: cls.code,
+      shift: detectedShift,
       startDateStr: formattedDate,
       schedule: cls.scheduleRaw || '',
       teacherName: cls.teacherName || '',
@@ -123,6 +138,25 @@ export default function ClassesPage() {
     });
     setIsEditModalOpen(true);
     setMessage({ type: '', text: '' });
+  };
+
+  // Khi chọn Ca học mới trong Modal Chỉnh sửa Lớp
+  const handleEditShiftChange = (newShift) => {
+    setEditFormData(prev => {
+      let updatedCode = prev.code;
+      const parts = prev.code.split('_');
+      if (parts.length >= 5) {
+        parts[4] = newShift;
+        updatedCode = parts.join('_');
+      } else {
+        updatedCode = `${prev.code}_${newShift}`;
+      }
+      return {
+        ...prev,
+        shift: newShift,
+        code: updatedCode,
+      };
+    });
   };
 
   // Tải danh sách lớp học
@@ -313,6 +347,7 @@ export default function ClassesPage() {
         },
         body: JSON.stringify({
           code: selectedClass.code,
+          newCode: editFormData.code?.trim() || selectedClass.code,
           startDateStr: editFormData.startDateStr,
           schedule: editFormData.schedule,
           teacherName: editFormData.teacherName,
@@ -351,6 +386,8 @@ export default function ClassesPage() {
           newStartDateStr: upgradeForm.newStartDateStr,
           teacherName: upgradeForm.teacherName,
           schedule: upgradeForm.schedule,
+          shift: upgradeForm.shift,
+          customNewClassCode: upgradeForm.customNewClassCode?.trim() || undefined,
         }),
       });
 
@@ -441,9 +478,11 @@ export default function ClassesPage() {
         setFormData({
           level: '',
           teacherName: '',
+          teacherId: '',
           careStaff: '',
           startDateStr: '',
           schedule: '35',
+          shift: 'Ca1',
         });
         fetchClasses();
         setTimeout(() => setIsModalOpen(false), 2000);
@@ -534,8 +573,12 @@ export default function ClassesPage() {
                 return (
                 <tr key={cls.code} className="table-row" style={isCompleted ? { backgroundColor: '#f1f5f9', opacity: 0.7, filter: 'grayscale(0.5)' } : {}}>
                   <td className="class-code">
-                    {cls.code}
-                    {isCompleted && <span style={{display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 'normal'}}>Đã kết thúc</span>}
+                    <div style={{ fontWeight: '700', color: 'var(--color-primary-dark)' }}>{cls.code}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#0284c7', marginTop: '2px', fontWeight: '500' }}>
+                      <i className="fa-solid fa-tag" style={{ fontSize: '0.72rem', marginRight: '4px' }}></i>
+                      {formatClassCode(cls.code)}
+                    </div>
+                    {isCompleted && <span style={{display: 'inline-block', fontSize: '0.75rem', color: '#64748b', fontWeight: 'normal', marginTop: '2px'}}>Đã kết thúc</span>}
                   </td>
                   <td>
                     <span className="badge-level">{cls.level}</span>
@@ -708,6 +751,23 @@ export default function ClassesPage() {
                 </div>
               </div>
 
+              <div className="form-group">
+                <label>6. Ca học (Kíp / Khung giờ) *</label>
+                <select 
+                  name="shift" 
+                  value={formData.shift} 
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="Ca1">Ca 1 (K1 - Ví dụ: 17h30 - 19h00)</option>
+                  <option value="Ca2">Ca 2 (K2 - Ví dụ: 19h15 - 20h45)</option>
+                  <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
+                  <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
+                  <option value="Ca5">Ca 5 (K5)</option>
+                  <option value="Ca6">Ca 6 (K6)</option>
+                </select>
+              </div>
+
               {previewEndDate && (
                 <div className="preview-end-date-box">
                   <i className="fa-regular fa-clock"></i>
@@ -742,8 +802,43 @@ export default function ClassesPage() {
 
             <form onSubmit={handleEditSubmit} className="modal-form">
               <div className="form-group">
-                <label>Mã Lớp Học (Không thể chỉnh sửa)</label>
-                <input type="text" value={selectedClass?.code || ''} disabled style={{ opacity: 0.7, cursor: 'not-allowed' }} />
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Mã Lớp Học *</span>
+                  <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'normal' }}>
+                    <i className="fa-solid fa-shield-halved"></i> Tự động đồng bộ & bảo toàn toàn bộ dữ liệu học viên
+                  </span>
+                </label>
+                <input 
+                  type="text" 
+                  value={editFormData.code} 
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, code: e.target.value }))}
+                  required 
+                  style={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--color-primary-dark)' }} 
+                />
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Đổi nhanh Ca học (Kíp / Khung giờ)</label>
+                  <select 
+                    value={editFormData.shift || extractClassShiftCode(editFormData.code)}
+                    onChange={(e) => handleEditShiftChange(e.target.value)}
+                  >
+                    <option value="Ca1">Ca 1 (K1 - 17h30 - 19h00)</option>
+                    <option value="Ca2">Ca 2 (K2 - 19h15 - 20h45)</option>
+                    <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
+                    <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
+                    <option value="Ca5">Ca 5 (K5)</option>
+                    <option value="Ca6">Ca 6 (K6)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Tên hiển thị chuẩn hệ thống</label>
+                  <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(13, 136, 196, 0.08)', borderRadius: '6px', border: '1px solid rgba(13, 136, 196, 0.2)', fontWeight: '600', color: 'var(--color-primary-dark)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', height: '38px' }}>
+                    <i className="fa-solid fa-tag" style={{ marginRight: '6px', fontSize: '0.8rem', color: '#0ea5e9' }}></i>
+                    {formatClassCode(editFormData.code)}
+                  </div>
+                </div>
               </div>
 
               <div className="form-grid-2">
@@ -924,7 +1019,7 @@ export default function ClassesPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>4. Ca học / Lịch học tuần *</label>
+                  <label>4. Lịch học tuần *</label>
                   <select 
                     value={upgradeForm.schedule} 
                     onChange={(e) => setUpgradeForm(prev => ({ ...prev, schedule: e.target.value }))}
@@ -936,8 +1031,55 @@ export default function ClassesPage() {
                 </div>
               </div>
 
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>5. Ca học (Kíp / Khung giờ) *</label>
+                  <select 
+                    value={upgradeForm.shift} 
+                    onChange={(e) => setUpgradeForm(prev => ({ ...prev, shift: e.target.value }))}
+                  >
+                    <option value="Ca1">Ca 1 (K1 - 17h30 - 19h00)</option>
+                    <option value="Ca2">Ca 2 (K2 - 19h15 - 20h45)</option>
+                    <option value="Ca3">Ca 3 (K3 - Sáng T7/CN)</option>
+                    <option value="Ca4">Ca 4 (K4 - Chiều T7/CN)</option>
+                    <option value="Ca5">Ca 5 (K5)</option>
+                    <option value="Ca6">Ca 6 (K6)</option>
+                  </select>
+                  <span style={{ fontSize: '0.75rem', color: '#047857', marginTop: '4px', fontWeight: '500' }}>
+                    ✨ Tự động giữ nguyên ca học của lớp cũ ({extractClassShiftCode(upgradeClass?.code || '')})
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label>Mã lớp dự kiến tạo mới</label>
+                  <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)', fontWeight: '700', color: '#047857', fontFamily: 'monospace', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '2px', minHeight: '38px', justifyContent: 'center' }}>
+                    <div>
+                      {(() => {
+                        const gv = upgradeForm.teacherName ? upgradeForm.teacherName.replace(/\s+/g, '') : 'GV';
+                        return `CN1_${upgradeForm.newLevel || 'LVL'}_${gv}_${upgradeForm.schedule || '35'}_${upgradeForm.shift || 'Ca1'}`;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: '600' }}>
+                      <i className="fa-solid fa-tag" style={{ marginRight: '4px' }}></i>
+                      {formatClassCode(`CN1_${upgradeForm.newLevel || 'LVL'}_${upgradeForm.teacherName ? upgradeForm.teacherName.replace(/\\s+/g, '') : 'GV'}_${upgradeForm.schedule || '35'}_${upgradeForm.shift || 'Ca1'}`)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Tùy chỉnh mã lớp mới (Để trống nếu dùng mặc định trên):</label>
+                <input 
+                  type="text" 
+                  placeholder="Để trống để hệ thống tự tạo theo quy chuẩn trên" 
+                  value={upgradeForm.customNewClassCode} 
+                  onChange={(e) => setUpgradeForm(prev => ({ ...prev, customNewClassCode: e.target.value }))}
+                  style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
+                />
+              </div>
+
               <p className="field-note" style={{ marginTop: '0.75rem', color: 'var(--color-success)', fontWeight: '600' }}>
-                <i className="fa-solid fa-circle-check"></i> Hệ thống tự động khởi tạo Mã lớp mới, chuyển sỹ số cả lớp và lập hóa đơn học phí mới cho từng học viên.
+                <i className="fa-solid fa-circle-check"></i> Hệ thống tự động kế thừa Ca học ({upgradeForm.shift}), chuyển toàn bộ học viên sang lớp mới và bảo toàn an toàn dữ liệu.
               </p>
 
               <div className="modal-actions" style={{ marginTop: '1.5rem' }}>

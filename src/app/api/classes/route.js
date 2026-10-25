@@ -122,7 +122,8 @@ export async function POST(request) {
       careStaff, 
       startDateStr, 
       schedule, 
-      shiftHours 
+      shiftHours,
+      shift 
     } = body;
 
     const branchId = request.headers.get('x-user-branch') || "CN1";
@@ -190,7 +191,7 @@ export async function POST(request) {
       });
     }
 
-    // TRƯỜNG HỢP 2: TẠO LỚP HỌC THEO KHÓA CỐ ĐỊNH (GIỮ NGUYÊN 100% LOGIC CŨ)
+    // TRƯỜNG HỢP 2: TẠO LỚP HỌC THEO KHÓA CỐ ĐỊNH
     if (!level || !startDateStr || !schedule) {
       return NextResponse.json({ success: false, error: 'Cấp độ, ngày khai giảng và lịch học là bắt buộc' }, { status: 400 });
     }
@@ -217,26 +218,33 @@ export async function POST(request) {
     }
 
     const gvAbbr = finalTeacherName ? finalTeacherName.replace(/\s+/g, '') : 'GV';
-    const classPrefix = `${branchPrefix}_${level}_${gvAbbr}_${schedule}_`;
 
-    const latestClass = await prisma.class.findFirst({
-      where: {
-        code: {
-          startsWith: classPrefix,
-        },
-      },
-      orderBy: {
-        code: 'desc',
-      },
-    });
-
-    let nextSerial = 1;
-    if (latestClass) {
-      const parts = latestClass.code.split('_');
-      const serialPart = parts[parts.length - 1];
-      nextSerial = parseInt(serialPart) + 1;
+    // Xử lý Ca học (shift): Ưu tiên shift truyền vào, chuẩn hóa thành Ca1, Ca2, Ca3, Ca4...
+    let finalShift = 'Ca1';
+    if (shift) {
+      const clean = shift.trim().toLowerCase();
+      if (clean === '01' || clean === 'ca1' || clean === 'k1' || clean === '1') finalShift = 'Ca1';
+      else if (clean === '02' || clean === 'ca2' || clean === 'k2' || clean === '2') finalShift = 'Ca2';
+      else if (clean === '03' || clean === 'ca3' || clean === 'k3' || clean === '3') finalShift = 'Ca3';
+      else if (clean === '04' || clean === 'ca4' || clean === 'k4' || clean === '4') finalShift = 'Ca4';
+      else if (clean === '05' || clean === 'ca5' || clean === 'k5' || clean === '5') finalShift = 'Ca5';
+      else if (clean === '06' || clean === 'ca6' || clean === 'k6' || clean === '6') finalShift = 'Ca6';
+      else finalShift = shift.trim();
     }
-    const classCode = `${classPrefix}${String(nextSerial).padStart(2, '0')}`;
+
+    const classPrefix = `${branchPrefix}_${level}_${gvAbbr}_${schedule}_`;
+    const classCode = (customCode && customCode.trim()) ? customCode.trim() : `${classPrefix}${finalShift}`;
+
+    // Kiểm tra trùng mã lớp
+    const existingClass = await prisma.class.findUnique({
+      where: { code: classCode }
+    });
+    if (existingClass) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Mã lớp học "${classCode}" đã tồn tại. Vui lòng chọn Ca học khác hoặc nhập Mã lớp tùy chỉnh!` 
+      }, { status: 400 });
+    }
 
     const holidays = await prisma.holiday.findMany();
 
@@ -298,11 +306,11 @@ export async function POST(request) {
   }
 }
 
-// PUT: Cập nhật thông tin lớp học (Ngày khai giảng, lịch học, GV...) và tính lại ngày kết thúc dự kiến
+// PUT: Cập nhật thông tin lớp học (Mã lớp mới, Ngày khai giảng, lịch học, GV...) và tính lại ngày kết thúc dự kiến
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { code, startDateStr, schedule, teacherName, teacherId, careStaff } = body;
+    const { code, newCode, startDateStr, schedule, teacherName, teacherId, careStaff } = body;
 
     if (!code || !startDateStr || !schedule) {
       return NextResponse.json({ success: false, error: 'Mã lớp, ngày khai giảng và lịch học là bắt buộc' }, { status: 400 });
@@ -346,9 +354,10 @@ export async function PUT(request) {
     let currentDate = new Date(startDate);
     let sessionsCount = 0;
 
+    const targetClassCodeForHoliday = (newCode && newCode.trim()) ? newCode.trim() : code;
     while (sessionsCount < totalSessions) {
       const dayOfWeek = currentDate.getDay();
-      const isDayHoliday = getHolidayForDate(currentDate, code, schedule, holidays);
+      const isDayHoliday = getHolidayForDate(currentDate, targetClassCodeForHoliday, schedule, holidays);
 
       if (targetDays.includes(dayOfWeek) && !isDayHoliday) {
         sessionsCount++;
@@ -369,6 +378,63 @@ export async function PUT(request) {
       }
     }
 
+    const finalNewCode = (newCode && newCode.trim()) ? newCode.trim() : code;
+
+    // TRƯỜNG HỢP ĐỔI MÃ LỚP HỌC (finalNewCode !== code)
+    if (finalNewCode !== code) {
+      // 1. Kiểm tra xem mã lớp mới đã tồn tại chưa
+      const existing = await prisma.class.findUnique({ where: { code: finalNewCode } });
+      if (existing) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `Mã lớp mới "${finalNewCode}" đã tồn tại trên hệ thống. Vui lòng chọn mã khác!` 
+        }, { status: 400 });
+      }
+
+      // 2. Chuyển đổi an toàn tuyệt đối qua transaction
+      const updatedClass = await prisma.$transaction(async (tx) => {
+        // Tạo lớp mới với finalNewCode
+        const created = await tx.class.create({
+          data: {
+            code: finalNewCode,
+            level: cls.level,
+            startDate,
+            schedule,
+            expectedEndDate,
+            teacherName: finalTeacherName || cls.teacherName,
+            teacherId: teacherId !== undefined ? teacherId : cls.teacherId,
+            careStaff: careStaff !== undefined ? careStaff : cls.careStaff,
+            branchId: cls.branchId || 'CN1_BinhDuong',
+          }
+        });
+
+        // Chuyển toàn bộ bản ghi con sang finalNewCode
+        await tx.enrollment.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.orderFinance.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.attendance.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.attendanceSummary.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.examResult.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.monthlyInvoice.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.tutoringPlan.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
+        await tx.lead.updateMany({ where: { trialClassCode: code }, data: { trialClassCode: finalNewCode } });
+
+        // Xóa lớp cũ sau khi tất cả dữ liệu đã được di dời sang lớp mới an toàn
+        await tx.class.delete({ where: { code } });
+
+        return created;
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `Đổi mã lớp thành công: [${code}] -> [${finalNewCode}]`,
+        data: {
+          ...updatedClass,
+          expectedEndDateStr: expectedEndDate.toLocaleDateString('vi-VN'),
+        } 
+      });
+    }
+
+    // NẾU GIỮ NGUYÊN MÃ LỚP CŨ: CẬP NHẬT THÔNG THƯỜNG
     const updatedClass = await prisma.class.update({
       where: { code },
       data: {
@@ -422,4 +488,3 @@ export async function DELETE(request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

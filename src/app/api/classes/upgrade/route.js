@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { recalculateClassEndDate } from '@/lib/holidayHelpers';
+import { extractClassShiftCode } from '@/lib/classHelper';
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { oldClassCode, newLevel, newStartDateStr, teacherName, schedule } = body;
+    const { 
+      oldClassCode, 
+      newLevel, 
+      newStartDateStr, 
+      teacherName, 
+      schedule,
+      shift,
+      customNewClassCode 
+    } = body;
 
     if (!oldClassCode || !newLevel || !newStartDateStr) {
       return NextResponse.json({ success: false, error: 'Mã lớp cũ, Mã khóa mới và Ngày khai giảng mới là bắt buộc' }, { status: 400 });
@@ -33,28 +42,31 @@ export async function POST(request) {
     const startDate = new Date(newStartDateStr);
     startDate.setHours(0, 0, 0, 0);
 
+    // Kế thừa chính xác Ca học từ lớp cũ (hoặc ca học người dùng chọn nếu đổi ca)
+    const inheritedShift = extractClassShiftCode(oldClassCode);
+    const finalShift = (shift && shift.trim()) ? shift.trim() : inheritedShift;
+
     const gvAbbr = finalTeacher ? finalTeacher.replace(/\s+/g, '') : 'GV';
-    const classPrefix = `CN1_${newLevel}_${gvAbbr}_${finalSchedule}_`;
+    const defaultNewCode = `CN1_${newLevel}_${gvAbbr}_${finalSchedule}_${finalShift}`;
+    const newClassCode = (customNewClassCode && customNewClassCode.trim()) ? customNewClassCode.trim() : defaultNewCode;
 
-    const latestClass = await prisma.class.findFirst({
-      where: { code: { startsWith: classPrefix } },
-      orderBy: { code: 'desc' }
+    // Kiểm tra xem mã lớp mới đã tồn tại trên hệ thống chưa
+    const existingClass = await prisma.class.findUnique({
+      where: { code: newClassCode }
     });
-
-    let nextSerial = 1;
-    if (latestClass) {
-      const parts = latestClass.code.split('_');
-      const serialPart = parts[parts.length - 1];
-      nextSerial = (parseInt(serialPart) || 0) + 1;
+    if (existingClass) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Mã lớp mới "${newClassCode}" đã tồn tại trên hệ thống. Vui lòng kiểm tra lại Ca học hoặc đổi Mã lớp tùy chỉnh!` 
+      }, { status: 400 });
     }
-    const newClassCode = `${classPrefix}${String(nextSerial).padStart(2, '0')}`;
 
     const now = new Date();
     const yearMonthPrefix = `${String(now.getFullYear()).substring(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const activeStudents = oldClass.enrollments.filter(e => e.status === 'Đang học');
 
-      const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Dọn dẹp các điểm danh mồ côi (nếu mã lớp này vô tình bị trùng với 1 lớp đã xóa trong quá khứ)
       await tx.attendance.deleteMany({ where: { classCode: newClassCode } });
       await tx.attendanceSummary.deleteMany({ where: { classCode: newClassCode } });
@@ -65,9 +77,12 @@ export async function POST(request) {
           code: newClassCode,
           level: newLevel,
           teacherName: finalTeacher,
+          teacherId: oldClass.teacherId || null,
+          careStaff: oldClass.careStaff || null,
           startDate: startDate,
           schedule: finalSchedule,
           expectedEndDate: startDate, // Tạm thời
+          branchId: oldClass.branchId || 'CN1_BinhDuong',
         }
       });
 
@@ -113,7 +128,7 @@ export async function POST(request) {
            promoNote += ` [Nợ cũ: ${oldDebt.toLocaleString('vi-VN')}đ]`;
         }
 
-        // Tạo hóa đơn học phí cho khóa mới (Sử dụng studentId đầy đủ để tránh trùng lặp thay vì split)
+        // Tạo hóa đơn học phí cho khóa mới
         const orderId = `ORD_UP_${yearMonthPrefix}_${en.studentId}`;
         await tx.orderFinance.upsert({
           where: { id: orderId },
