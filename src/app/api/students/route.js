@@ -69,6 +69,12 @@ export async function GET(request) {
           { status: 'Nghỉ luôn' },
           { status: 'Thôi học' }
         ];
+      } else if (studentStatus === 'Đang học') {
+        where.OR = [
+          ...(where.OR || []),
+          { status: 'Đang học' },
+          { status: 'Ä ang há» c' }
+        ];
       } else {
         where.status = studentStatus;
       }
@@ -131,6 +137,12 @@ export async function GET(request) {
         displayPolicy = student.specialPolicy;
       }
 
+      // Chuẩn hóa trạng thái nếu có lỗi mã hóa font UTF-8
+      let cleanStatus = student.status || 'Đang học';
+      if (cleanStatus.includes('Ä') || cleanStatus.includes('ang h') || cleanStatus.includes('há» c')) {
+        cleanStatus = 'Đang học';
+      }
+
       return {
         id: student.id,
         name: student.name,
@@ -151,7 +163,7 @@ export async function GET(request) {
         totalPaid,
         debt: totalToPay - totalPaid,
         paymentStatus,
-        status: student.status,
+        status: cleanStatus,
         walletBalance: student.walletBalance || 0,
         callbackDate: student.callbackDate,
         reservationAmount: student.reservationAmount || 0,
@@ -198,7 +210,7 @@ export async function GET(request) {
 
     const statusSummary = {
       total: allMatchingStudents.length,
-      studying: allMatchingStudents.filter(s => s.status === 'Đang học').length,
+      studying: allMatchingStudents.filter(s => s.status === 'Đang học' || s.status?.includes('Ä') || s.status?.includes('ang h')).length,
       paused: allMatchingStudents.filter(s => s.status === 'Tạm nghỉ').length,
       reserved: allMatchingStudents.filter(s => s.status === 'Bảo lưu').length,
       dropout: allMatchingStudents.filter(s => s.status === 'Nghỉ luôn' || s.status === 'Thôi học').length,
@@ -349,6 +361,7 @@ export async function POST(request) {
         specialPolicy: policyVal > 0 ? `${specialPolicyType || 'Ưu đãi'} (-${policyVal.toLocaleString('vi-VN')}đ)` : 'Không',
         referralCode: studentId,
         branchId: branchId || process.env.DEFAULT_BRANCH_ID || "CN1",
+        status: 'Đang học',
       },
     });
 

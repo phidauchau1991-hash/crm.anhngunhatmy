@@ -115,7 +115,7 @@ export async function POST(request) {
       const communicationScore = parseFloat(r.communicationScore) || 0;
       
       const processTotal = (attendanceScore + hwScore + activityScore + pronunciationScore + communicationScore) / 5;
-      const processContribution = processTotal * (config.processWeight / 100);
+      const processContribution = (processTotal / 10) * config.processWeight;
 
       // 2. Bài thi (90%)
       const speakingScore = parseFloat(r.speakingScore) || 0;

@@ -148,7 +148,7 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
   const communicationScore = parseFloat(result.communicationScore) || 0;
   
   const processTotal = (attendanceScore + hwScore + activityScore + pronunciationScore + communicationScore) / 5;
-  const processContribution = processTotal * ((config.processWeight || 10) / 100);
+  const processContribution = (processTotal / 10) * (config.processWeight || 10);
 
   const speakingScore = parseFloat(result.speakingScore) || 0;
   const listeningScore = parseFloat(result.listeningScore) || 0;

@@ -79,7 +79,7 @@ model Student {
   saleStaff          String? // NhÃ¢n viÃªn Sale/TÆ° váº¥n phá»¥ trÃ¡ch há»c viÃªn (Sprint 5)
 
   // Tráº¡ng thÃ¡i & Quáº£n trá»‹ há»c viÃªn nÃ¢ng cao (Má»šI Bá»” SUNG)
-  status              String    @default("Äang há»c") // Äang há»c, Táº¡m nghá»‰, Báº£o lÆ°u, Nghá»‰ luÃ´n
+  status              String    @default("Đang học") // Äang há»c, Táº¡m nghá»‰, Báº£o lÆ°u, Nghá»‰ luÃ´n
   callbackDate        DateTime? // NgÃ y háº¹n liÃªn há»‡ láº¡i (Táº¡m nghá»‰)
   walletBalance       Float?    @default(0) // VÃ­ há»c viÃªn (Chuyá»ƒn lá»›p dÆ° tiá»n)
   reservationAmount   Float?    @default(0) // Sá»‘ tiá»n báº£o lÆ°u
@@ -106,7 +106,7 @@ model Enrollment {
   classCode String
   class     Class   @relation(fields: [classCode], references: [code], onDelete: Cascade)
 
-  status String @default("Ä ang há» c") // Ä ang há» c, Ä Ã£ chuyá»ƒn, Báº£o lÆ°u, Nghá»‰ há» c
+  status              String    @default("Đang học") // Ä ang há» c, Ä Ã£ chuyá»ƒn, Báº£o lÆ°u, Nghá»‰ há» c
 
   // Ä iá»ƒm sá»‘ theo ká»¹ nÄƒng
   midTermListening Float?

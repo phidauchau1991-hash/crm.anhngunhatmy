@@ -6,6 +6,16 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
 
+const getNormalizedStatus = (st) => {
+  if (!st) return 'Đang học';
+  const clean = String(st).trim();
+  if (clean.includes('Ä') || clean.includes('ang h') || clean.includes('há» c') || clean === 'Đang học') return 'Đang học';
+  if (clean.includes('Tạm nghỉ') || clean.includes('Tam nghi')) return 'Tạm nghỉ';
+  if (clean.includes('Bảo lưu') || clean.includes('Bao luu')) return 'Bảo lưu';
+  if (clean.includes('Nghỉ luôn') || clean.includes('Nghi luon') || clean === 'Thôi học') return 'Nghỉ luôn';
+  return clean;
+};
+
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1781,60 +1791,191 @@ export default function StudentsPage() {
                           />
                           {transferPreview?.selectedClassInfo && (
                             <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                              <i className="fa-solid fa-circle-info"></i> Lớp học mới đã học {transferPreview.selectedClassInfo.sessionsTaught} buổi - Còn lại {transferPreview.selectedClassInfo.sessionsRemaining} buổi - Tổng {transferPreview.selectedClassInfo.totalSessions} buổi.
+                              <i className="fa-solid fa-circle-info"></i> Lớp học mới đã dạy {transferPreview.selectedClassInfo.sessionsTaught} buổi - Còn lại {transferPreview.selectedClassInfo.sessionsRemaining} buổi - Tổng {transferPreview.selectedClassInfo.totalSessions} buổi.
                             </p>
                           )}
                         </div>
 
+                        {/* TÙY CHỌN NGHIỆP VỤ: CHUYỂN LỚP / HỌC LẠI / CHUYỂN NGANG */}
+                        {editForm.newClassCode && (
+                          <div className="form-group" style={{ marginTop: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                            <label style={{ fontWeight: '700', color: 'var(--color-primary-dark)', display: 'block', marginBottom: '0.5rem' }}>
+                              <i className="fa-solid fa-briefcase"></i> Loại nghiệp vụ chuyển lớp
+                            </label>
+                            <select 
+                              name="transferType" 
+                              value={editForm.transferType || 'normal'} 
+                              onChange={handleEditInputChange}
+                              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: '600' }}
+                            >
+                              <option value="normal">Chuyển lớp thông thường (Cấn trừ theo số buổi đã học)</option>
+                              <option value="repeat">🔄 Học lại khóa học (Repeat Course - Áp dụng chính sách ưu đãi)</option>
+                              <option value="lateral">➡️ Chuyển ngang trọn gói (Giữ nguyên tiền, không trừ số buổi cũ)</option>
+                            </select>
+
+                            {editForm.transferType === 'repeat' && (
+                              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f0fdf4', border: '1px dashed #16a34a', borderRadius: '8px' }}>
+                                <label style={{ display: 'block', fontWeight: '700', color: '#166534', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                                  <i className="fa-solid fa-tags"></i> Chính sách ưu đãi Học viên Học Lại
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                  {[
+                                    { id: 'percent_30', label: 'Giảm 30%' },
+                                    { id: 'percent_50', label: 'Giảm 50%' },
+                                    { id: 'free', label: 'Miễn phí (0đ)' },
+                                    { id: 'custom_vnd', label: 'Số tiền VND' },
+                                    { id: 'custom_percent', label: '% Tùy chỉnh' },
+                                  ].map(opt => (
+                                    <button
+                                      key={opt.id}
+                                      type="button"
+                                      onClick={() => setEditForm(prev => ({ ...prev, repeatDiscountType: opt.id }))}
+                                      style={{
+                                        padding: '0.45rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        border: (editForm.repeatDiscountType || 'percent_30') === opt.id ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                                        background: (editForm.repeatDiscountType || 'percent_30') === opt.id ? '#16a34a' : '#fff',
+                                        color: (editForm.repeatDiscountType || 'percent_30') === opt.id ? '#fff' : '#334155'
+                                      }}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {editForm.repeatDiscountType === 'custom_vnd' && (
+                                  <div style={{ marginTop: '0.5rem' }}>
+                                    <label style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>Số tiền miễn giảm trực tiếp (VND):</label>
+                                    <input 
+                                      type="text" 
+                                      name="repeatDiscountAmount" 
+                                      value={editForm.repeatDiscountAmount} 
+                                      onChange={handleEditCurrencyChange} 
+                                      placeholder="Ví dụ: 1.000.000"
+                                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #86efac' }}
+                                    />
+                                  </div>
+                                )}
+
+                                {editForm.repeatDiscountType === 'custom_percent' && (
+                                  <div style={{ marginTop: '0.5rem' }}>
+                                    <label style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>Phần trăm miễn giảm (%):</label>
+                                    <input 
+                                      type="number" 
+                                      name="repeatDiscountPercent" 
+                                      min="0"
+                                      max="100"
+                                      value={editForm.repeatDiscountPercent} 
+                                      onChange={handleEditInputChange} 
+                                      placeholder="Ví dụ: 40"
+                                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #86efac' }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {transferPreview && (
-                          <div className="fee-preview-box animated-scale" style={{ marginTop: '1rem' }}>
-                            <h4>
-                              <i className="fa-solid fa-calculator"></i>{' '}
-                              {transferPreview.isInitial ? 'Thông tin học phí xếp lớp' : 'Tính toán cấn trừ chênh lệch'}
+                          <div className="fee-preview-box animated-scale" style={{ marginTop: '1rem', border: '1px solid #93c5fd', background: '#f8fafc', borderRadius: '10px', padding: '1.25rem' }}>
+                            <h4 style={{ margin: '0 0 1rem 0', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <i className="fa-solid fa-calculator"></i> Bảng tính cấn trừ học phí xem trước
                             </h4>
                             
                             {transferPreview.isInitial ? (
-                              <>
-                                <div className="fee-row">
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span>Học phí lớp mới ({transferPreview.selectedClassInfo.sessionsRemaining} buổi còn lại):</span>
+                                  <span>{transferPreview.proRatedPriceNew.toLocaleString()}đ</span>
+                                </div>
+                                {transferPreview.repeatDiscountAmount > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: '600' }}>
+                                    <span>Ưu đãi học lại:</span>
+                                    <span>-{transferPreview.repeatDiscountAmount.toLocaleString()}đ</span>
+                                  </div>
+                                )}
+                                <div style={{ borderTop: '2px solid #3b82f6', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem', color: '#1e40af' }}>
+                                  <span>Tổng học phí cần đóng:</span>
                                   <span>{transferPreview.newClassFeeBase.toLocaleString()}đ</span>
                                 </div>
-                                <div className="fee-total-rows" style={{ borderTop: '2px solid var(--color-border)' }}>
-                                  <div className="fee-row total-fee">
-                                    <span>Tổng học phí cần đóng:</span>
-                                    <span>{transferPreview.newClassFeeBase.toLocaleString()}đ</span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+                                {/* 1. Lớp cũ */}
+                                <div style={{ padding: '0.6rem', background: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}>
+                                    <span>1. Lớp cũ: {editStudentData.currentClass.classCode}</span>
+                                    <span>Thực đóng: {(transferPreview.amountPaidOld || 0).toLocaleString()}đ</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                                    <span>{editForm.transferType === 'lateral' ? 'Chuyển ngang trọn gói (Không tính tiền buổi cũ)' : `Đã học: ${transferPreview.attendedSessions} buổi (Tiêu dùng: ${transferPreview.costUsedOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ)`}</span>
+                                    <strong style={{ color: '#059669' }}>Dư chuyển đi: +{transferPreview.balanceOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</strong>
                                   </div>
                                 </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="fee-row">
-                                  <span>[Dòng 1] Chi phí lớp cũ đã tiêu dùng ({transferPreview.attendedSessions} buổi):</span>
-                                  <span>{transferPreview.costUsedOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
-                                </div>
-                                <div className="fee-row text-success" style={{ fontWeight: '600' }}>
-                                  <span>[Dòng 2] Số tiền còn dư của học viên (Thực đóng cũ - Đã dùng):</span>
-                                  <span>{transferPreview.balanceOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
-                                </div>
-                                <div className="fee-row" style={{ fontWeight: '600' }}>
-                                  <span>[Dòng 3] Học phí lớp mới ({transferPreview.selectedClassInfo.sessionsRemaining} buổi còn lại):</span>
-                                  <span>{transferPreview.newClassFeeBase.toLocaleString()}đ</span>
+
+                                {/* 2. Lớp mới */}
+                                <div style={{ padding: '0.6rem', background: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}>
+                                    <span>2. Lớp mới: {transferPreview.selectedClassInfo.code}</span>
+                                    <span>Giá gốc: {(transferPreview.priceNew || 0).toLocaleString()}đ</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                                    <span>Học phí {transferPreview.selectedClassInfo.sessionsRemaining} buổi còn lại:</span>
+                                    <span>{transferPreview.proRatedPriceNew.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                  </div>
+                                  {transferPreview.repeatDiscountAmount > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontSize: '0.8rem', marginTop: '0.2rem', fontWeight: '600' }}>
+                                      <span>- Ưu đãi học viên học lại:</span>
+                                      <span>-{transferPreview.repeatDiscountAmount.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                    </div>
+                                  )}
+                                  {transferPreview.specialDiscount > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontSize: '0.8rem', marginTop: '0.2rem', fontWeight: '600' }}>
+                                      <span>- Ưu đãi chính sách học viên:</span>
+                                      <span>-{transferPreview.specialDiscount.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', marginTop: '0.3rem', paddingTop: '0.3rem', fontWeight: 'bold' }}>
+                                    <span>Thành tiền lớp mới:</span>
+                                    <span style={{ color: '#1e40af' }}>{transferPreview.newClassFeeBase.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                  </div>
                                 </div>
 
-                                <div className="fee-total-rows" style={{ borderTop: '2px solid var(--color-border)', marginTop: '0.75rem' }}>
+                                {/* 3. Điều chỉnh thủ công */}
+                                {transferPreview.manualAdj !== 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: '#fef3c7', borderRadius: '6px', color: '#b45309', fontWeight: '600', fontSize: '0.85rem' }}>
+                                    <span>Điều chỉnh thủ công ({editForm.manualReason || 'Giám đốc'}):</span>
+                                    <span>{transferPreview.manualAdj > 0 ? '+' : ''}{transferPreview.manualAdj.toLocaleString()}đ</span>
+                                  </div>
+                                )}
+
+                                {/* 4. Tổng kết */}
+                                <div style={{ borderTop: '2px solid #3b82f6', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
                                   {transferPreview.difference > 0 ? (
-                                    <div className="fee-row total-fee text-danger">
-                                      <span>[Dòng 4] Tổng kết công nợ (Cần đóng thêm):</span>
-                                      <span>{transferPreview.difference.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                                      <span style={{ fontWeight: 'bold', color: '#991b1b', fontSize: '1rem' }}>
+                                        <i className="fa-solid fa-money-bill-wave"></i> Học viên CẦN ĐÓNG THÊM:
+                                      </span>
+                                      <span style={{ fontWeight: '800', color: '#dc2626', fontSize: '1.25rem' }}>
+                                        {transferPreview.difference.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ
+                                      </span>
                                     </div>
                                   ) : (
-                                    <div className="fee-row total-fee text-success">
-                                      <span>[Dòng 4] Tổng kết công nợ (Dư tiền lưu ví/Bảo lưu):</span>
-                                      <span>{Math.abs(transferPreview.difference).toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                      <span style={{ fontWeight: 'bold', color: '#166534', fontSize: '1rem' }}>
+                                        <i className="fa-solid fa-wallet"></i> Tiền thừa cộng vào VÍ HỌC VIÊN:
+                                      </span>
+                                      <span style={{ fontWeight: '800', color: '#16a34a', fontSize: '1.25rem' }}>
+                                        +{Math.abs(transferPreview.difference).toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ
+                                      </span>
                                     </div>
                                   )}
                                 </div>
-                              </>
+                              </div>
                             )}
                           </div>
                         )}

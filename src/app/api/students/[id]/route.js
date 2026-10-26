@@ -477,7 +477,13 @@ export async function PUT(request, { params }) {
       const amountPaidOld = oldOrder ? oldOrder.amountPaid : 0;
       const feeToPayOld = oldOrder ? oldOrder.feeToPay : 0;
 
-      const { manualAdjustment, manualReason } = body;
+      const { 
+        manualAdjustment, 
+        manualReason,
+        transferType = 'normal',
+        repeatDiscountType = 'none',
+        repeatDiscountValue = 0
+      } = body;
       const adjVal = parseFloat(manualAdjustment) || 0;
 
       if (adjVal !== 0 && !manualReason) {
@@ -486,8 +492,14 @@ export async function PUT(request, { params }) {
 
       // Tính chi phí buổi đã học ở lớp cũ: (Học phí phải đóng / Tổng số buổi) * Số buổi đã học
       const oldTotalSessions = oldConfig?.totalSessions || 32;
-      const costPerSessionOld = feeToPayOld / oldTotalSessions;
-      const costUsedOld = costPerSessionOld * attendedSessions;
+      let costUsedOld = 0;
+      if (transferType === 'lateral') {
+        // Chuyển ngang trọn gói: Không trừ tiền số buổi đã học ở lớp cũ
+        costUsedOld = 0;
+      } else {
+        const costPerSessionOld = oldTotalSessions > 0 ? (feeToPayOld / oldTotalSessions) : 0;
+        costUsedOld = costPerSessionOld * attendedSessions;
+      }
 
       // Số tiền dư / Công nợ từ lớp cũ
       const financialDifference = amountPaidOld - costUsedOld;
@@ -516,12 +528,30 @@ export async function PUT(request, { params }) {
       const sessionsRemainingNew = Math.max(0, totalSessionsNew - sessionsTaughtNew);
 
       // Tính học phí khấu trừ của lớp mới
-      const costPerSessionNew = newConfig.price / totalSessionsNew;
+      const costPerSessionNew = totalSessionsNew > 0 ? (newConfig.price / totalSessionsNew) : 0;
       const proRatedTuitionNew = costPerSessionNew * sessionsRemainingNew;
+
+      // Tính ưu đãi học lại nếu có
+      let repeatDiscountAmount = 0;
+      if (transferType === 'repeat') {
+        const rVal = parseFloat(repeatDiscountValue) || 0;
+        if (repeatDiscountType === 'percent_30') {
+          repeatDiscountAmount = proRatedTuitionNew * 0.3;
+        } else if (repeatDiscountType === 'percent_50') {
+          repeatDiscountAmount = proRatedTuitionNew * 0.5;
+        } else if (repeatDiscountType === 'free') {
+          repeatDiscountAmount = proRatedTuitionNew;
+        } else if (repeatDiscountType === 'custom_percent') {
+          repeatDiscountAmount = (proRatedTuitionNew * rVal) / 100;
+        } else if (repeatDiscountType === 'custom_vnd') {
+          repeatDiscountAmount = rVal;
+        }
+      }
 
       // Áp dụng chính sách giảm học phí trọn đời của học sinh vào lớp mới
       const specialDiscount = student.specialPolicyValue || 0;
-      const newClassFeeBase = Math.max(0, proRatedTuitionNew - specialDiscount);
+      const totalDiscountNew = repeatDiscountAmount + specialDiscount;
+      const newClassFeeBase = Math.max(0, proRatedTuitionNew - totalDiscountNew);
 
       // Cấn trừ: Hiệu số = Học phí lớp mới (khấu trừ) - Số tiền dư lớp cũ + Công nợ cũ + Điều chỉnh thủ công
       const baseDifference = newClassFeeBase - balanceOld + debtOld;
@@ -578,13 +608,15 @@ export async function PUT(request, { params }) {
 
         const adjNote = adjVal !== 0 ? ` [Điều chỉnh thủ công: ${adjVal.toLocaleString()}đ. Lý do: ${manualReason}]` : '';
         const debtNote = debtOld > 0 ? ` [Nợ cũ: ${Math.round(debtOld).toLocaleString()}đ]` : '';
+        const repeatNote = transferType === 'repeat' && repeatDiscountAmount > 0 ? ` [Ưu đãi học lại: -${Math.round(repeatDiscountAmount).toLocaleString('vi-VN')}đ]` : '';
+        const lateralNote = transferType === 'lateral' ? ` [Chuyển ngang trọn gói]` : '';
 
         await tx.orderFinance.create({
           data: {
             id: orderId,
             studentId: id,
             classCode: newClassCode,
-            promoType: `Chuyển lớp từ ${oldClassCode} (Lớp mới còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${debtNote}${adjNote}`,
+            promoType: `Chuyển lớp từ ${oldClassCode} (Lớp mới còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${repeatNote}${lateralNote}${debtNote}${adjNote}`,
             promoDiscount: balanceOld + (newConfig.price - proRatedTuitionNew) - adjVal - debtOld, // Ghi nhận các khoản cấn trừ và công nợ
             feeToPay: finalFeeToPay,
             amountPaid: finalAmountPaid,

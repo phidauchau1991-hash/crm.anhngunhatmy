@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import ClassSelect from '../components/ClassSelect';
@@ -428,6 +428,94 @@ export default function ExamsPage() {
   const activeConfig = configs.find(c => c.id === parseInt(selectedConfig));
   const selectedClassObj = classes.find(c => c.code === selectedClass);
   const isLevelMismatch = activeConfig && selectedClassObj && activeConfig.level !== selectedClassObj.level;
+  // Helper tính điểm quy đổi hệ 100 và xếp loại thời gian thực
+  const calculateStudentScore = (r, config) => {
+    if (!r || !config) return { processTotal: 0, totalScore: 0, grade: 'D', rank: 0 };
+    const att = parseFloat(r.attendanceScore) || 0;
+    const hw = parseFloat(r.hwScore) || 0;
+    const act = parseFloat(r.activityScore) || 0;
+    const pron = parseFloat(r.pronunciationScore) || 0;
+    const comm = parseFloat(r.communicationScore) || 0;
+    const processTotal = (att + hw + act + pron + comm) / 5;
+    const processContribution = (processTotal / 10) * (config.processWeight || 10);
+
+    const spk = parseFloat(r.speakingScore) || 0;
+    const lis = parseFloat(r.listeningScore) || 0;
+    const rw = parseFloat(r.rwScore) || 0;
+
+    const spkPercent = config.speakingMax > 0 ? (spk / config.speakingMax) * (config.speakingWeight || 30) : 0;
+    const lisPercent = config.listeningMax > 0 ? (lis / config.listeningMax) * (config.listeningWeight || 20) : 0;
+    const rwPercent = config.rwMax > 0 ? (rw / config.rwMax) * (config.rwWeight || 40) : 0;
+
+    const totalScore = Math.round((processContribution + spkPercent + lisPercent + rwPercent) * 10) / 10;
+
+    let grade = 'D';
+    let gradeColor = '#ef4444';
+    let gradeBg = '#fef2f2';
+    if (totalScore >= 98) { grade = 'A+'; gradeColor = '#059669'; gradeBg = '#ecfdf5'; }
+    else if (totalScore >= 95) { grade = 'A'; gradeColor = '#10b981'; gradeBg = '#f0fdf4'; }
+    else if (totalScore >= 90) { grade = 'B+'; gradeColor = '#2563eb'; gradeBg = '#eff6ff'; }
+    else if (totalScore >= 80) { grade = 'B'; gradeColor = '#3b82f6'; gradeBg = '#f0f9ff'; }
+    else if (totalScore >= 75) { grade = 'C+'; gradeColor = '#d97706'; gradeBg = '#fffbeb'; }
+    else if (totalScore >= 65) { grade = 'C'; gradeColor = '#f59e0b'; gradeBg = '#fffbeb'; }
+
+    return {
+      processTotal: Math.round(processTotal * 10) / 10,
+      processContribution: Math.round(processContribution * 10) / 10,
+      spkPercent: Math.round(spkPercent * 10) / 10,
+      lisPercent: Math.round(lisPercent * 10) / 10,
+      rwPercent: Math.round(rwPercent * 10) / 10,
+      totalScore,
+      grade,
+      gradeColor,
+      gradeBg
+    };
+  };
+
+  const studentScoresMap = useMemo(() => {
+    if (!activeConfig || !students.length) return {};
+    const map = {};
+    const list = [];
+    students.forEach(s => {
+      const r = results.find(res => res.studentId === s.id);
+      const scoreInfo = calculateStudentScore(r, activeConfig);
+      map[s.id] = scoreInfo;
+      list.push({ studentId: s.id, totalScore: scoreInfo.totalScore });
+    });
+
+    list.sort((a, b) => b.totalScore - a.totalScore);
+    list.forEach((item, index) => {
+      map[item.studentId].rank = index + 1;
+    });
+    return map;
+  }, [students, results, activeConfig]);
+
+  const classStats = useMemo(() => {
+    if (!activeConfig || !students.length) return null;
+    const validScores = students
+      .map(s => studentScoresMap[s.id]?.totalScore)
+      .filter(sc => sc !== undefined);
+    if (!validScores.length) return null;
+    const avg = Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10;
+    const max = Math.max(...validScores);
+    const topStudent = students.find(s => studentScoresMap[s.id]?.totalScore === max);
+    const countA = students.filter(s => ['A+', 'A'].includes(studentScoresMap[s.id]?.grade)).length;
+    const countB = students.filter(s => ['B+', 'B'].includes(studentScoresMap[s.id]?.grade)).length;
+    const countCD = students.filter(s => ['C+', 'C', 'D'].includes(studentScoresMap[s.id]?.grade)).length;
+    return {
+      total: students.length,
+      avg,
+      max,
+      topStudentName: topStudent?.name || '',
+      countA,
+      countB,
+      countCD,
+      rateA: Math.round((countA / students.length) * 100),
+      rateB: Math.round((countB / students.length) * 100),
+      rateCD: Math.round((countCD / students.length) * 100),
+    };
+  }, [students, studentScoresMap, activeConfig]);
+
 
   return (
     <div className="page-container" style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
@@ -636,7 +724,65 @@ export default function ExamsPage() {
           )}
 
           {students.length > 0 && activeConfig && (
-            <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+            <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+              {/* THANH TỔNG HỢP THỐNG KÊ LỚP */}
+              {classStats && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '1rem',
+                  marginBottom: '1.25rem',
+                  padding: '1rem',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', fontSize: '1.2rem' }}>
+                      <i className="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>SĨ SỐ ĐÁNH GIÁ</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#1e293b' }}>{classStats.total} học viên</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', fontSize: '1.2rem' }}>
+                      <i className="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>ĐIỂM TRUNG BÌNH LỚP</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#16a34a' }}>{classStats.avg} / 100đ</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706', fontSize: '1.2rem' }}>
+                      <i className="fa-solid fa-crown"></i>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>THỦ KHOA LỚP (TOP 1)</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#b45309' }}>
+                        {classStats.topStudentName || 'Chưa có'} {classStats.max > 0 ? `(${classStats.max}đ)` : ''}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed', fontSize: '1.2rem' }}>
+                      <i className="fa-solid fa-award"></i>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>TỶ LỆ XẾP LOẠI</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#5b21b6' }}>
+                        A/A+: {classStats.rateA}% | B/B+: {classStats.rateB}% | C/D: {classStats.rateCD}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
@@ -646,7 +792,8 @@ export default function ExamsPage() {
                         <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#fef3c7' }}>NÓI (Speaking)</th>
                         <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#e0f2fe' }}>NGHE (Listening)</th>
                         <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '15%', background: '#ede9fe' }}>ĐỌC VIẾT (R&W)</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', width: '18%', background: '#dcfce7' }}>Thao tác</th>
+                        <th style={{ padding: '1rem', borderRight: '1px solid #e2e8f0', width: '14%', background: '#f0fdf4', textAlign: 'center' }}>TỔNG ĐIỂM & HẠNG</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', width: '16%', background: '#dcfce7' }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -732,6 +879,60 @@ export default function ExamsPage() {
                                 <input type="text" placeholder="Từ khóa nhận xét..." value={aiKeywords[student.id]?.rw || ''} onChange={e => handleKeywordChange(student.id, 'rw', e.target.value)} style={{ width: '100%', padding: '0.4rem', border: '1px solid #c4b5fd', borderRadius: '4px', fontSize: '0.8rem' }} />
                               </div>
                             </td>
+
+                            {/* CỘT TỔNG ĐIỂM & XẾP HẠNG THỜI GIAN THỰC */}
+                            {(() => {
+                              const sInfo = studentScoresMap[student.id] || { totalScore: 0, grade: 'D', rank: '-' };
+                              return (
+                                <td style={{ padding: '0.75rem', borderRight: '1px solid #e2e8f0', background: '#f8fafc', textAlign: 'center', verticalAlign: 'middle' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                                    {/* Điểm tổng */}
+                                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b' }}>
+                                      {sInfo.totalScore} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'normal' }}>/ 100</span>
+                                    </div>
+                                    
+                                    {/* Huy hiệu xếp loại */}
+                                    <span style={{
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      padding: '0.15rem 0.6rem',
+                                      borderRadius: '12px',
+                                      background: sInfo.gradeBg || '#f1f5f9',
+                                      color: sInfo.gradeColor || '#334155',
+                                      border: `1px solid ${sInfo.gradeColor || '#cbd5e1'}40`
+                                    }}>
+                                      Loại {sInfo.grade}
+                                    </span>
+
+                                    {/* Thứ hạng */}
+                                    <div style={{ marginTop: '0.15rem', fontSize: '0.8rem', fontWeight: '700' }}>
+                                      {sInfo.rank === 1 ? (
+                                        <span style={{ color: '#d97706', background: '#fef3c7', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
+                                          🥇 Hạng 1
+                                        </span>
+                                      ) : sInfo.rank === 2 ? (
+                                        <span style={{ color: '#475569', background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                          🥈 Hạng 2
+                                        </span>
+                                      ) : sInfo.rank === 3 ? (
+                                        <span style={{ color: '#b45309', background: '#ffedd5', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #fed7aa' }}>
+                                          🥉 Hạng 3
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                                          🎖️ Hạng {sInfo.rank}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Chi tiết trọng số nhỏ */}
+                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.1rem' }}>
+                                      QT: {sInfo.processContribution}đ | Thi: {Math.round(((sInfo.spkPercent || 0) + (sInfo.lisPercent || 0) + (sInfo.rwPercent || 0)) * 10) / 10}đ
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })()}
 
                             {/* Actions */}
                             <td style={{ padding: '0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
