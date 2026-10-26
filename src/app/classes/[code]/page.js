@@ -254,18 +254,18 @@ export default function ClassPortalPage() {
                         {g.name}
                         {g.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
                       </td>
-                      <td className="text-center">{g.midTerm?.processTotal ?? '-'}</td>
+                      <td className="text-center">{g.midTerm?.processTotal !== undefined && g.midTerm?.processTotal !== null ? Math.round(g.midTerm.processTotal * 10) / 10 : '-'}</td>
                       <td className="text-center">{g.midTerm?.speakingScore ?? '-'}</td>
                       <td className="text-center">{g.midTerm?.listeningScore ?? '-'}</td>
                       <td className="text-center">{g.midTerm?.rwScore ?? '-'}</td>
-                      <td className="text-center" style={{ fontWeight: 'bold', color: '#ef4444' }}>{g.midTerm?.totalScore ?? '-'}</td>
+                      <td className="text-center" style={{ fontWeight: 'bold', color: '#ef4444' }}>{g.midTerm?.totalScore !== undefined && g.midTerm?.totalScore !== null ? Math.round(g.midTerm.totalScore * 10) / 10 : '-'}</td>
                       <td className="text-center" style={{ fontWeight: 'bold', color: '#3b82f6', borderRight: '1px solid #e2e8f0' }}>{g.midTerm?.grade ?? '-'}</td>
                       
-                      <td className="text-center">{g.finalTerm?.processTotal ?? '-'}</td>
+                      <td className="text-center">{g.finalTerm?.processTotal !== undefined && g.finalTerm?.processTotal !== null ? Math.round(g.finalTerm.processTotal * 10) / 10 : '-'}</td>
                       <td className="text-center">{g.finalTerm?.speakingScore ?? '-'}</td>
                       <td className="text-center">{g.finalTerm?.listeningScore ?? '-'}</td>
                       <td className="text-center">{g.finalTerm?.rwScore ?? '-'}</td>
-                      <td className="text-center" style={{ fontWeight: 'bold', color: '#ef4444' }}>{g.finalTerm?.totalScore ?? '-'}</td>
+                      <td className="text-center" style={{ fontWeight: 'bold', color: '#ef4444' }}>{g.finalTerm?.totalScore !== undefined && g.finalTerm?.totalScore !== null ? Math.round(g.finalTerm.totalScore * 10) / 10 : '-'}</td>
                       <td className="text-center" style={{ fontWeight: 'bold', color: '#3b82f6' }}>{g.finalTerm?.grade ?? '-'}</td>
                     </tr>
                   )
