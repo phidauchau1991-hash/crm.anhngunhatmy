@@ -9,16 +9,18 @@ export function isWeekendSchedule(schedule) {
 export const SHIFT_HOURS_CONFIG = {
   // 1. Các ngày trong tuần (Thứ Hai đến thứ Sáu, ví dụ: 24, 35, 246...)
   WEEKDAY: {
-    Ca1: { shift: 'Ca 1', hours: '17:45 - 19:15', label: 'Ca 1 (17:45 - 19:15)' },
-    Ca2: { shift: 'Ca 2', hours: '19:30 - 21:00', label: 'Ca 2 (19:30 - 21:00)' },
+    Ca1: { shift: 'Ca 1', hours: '17:30 - 19:00', label: 'Ca 1 (17:30 - 19:00)' },
+    Ca2: { shift: 'Ca 2', hours: '19:00 - 20:30', label: 'Ca 2 (19:00 - 20:30)' },
+    Ca3: { shift: 'Ca 3', hours: '17:45 - 19:15', label: 'Ca 3 (17:45 - 19:15)' },
+    Ca4: { shift: 'Ca 4', hours: '19:30 - 21:00', label: 'Ca 4 (19:30 - 21:00)' },
   },
   // 2. Cuối tuần (Thứ Bảy & Chủ Nhật - học sinh tiểu học nghỉ học, học gần như cả ngày)
   WEEKEND: {
-    Ca1: { shift: 'Ca 1', hours: '07:45 - 09:15', label: 'Ca 1 (07:45 - 09:15 - Sáng)' },
+    Ca1: { shift: 'Ca 1', hours: '08:00 - 09:30', label: 'Ca 1 (08:00 - 09:30 - Sáng)' },
     Ca2: { shift: 'Ca 2', hours: '09:30 - 11:00', label: 'Ca 2 (09:30 - 11:00 - Sáng)' },
-    Ca3: { shift: 'Ca 3', hours: '13:45 - 15:15', label: 'Ca 3 (13:45 - 15:15 - Đầu giờ chiều)' },
-    Ca4: { shift: 'Ca 4', hours: '15:30 - 17:00', label: 'Ca 4 (15:30 - 17:00 - Chiều)' },
-    Ca5: { shift: 'Ca 5', hours: '17:00 - 18:30', label: 'Ca 5 (17:00 - 18:30 - Chiều tối)' },
+    Ca3: { shift: 'Ca 3', hours: '15:30 - 17:00', label: 'Ca 3 (15:30 - 17:00 - Chiều)' },
+    Ca4: { shift: 'Ca 4', hours: '17:30 - 19:00', label: 'Ca 4 (17:30 - 19:00 - Chiều tối)' },
+    Ca5: { shift: 'Ca 5', hours: '19:00 - 20:30', label: 'Ca 5 (19:00 - 20:30 - Tối)' },
   }
 };
 
