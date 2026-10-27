@@ -1248,6 +1248,11 @@ export default function StudentsPage() {
                         </td>
                         <td style={{ textAlign: 'right', color: 'var(--color-success)', fontWeight: 'bold' }} title={`Lớp hiện tại: ${student.totalPaid.toLocaleString('vi-VN')}đ | Tích lũy toàn khóa: ${(student.allTimeTotalPaid || student.totalPaid).toLocaleString('vi-VN')}đ`}>
                           {student.totalPaid.toLocaleString('vi-VN')}đ
+                          {student.bookPaidInClass > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '600', marginTop: '1px' }} title="Đã thanh toán tiền giáo trình cho lớp này">
+                              (+Sách: {student.bookPaidInClass.toLocaleString('vi-VN')}đ)
+                            </div>
+                          )}
                           {student.allTimeTotalPaid !== undefined && student.allTimeTotalPaid !== student.totalPaid && (
                             <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'normal', marginTop: '2px' }}>
                               (Toàn khóa: {student.allTimeTotalPaid.toLocaleString('vi-VN')}đ)

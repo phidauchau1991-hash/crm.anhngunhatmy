@@ -87,7 +87,8 @@ export async function GET(request) {
 
     const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
     const currentClassCode = activeEnrollment?.classCode;
-    const currentOrder = currentClassCode ? student.orders.find(o => o.classCode === currentClassCode) : (student.orders[student.orders.length - 1] || null);
+    const tuitionOrders = student.orders.filter(o => !o.id.startsWith('ORD_BK'));
+    const currentOrder = currentClassCode ? tuitionOrders.find(o => o.classCode === currentClassCode) : (tuitionOrders[tuitionOrders.length - 1] || null);
 
     let totalToPay = 0;
     let totalPaid = 0;
@@ -99,7 +100,7 @@ export async function GET(request) {
       totalPaid = currentOrder.amountPaid;
       outstanding = Math.max(0, currentOrder.feeToPay - currentOrder.amountPaid);
     }
-    historicalDebt = student.orders
+    historicalDebt = tuitionOrders
       .filter(o => currentOrder ? o.id !== currentOrder.id : true)
       .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
 

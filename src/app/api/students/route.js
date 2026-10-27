@@ -114,19 +114,23 @@ export async function GET(request) {
       const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
       const targetClassCode = (classCode && classCode !== 'all') ? classCode : activeEnrollment?.classCode;
 
-      // Tìm hóa đơn học phí tương ứng với lớp mục tiêu
+      // Tách bạch hoàn toàn Đơn học phí và Đơn giáo trình/vật tư
+      const tuitionOrders = student.orders.filter(o => !o.id.startsWith('ORD_BK'));
+      const bookOrders = student.orders.filter(o => o.id.startsWith('ORD_BK'));
+
+      // Tìm hóa đơn học phí tương ứng với lớp mục tiêu (loại trừ đơn giáo trình)
       let targetOrder = null;
-      if (targetClassCode && student.orders.length > 0) {
-        const matchingOrders = student.orders.filter(o => o.classCode === targetClassCode);
+      if (targetClassCode && tuitionOrders.length > 0) {
+        const matchingOrders = tuitionOrders.filter(o => o.classCode === targetClassCode);
         if (matchingOrders.length > 0) {
           // Lấy đơn hàng mới nhất của lớp này
           targetOrder = [...matchingOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
         }
       }
 
-      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn hàng, lấy đơn hàng mới nhất
-      if (!targetOrder && student.orders.length > 0) {
-        targetOrder = [...student.orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn học phí khác, lấy đơn học phí mới nhất
+      if (!targetOrder && tuitionOrders.length > 0) {
+        targetOrder = [...tuitionOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
       }
 
       let totalToPay = 0;
@@ -148,12 +152,18 @@ export async function GET(request) {
         }
       }
 
-      // Tính tổng nợ cũ từ các khóa học trước (để hiển thị phụ chú nợ cũ nếu có)
-      const historicalDebt = student.orders
+      // Tiền giáo trình đã mua của lớp mục tiêu (nếu có)
+      const classBookOrders = bookOrders.filter(o => o.classCode === targetClassCode);
+      const bookPaidInClass = classBookOrders.reduce((sum, o) => sum + o.amountPaid, 0);
+
+      // Tính tổng nợ cũ từ các khóa học trước (không tính đơn hiện tại và loại trừ giáo trình)
+      const historicalDebt = tuitionOrders
         .filter(o => targetOrder ? o.id !== targetOrder.id : true)
         .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
 
       // Tích lũy toàn khóa học (toàn bộ lịch sử đóng tại trung tâm)
+      const allTimeTuitionPaid = tuitionOrders.reduce((sum, o) => sum + o.amountPaid, 0);
+      const allTimeBookPaid = bookOrders.reduce((sum, o) => sum + o.amountPaid, 0);
       const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0);
       const allTimeTotalToPay = student.orders.reduce((sum, o) => sum + o.feeToPay, 0);
 
@@ -194,7 +204,11 @@ export async function GET(request) {
         paymentStatus,
         historicalDebt,
         allTimeTotalPaid,
+        allTimeTuitionPaid,
+        allTimeBookPaid,
         allTimeTotalToPay,
+        bookPaidInClass,
+        hasBoughtBook: bookPaidInClass > 0,
         targetOrderId: targetOrder?.id || null,
         targetOrderClass: targetOrder?.classCode || null,
         status: cleanStatus,
