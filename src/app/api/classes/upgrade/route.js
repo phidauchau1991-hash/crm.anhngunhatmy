@@ -120,12 +120,13 @@ export async function POST(request) {
         const specialDiscount = student?.specialPolicyValue || 0;
         const baseNewFee = Math.max(0, newConfig.price - specialDiscount);
         
-        // Cộng dồn nợ cũ vào học phí cần đóng của lớp mới
-        const finalFeeToPay = baseNewFee + oldDebt;
+        // KHÔNG cộng dồn nợ cũ vào học phí cần đóng của lớp mới (tránh làm sai lệch doanh thu và đơn giá khóa học)
+        // Nợ cũ được lưu giữ trên hóa đơn lớp cũ để thu đúng hóa đơn đó.
+        const finalFeeToPay = baseNewFee;
         
         let promoNote = `Lên khóa tự động từ lớp ${oldClassCode} (Khóa ${newLevel})`;
         if (oldDebt > 0) {
-           promoNote += ` [Nợ cũ: ${oldDebt.toLocaleString('vi-VN')}đ]`;
+           promoNote += ` [Nợ cũ lớp trước: ${oldDebt.toLocaleString('vi-VN')}đ]`;
         }
 
         // Tạo hóa đơn học phí cho khóa mới

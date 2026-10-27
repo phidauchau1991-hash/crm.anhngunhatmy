@@ -85,14 +85,25 @@ export async function GET(request) {
       presenceRate = Math.round((totalSessionsAttended / totalSessionsChecked) * 1000) / 10;
     }
 
+    const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
+    const currentClassCode = activeEnrollment?.classCode;
+    const currentOrder = currentClassCode ? student.orders.find(o => o.classCode === currentClassCode) : (student.orders[student.orders.length - 1] || null);
+
     let totalToPay = 0;
     let totalPaid = 0;
-    student.orders.forEach(order => {
-      totalToPay += order.feeToPay;
-      totalPaid += order.amountPaid;
-    });
+    let outstanding = 0;
+    let historicalDebt = 0;
 
-    const outstanding = Math.max(0, totalToPay - totalPaid);
+    if (currentOrder) {
+      totalToPay = currentOrder.feeToPay;
+      totalPaid = currentOrder.amountPaid;
+      outstanding = Math.max(0, currentOrder.feeToPay - currentOrder.amountPaid);
+    }
+    historicalDebt = student.orders
+      .filter(o => currentOrder ? o.id !== currentOrder.id : true)
+      .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
+
+    const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0);
 
     // 4. Format inventory logs
     const inventoryLogs = student.inventoryLogs.map(log => ({
@@ -125,6 +136,8 @@ export async function GET(request) {
           totalToPay,
           totalPaid,
           outstanding,
+          historicalDebt,
+          allTimeTotalPaid,
         },
         enrollments: student.enrollments.map(e => ({
           id: e.id,

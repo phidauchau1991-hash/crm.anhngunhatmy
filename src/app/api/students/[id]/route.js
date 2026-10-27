@@ -181,15 +181,28 @@ export async function PUT(request, { params }) {
       const updatedOrders = [];
 
       await prisma.$transaction(async (tx) => {
-        // 1. Thu tiền học phí theo thứ tự FIFO
+        // 1. Thu tiền học phí (Ưu tiên đơn hàng chỉ định targetOrderId, sau đó theo thứ tự FIFO)
         if (tuitionPayment > 0) {
-          const unpaidOrders = await tx.orderFinance.findMany({
+          let unpaidOrders = [];
+          if (body.targetOrderId) {
+            const specificOrder = await tx.orderFinance.findUnique({
+              where: { id: body.targetOrderId }
+            });
+            if (specificOrder && (specificOrder.feeToPay - specificOrder.amountPaid > 0)) {
+              unpaidOrders.push(specificOrder);
+            }
+          }
+
+          const otherUnpaidOrders = await tx.orderFinance.findMany({
             where: {
               studentId: id,
+              id: body.targetOrderId ? { not: body.targetOrderId } : undefined,
               paymentStatus: { in: ['Chưa đóng', 'Chưa đóng đủ'] },
             },
             orderBy: { createdAt: 'asc' },
           });
+
+          unpaidOrders = [...unpaidOrders, ...otherUnpaidOrders];
 
           let remainingPayment = tuitionPayment;
           for (const order of unpaidOrders) {
@@ -474,7 +487,9 @@ export async function PUT(request, { params }) {
 
       // Hóa đơn của lớp cũ để xem thực đóng
       const oldOrder = student.orders.find(o => o.classCode === oldClassCode);
-      const amountPaidOld = oldOrder ? oldOrder.amountPaid : 0;
+      const amountPaidOld = (body.overrideAmountPaidOld !== undefined && body.overrideAmountPaidOld !== null && body.overrideAmountPaidOld !== '')
+        ? parseFloat(body.overrideAmountPaidOld)
+        : (oldOrder ? oldOrder.amountPaid : 0);
       const feeToPayOld = oldOrder ? oldOrder.feeToPay : 0;
 
       const { 
@@ -490,15 +505,16 @@ export async function PUT(request, { params }) {
         return NextResponse.json({ success: false, error: 'Lý do điều chỉnh là bắt buộc khi có điền số tiền điều chỉnh thủ công' }, { status: 400 });
       }
 
-      // Tính chi phí buổi đã học ở lớp cũ: (Học phí phải đóng / Tổng số buổi) * Số buổi đã học
+      // Tính chi phí buổi đã học ở lớp cũ: (Học phí của lớp / Tổng số buổi) * Số buổi đã học
       const oldTotalSessions = oldConfig?.totalSessions || 32;
       let costUsedOld = 0;
       if (transferType === 'lateral') {
         // Chuyển ngang trọn gói: Không trừ tiền số buổi đã học ở lớp cũ
         costUsedOld = 0;
       } else {
-        const costPerSessionOld = oldTotalSessions > 0 ? (feeToPayOld / oldTotalSessions) : 0;
-        costUsedOld = costPerSessionOld * attendedSessions;
+        const baseOldFee = feeToPayOld > 0 ? feeToPayOld : (oldConfig?.price || 0);
+        const costPerSessionOld = oldTotalSessions > 0 ? (baseOldFee / oldTotalSessions) : 0;
+        costUsedOld = Math.round(costPerSessionOld * attendedSessions);
       }
 
       // Số tiền dư / Công nợ từ lớp cũ
@@ -617,7 +633,7 @@ export async function PUT(request, { params }) {
             studentId: id,
             classCode: newClassCode,
             promoType: `Chuyển lớp từ ${oldClassCode} (Lớp mới còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${repeatNote}${lateralNote}${debtNote}${adjNote}`,
-            promoDiscount: balanceOld + (newConfig.price - proRatedTuitionNew) - adjVal - debtOld, // Ghi nhận các khoản cấn trừ và công nợ
+            promoDiscount: balanceOld + repeatDiscountAmount + specialDiscount + (newConfig.price - proRatedTuitionNew) + (adjVal < 0 ? Math.abs(adjVal) : 0), // Ghi nhận các khoản cấn trừ và ưu đãi
             feeToPay: finalFeeToPay,
             amountPaid: finalAmountPaid,
             paymentStatus: finalFeeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',

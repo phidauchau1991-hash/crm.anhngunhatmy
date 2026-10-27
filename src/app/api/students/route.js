@@ -107,17 +107,37 @@ export async function GET(request) {
       },
     });
 
-    // Tính toán trạng thái thanh toán và thông tin hiển thị cho từng học viên
+    // Tính toán trạng thái thanh toán và thông tin hiển thị cho từng học viên theo ngữ cảnh lớp học
     const formattedStudents = students.map((student) => {
-      let paymentStatus = 'Chưa đóng';
+      // Xác định lớp học mục tiêu theo ngữ cảnh: Nếu có lọc classCode cụ thể thì dùng classCode đó,
+      // ngược lại dùng lớp đang học (status = 'Đang học') hoặc lớp đầu tiên trong danh sách enrollment
+      const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
+      const targetClassCode = (classCode && classCode !== 'all') ? classCode : activeEnrollment?.classCode;
+
+      // Tìm hóa đơn học phí tương ứng với lớp mục tiêu
+      let targetOrder = null;
+      if (targetClassCode && student.orders.length > 0) {
+        const matchingOrders = student.orders.filter(o => o.classCode === targetClassCode);
+        if (matchingOrders.length > 0) {
+          // Lấy đơn hàng mới nhất của lớp này
+          targetOrder = [...matchingOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        }
+      }
+
+      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn hàng, lấy đơn hàng mới nhất
+      if (!targetOrder && student.orders.length > 0) {
+        targetOrder = [...student.orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+      }
+
       let totalToPay = 0;
       let totalPaid = 0;
+      let debt = 0;
+      let paymentStatus = 'Chưa đóng';
 
-      if (student.orders.length > 0) {
-        student.orders.forEach((order) => {
-          totalToPay += order.feeToPay;
-          totalPaid += order.amountPaid;
-        });
+      if (targetOrder) {
+        totalToPay = targetOrder.feeToPay;
+        totalPaid = targetOrder.amountPaid;
+        debt = Math.max(0, targetOrder.feeToPay - targetOrder.amountPaid);
 
         if (totalPaid >= totalToPay && totalToPay > 0) {
           paymentStatus = 'Đã đóng đủ';
@@ -127,6 +147,15 @@ export async function GET(request) {
           paymentStatus = 'Chưa đóng';
         }
       }
+
+      // Tính tổng nợ cũ từ các khóa học trước (để hiển thị phụ chú nợ cũ nếu có)
+      const historicalDebt = student.orders
+        .filter(o => targetOrder ? o.id !== targetOrder.id : true)
+        .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
+
+      // Tích lũy toàn khóa học (toàn bộ lịch sử đóng tại trung tâm)
+      const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0);
+      const allTimeTotalToPay = student.orders.reduce((sum, o) => sum + o.feeToPay, 0);
 
       // Format hiển thị chính sách miễn giảm
       let displayPolicy = 'Không';
@@ -155,14 +184,19 @@ export async function GET(request) {
         specialPolicyType: student.specialPolicyType || 'Không giảm',
         specialPolicyValue: student.specialPolicyValue || 0,
         referralCode: student.referralCode || 'N/A',
-        classCode: student.enrollments[0]?.classCode || 'Chưa xếp lớp',
+        classCode: targetClassCode || student.enrollments[0]?.classCode || 'Chưa xếp lớp',
         className: student.enrollments[0]?.class?.teacherName 
           ? `${student.enrollments[0]?.classCode} (${student.enrollments[0]?.class?.teacherName})`
           : 'Chưa xếp lớp',
         totalToPay,
         totalPaid,
-        debt: totalToPay - totalPaid,
+        debt,
         paymentStatus,
+        historicalDebt,
+        allTimeTotalPaid,
+        allTimeTotalToPay,
+        targetOrderId: targetOrder?.id || null,
+        targetOrderClass: targetOrder?.classCode || null,
         status: cleanStatus,
         walletBalance: student.walletBalance || 0,
         callbackDate: student.callbackDate,

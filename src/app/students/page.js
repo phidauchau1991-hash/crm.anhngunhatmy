@@ -298,6 +298,7 @@ export default function StudentsPage() {
         setEditStudentData(result.data);
         
         const std = result.data.student;
+        const currentClassPaid = result.data.currentClass?.amountPaid || 0;
         setEditForm({
           name: std.name || '',
           phone: std.phone || '',
@@ -316,6 +317,13 @@ export default function StudentsPage() {
           billingType: result.data.currentClass?.billingType || 'COURSE',
           monthlyRate: result.data.currentClass?.monthlyRate || '',
           monthlySessions: result.data.currentClass?.monthlySessions || '',
+          transferType: 'normal',
+          repeatDiscountType: 'percent_30',
+          repeatDiscountAmount: '',
+          repeatDiscountPercent: '',
+          overrideAmountPaidOld: formatNumber(currentClassPaid),
+          manualAdjustment: '',
+          manualReason: '',
         });
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -389,20 +397,44 @@ export default function StudentsPage() {
 
     if (!newClass || !newConfig) return;
 
+    const totalSessionsNew = newClass.totalSessions || 32;
+    const sessionsRemainingNew = newClass.sessionsRemaining !== undefined ? newClass.sessionsRemaining : totalSessionsNew;
     // Đơn giá 1 buổi mới = Học phí gốc / Tổng số buổi mới
-    const costPerSessionNew = newConfig.price / newClass.totalSessions;
+    const costPerSessionNew = totalSessionsNew > 0 ? (newConfig.price / totalSessionsNew) : 0;
     // Học phí lớp mới chỉ tính cho số buổi còn lại
-    const proRatedPriceNew = costPerSessionNew * newClass.sessionsRemaining;
+    const proRatedPriceNew = costPerSessionNew * sessionsRemainingNew;
+
+    // Tính ưu đãi học lại nếu có
+    let repeatDiscountAmount = 0;
+    if (editForm.transferType === 'repeat') {
+      if (editForm.repeatDiscountType === 'percent_30') {
+        repeatDiscountAmount = proRatedPriceNew * 0.3;
+      } else if (editForm.repeatDiscountType === 'percent_50') {
+        repeatDiscountAmount = proRatedPriceNew * 0.5;
+      } else if (editForm.repeatDiscountType === 'free') {
+        repeatDiscountAmount = proRatedPriceNew;
+      } else if (editForm.repeatDiscountType === 'custom_percent') {
+        repeatDiscountAmount = (proRatedPriceNew * (parseFloat(editForm.repeatDiscountPercent) || 0)) / 100;
+      } else if (editForm.repeatDiscountType === 'custom_vnd') {
+        repeatDiscountAmount = parseNumber(editForm.repeatDiscountAmount);
+      }
+    }
 
     // Học phí lớp mới (sau khi áp dụng ưu đãi đặc biệt của học sinh nếu có)
     const specialDiscount = parseNumber(editForm.specialPolicyValue);
-    const newClassFeeBase = Math.max(0, proRatedPriceNew - specialDiscount);
+    const totalDiscountNew = repeatDiscountAmount + specialDiscount;
+    const newClassFeeBase = Math.max(0, proRatedPriceNew - totalDiscountNew);
 
     if (!editStudentData?.currentClass) {
       // Học viên chưa có lớp -> Xem trước học phí xếp lớp ban đầu (khấu trừ)
       setTransferPreview({
         isInitial: true,
+        priceNew: newConfig.price,
+        proRatedPriceNew,
+        repeatDiscountAmount,
+        specialDiscount,
         newClassFeeBase,
+        difference: newClassFeeBase,
         selectedClassInfo: newClass,
       });
       return;
@@ -410,12 +442,19 @@ export default function StudentsPage() {
 
     const currentClass = editStudentData.currentClass;
 
-    // Chi phí lớp cũ đã học: (Học phí phải đóng / Tổng số buổi cũ) * Số buổi đã học
-    const costPerSessionOld = currentClass.feeToPay / currentClass.totalSessions;
-    const costUsedOld = costPerSessionOld * currentClass.attendedSessions;
+    // Số tiền thực đóng lớp cũ (lấy giá trị người dùng nhập ghi đè nếu có, hoặc mặc định từ currentClass)
+    const amountPaidOld = editForm.overrideAmountPaidOld !== undefined && editForm.overrideAmountPaidOld !== ''
+      ? parseNumber(editForm.overrideAmountPaidOld)
+      : (currentClass.amountPaid || 0);
+
+    const oldTotalSessions = currentClass.totalSessions || 32;
+    // Chi phí buổi học lớp cũ: (Học phí gốc / Tổng số buổi cũ) * Số buổi đã học
+    const baseOldFee = currentClass.feeToPay > 0 ? currentClass.feeToPay : (currentClass.price || 0);
+    const costPerSessionOld = oldTotalSessions > 0 ? (baseOldFee / oldTotalSessions) : 0;
+    const costUsedOld = editForm.transferType === 'lateral' ? 0 : Math.round(costPerSessionOld * (currentClass.attendedSessions || 0));
 
     // Tiền dư lớp cũ còn lại / Nợ cũ
-    const financialDifference = currentClass.amountPaid - costUsedOld;
+    const financialDifference = amountPaidOld - costUsedOld;
     const balanceOld = financialDifference > 0 ? financialDifference : 0;
     const debtOld = financialDifference < 0 ? Math.abs(financialDifference) : 0;
 
@@ -425,16 +464,35 @@ export default function StudentsPage() {
 
     setTransferPreview({
       isInitial: false,
-      attendedSessions: currentClass.attendedSessions,
+      amountPaidOld,
+      attendedSessions: currentClass.attendedSessions || 0,
+      totalSessionsOld: oldTotalSessions,
       costUsedOld,
       balanceOld,
       debtOld,
+      priceNew: newConfig.price,
+      proRatedPriceNew,
+      repeatDiscountAmount,
+      specialDiscount,
       newClassFeeBase,
       difference,
       selectedClassInfo: newClass,
       manualAdj,
     });
-  }, [editForm.newClassCode, editTab, editStudentData, courseConfigs, classes, editForm.specialPolicyValue, editForm.manualAdjustment]);
+  }, [
+    editForm.newClassCode,
+    editTab,
+    editStudentData,
+    courseConfigs,
+    classes,
+    editForm.specialPolicyValue,
+    editForm.manualAdjustment,
+    editForm.transferType,
+    editForm.repeatDiscountType,
+    editForm.repeatDiscountAmount,
+    editForm.repeatDiscountPercent,
+    editForm.overrideAmountPaidOld
+  ]);
 
   // Submit chỉnh sửa học viên (Phân loại theo Action)
   const handleEditSubmit = async (e, actionType) => {
@@ -471,12 +529,25 @@ export default function StudentsPage() {
         monthlySessions: parseInt(editForm.monthlySessions, 10) || null,
       };
     } else if (actionType === 'transfer') {
+      let repeatDiscountVal = 0;
+      if (editForm.repeatDiscountType === 'custom_vnd') {
+        repeatDiscountVal = parseNumber(editForm.repeatDiscountAmount);
+      } else if (editForm.repeatDiscountType === 'custom_percent') {
+        repeatDiscountVal = parseFloat(editForm.repeatDiscountPercent) || 0;
+      }
+
       payload = {
         ...payload,
         action: 'classTransfer',
         newClassCode: editForm.newClassCode,
+        transferType: editForm.transferType || 'normal',
+        repeatDiscountType: editForm.repeatDiscountType || 'none',
+        repeatDiscountValue: repeatDiscountVal,
         manualAdjustment: parseNumber(editForm.manualAdjustment),
         manualReason: editForm.manualReason,
+        overrideAmountPaidOld: editForm.overrideAmountPaidOld !== undefined && editForm.overrideAmountPaidOld !== ''
+          ? parseNumber(editForm.overrideAmountPaidOld)
+          : undefined,
       };
     } else if (actionType === 'reserve') {
       payload = {
@@ -1169,9 +1240,19 @@ export default function StudentsPage() {
                         <td className="policy-cell">{student.specialPolicy}</td>
                         <td style={{ textAlign: 'right', fontWeight: 'bold', color: student.debt > 0 ? 'var(--color-danger)' : 'var(--color-text)' }}>
                           {student.debt.toLocaleString('vi-VN')}đ
+                          {student.historicalDebt > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#c05621', fontWeight: '600', marginTop: '2px' }} title="Công nợ đọng từ các khóa học trước">
+                              (+Nợ cũ: {student.historicalDebt.toLocaleString('vi-VN')}đ)
+                            </div>
+                          )}
                         </td>
-                        <td style={{ textAlign: 'right', color: 'var(--color-success)', fontWeight: 'bold' }}>
+                        <td style={{ textAlign: 'right', color: 'var(--color-success)', fontWeight: 'bold' }} title={`Lớp hiện tại: ${student.totalPaid.toLocaleString('vi-VN')}đ | Tích lũy toàn khóa: ${(student.allTimeTotalPaid || student.totalPaid).toLocaleString('vi-VN')}đ`}>
                           {student.totalPaid.toLocaleString('vi-VN')}đ
+                          {student.allTimeTotalPaid !== undefined && student.allTimeTotalPaid !== student.totalPaid && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'normal', marginTop: '2px' }}>
+                              (Toàn khóa: {student.allTimeTotalPaid.toLocaleString('vi-VN')}đ)
+                            </div>
+                          )}
                         </td>
                         <td style={{ textAlign: 'right', color: 'var(--color-primary-dark)', fontWeight: 'bold' }}>
                           {student.walletBalance ? `${student.walletBalance.toLocaleString('vi-VN')}đ` : '0đ'}
@@ -1771,7 +1852,21 @@ export default function StudentsPage() {
                           <div className="transfer-summary-box">
                             <p><strong>Lớp hiện tại:</strong> {editStudentData.currentClass.classCode} ({editStudentData.currentClass.level})</p>
                             <p><strong>Số buổi đã học (Điểm danh có mặt):</strong> {editStudentData.currentClass.attendedSessions} / {editStudentData.currentClass.totalSessions} buổi</p>
-                            <p><strong>Đã đóng học phí lớp cũ:</strong> {editStudentData.currentClass.amountPaid.toLocaleString()}đ</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: '600', color: 'var(--color-text)' }}>Thực đóng lớp cũ:</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <input
+                                  type="text"
+                                  name="overrideAmountPaidOld"
+                                  value={editForm.overrideAmountPaidOld || ''}
+                                  onChange={handleEditCurrencyChange}
+                                  placeholder="VD: 1.750.000"
+                                  style={{ width: '150px', padding: '0.35rem 0.6rem', fontWeight: 'bold', color: '#059669', borderRadius: '6px', border: '1px solid #10b981', background: '#fff' }}
+                                />
+                                <span style={{ fontWeight: 'bold' }}>đ</span>
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>(Có thể chỉnh sửa nếu cần đối soát lại với thực tế)</span>
+                            </div>
                           </div>
                         ) : (
                           <div className="alert-box alert-info" style={{ margin: '0 0 1rem 0' }}>
@@ -1912,8 +2007,14 @@ export default function StudentsPage() {
                                     <span>Thực đóng: {(transferPreview.amountPaidOld || 0).toLocaleString()}đ</span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                                    <span>{editForm.transferType === 'lateral' ? 'Chuyển ngang trọn gói (Không tính tiền buổi cũ)' : `Đã học: ${transferPreview.attendedSessions} buổi (Tiêu dùng: ${transferPreview.costUsedOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ)`}</span>
-                                    <strong style={{ color: '#059669' }}>Dư chuyển đi: +{transferPreview.balanceOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</strong>
+                                    <span>{editForm.transferType === 'lateral' ? 'Chuyển ngang trọn gói (Không tính tiền buổi cũ)' : `Đã học: ${transferPreview.attendedSessions}/${transferPreview.totalSessionsOld || 32} buổi (Tiêu dùng: ${transferPreview.costUsedOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ)`}</span>
+                                    {transferPreview.balanceOld > 0 ? (
+                                      <strong style={{ color: '#059669' }}>Dư chuyển đi: +{transferPreview.balanceOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</strong>
+                                    ) : transferPreview.debtOld > 0 ? (
+                                      <strong style={{ color: '#dc2626' }}>Nợ chuyển tiếp: +{transferPreview.debtOld.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</strong>
+                                    ) : (
+                                      <strong style={{ color: '#64748b' }}>Đã hoàn tất (0đ)</strong>
+                                    )}
                                   </div>
                                 </div>
 
