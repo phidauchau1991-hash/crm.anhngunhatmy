@@ -78,7 +78,12 @@ export async function POST(request) {
       where: { code: classCode }
     });
 
-    const upsertPromises = results.map(async (r) => {
+    const validResults = results.filter(r => r && r.studentId);
+    if (validResults.length === 0) {
+      return NextResponse.json({ success: false, error: 'Không có dữ liệu học viên hợp lệ (thiếu studentId)' }, { status: 400 });
+    }
+
+    const upsertPromises = validResults.map(async (r) => {
       // TỰ ĐỘNG ĐIỀU HƯỚNG VỀ LỚP CŨ NẾU LEVEL ĐỀ THI KHÁC LEVEL LỚP HIỆN TẠI
       let actualClassCode = classCode;
       if (targetClass && targetClass.level !== config.level) {

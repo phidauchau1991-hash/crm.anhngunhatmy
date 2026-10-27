@@ -55,6 +55,7 @@ export default function ExamsPage() {
   const [isGeneratingAi, setIsGeneratingAi] = useState({}); // track loading per student
   const [bilingualMode, setBilingualMode] = useState(false); // Tùy chọn song ngữ Việt-Anh
   const [previewModalData, setPreviewModalData] = useState(null); // { student, ...result } for AI comment review/edit
+  const [isSavingModalComment, setIsSavingModalComment] = useState(false);
   const [noticeMode, setNoticeMode] = useState('general'); // 'general' or 'personalized'
   const [studentNotices, setStudentNotices] = useState({}); // { [studentId]: { selected, discount, isGiftBook } }
   const [previewStudentId, setPreviewStudentId] = useState(null);
@@ -166,7 +167,7 @@ export default function ExamsPage() {
         // Merge existing results or initialize empty
         const initialResults = clsData.data.map(student => {
           const existing = resData.data?.find(r => r.studentId === student.id);
-          return existing || {
+          return existing ? { ...existing, studentId: student.id } : {
             studentId: student.id,
             attendanceScore: 10,
             hwScore: 10,
@@ -235,12 +236,50 @@ export default function ExamsPage() {
       });
       const data = await res.json();
       if (data.success && data.data) {
-        handleResultChange(student.id, 'commentSpeaking', data.data.speaking);
-        handleResultChange(student.id, 'commentListening', data.data.listening);
-        handleResultChange(student.id, 'commentRW', data.data.rw);
-        handleResultChange(student.id, 'commentDev', data.data.dev);
+        const currentResult = results.find(r => r.studentId === student.id) || { studentId: student.id };
+        const updatedRes = {
+          ...currentResult,
+          studentId: student.id,
+          commentSpeaking: data.data.speaking || '',
+          commentListening: data.data.listening || '',
+          commentRW: data.data.rw || '',
+          commentDev: data.data.dev || '',
+        };
+
+        // Cập nhật State React ngay lập tức
+        setResults(prev => prev.map(r => r.studentId === student.id ? updatedRes : r));
+
+        // Tự động lưu ngầm ngay vào cơ sở dữ liệu (Auto-Save on AI generate)
+        try {
+          const autoSaveRes = await fetch('/api/exams/result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              classCode: selectedClass,
+              configId: selectedConfig,
+              examDate: examDate,
+              results: [{
+                ...updatedRes,
+                studentId: student.id,
+                keywordSpeaking: studentKeywords.speaking || '',
+                keywordListening: studentKeywords.listening || '',
+                keywordRW: studentKeywords.rw || ''
+              }]
+            })
+          });
+          const autoSaveData = await autoSaveRes.json();
+          if (autoSaveRes.ok && autoSaveData.success) {
+            setMessage({ type: 'success', text: `✨ Đã sinh và tự động lưu nhận xét thành công cho ${student.name}!` });
+          } else {
+            console.warn("Lưu ngầm nhận xét:", autoSaveData.error);
+            setMessage({ type: 'success', text: `✨ Đã sinh nhận xét cho ${student.name} (Hãy bấm Lưu Bảng Điểm để lưu lại)` });
+          }
+        } catch(autoSaveErr) {
+          console.error("Lỗi tự động lưu ngầm nhận xét:", autoSaveErr);
+        }
+        setTimeout(() => setMessage(null), 3000);
       } else {
-        alert('Lỗi khi sinh nhận xét: ' + data.error);
+        alert('Lỗi khi sinh nhận xét: ' + (data.error || 'Vui lòng thử lại'));
       }
     } catch (error) {
       alert('Lỗi kết nối AI');
@@ -254,6 +293,7 @@ export default function ExamsPage() {
     try {
       const payloadResults = results.map(r => ({
         ...r,
+        studentId: r.studentId,
         keywordSpeaking: aiKeywords[r.studentId]?.speaking || '',
         keywordListening: aiKeywords[r.studentId]?.listening || '',
         keywordRW: aiKeywords[r.studentId]?.rw || ''
@@ -270,13 +310,13 @@ export default function ExamsPage() {
         })
       });
       const data = await res.json();
-      if (data.success) {
-        setMessage({ type: 'success', text: 'Đã lưu điểm thi thành công!' });
+      if (res.ok && data.success) {
+        setMessage({ type: 'success', text: '💾 Đã lưu toàn bộ bảng điểm và nhận xét thành công!' });
       } else {
-        setMessage({ type: 'error', text: data.error });
+        setMessage({ type: 'error', text: data.error || 'Lỗi khi lưu bảng điểm' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Lỗi kết nối' });
+      setMessage({ type: 'error', text: 'Lỗi kết nối máy chủ' });
     } finally {
       setIsSavingResults(false);
       setTimeout(() => setMessage(null), 3000);
@@ -936,7 +976,35 @@ export default function ExamsPage() {
 
                             {/* Actions */}
                             <td style={{ padding: '0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', width: '100%' }}>
+                                {/* Trạng thái nhận xét (Visual Status Badge) */}
+                                {(() => {
+                                  const hasSpk = !!(r.commentSpeaking && r.commentSpeaking.trim());
+                                  const hasLis = !!(r.commentListening && r.commentListening.trim());
+                                  const hasRW = !!(r.commentRW && r.commentRW.trim());
+                                  const hasDev = !!(r.commentDev && r.commentDev.trim());
+                                  const count = [hasSpk, hasLis, hasRW, hasDev].filter(Boolean).length;
+                                  if (count === 4) {
+                                    return (
+                                      <div style={{ fontSize: '0.72rem', fontWeight: '700', padding: '0.2rem 0.4rem', borderRadius: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                        <i className="fa-solid fa-circle-check"></i> Đã có nhận xét (4/4)
+                                      </div>
+                                    );
+                                  } else if (count > 0) {
+                                    return (
+                                      <div style={{ fontSize: '0.72rem', fontWeight: '700', padding: '0.2rem 0.4rem', borderRadius: '4px', background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                        <i className="fa-solid fa-pen-to-square"></i> Đang nhận xét ({count}/4)
+                                      </div>
+                                    );
+                                  } else {
+                                    return (
+                                      <div style={{ fontSize: '0.72rem', fontWeight: '500', padding: '0.2rem 0.4rem', borderRadius: '4px', background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                        <i className="fa-regular fa-comment-dots"></i> Chưa có nhận xét
+                                      </div>
+                                    );
+                                  }
+                                })()}
+
                                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', color: bilingualMode ? '#2563eb' : '#94a3b8' }}>
                                     <input type="checkbox" checked={bilingualMode} onChange={e => setBilingualMode(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: '#2563eb' }} />
@@ -953,7 +1021,7 @@ export default function ExamsPage() {
                                 </div>
                                 
                                 <button 
-                                  onClick={() => setPreviewModalData({ student, ...r })}
+                                  onClick={() => setPreviewModalData({ ...r, student, studentId: student.id })}
                                   style={{ width: '100%', background: '#10b981', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }} 
                                 >
                                   <i className="fa-solid fa-eye"></i> Xem / Sửa
@@ -1077,7 +1145,7 @@ export default function ExamsPage() {
               {/* Score Report */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h4 style={{ margin: 0, color: '#334155' }}>📋 Bảng Điểm Cuối Khóa</h4>
+                  <h4 style={{ margin: 0, color: '#334155' }}>📋 Bảng Điểm {configs.find(c => c.id === parseInt(selectedConfig))?.examType || 'Khóa Học'}</h4>
                   <button onClick={() => {
                      const el = document.getElementById(`modal-score-report-${previewModalData.student.id}`);
                      if(el) {
@@ -1103,26 +1171,36 @@ export default function ExamsPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-              <button onClick={() => setPreviewModalData(null)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>
+              <button 
+                onClick={() => setPreviewModalData(null)} 
+                disabled={isSavingModalComment}
+                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: isSavingModalComment ? 'not-allowed' : 'pointer', fontWeight: 'bold', color: '#64748b' }}
+              >
                 Hủy bỏ
               </button>
               <button 
+                disabled={isSavingModalComment}
                 onClick={async () => {
+                  const targetStudentId = previewModalData.student?.id || previewModalData.studentId;
+                  if (!targetStudentId) {
+                    alert("Lỗi: Không tìm thấy mã học viên. Vui lòng đóng bảng và mở lại!");
+                    return;
+                  }
+
+                  setIsSavingModalComment(true);
+                  const currentRes = results.find(res => res.studentId === targetStudentId) || {};
                   const updatedRes = {
-                    ...results.find(res => res.studentId === previewModalData.student.id),
-                    commentSpeaking: previewModalData.commentSpeaking,
-                    commentListening: previewModalData.commentListening,
-                    commentRW: previewModalData.commentRW,
-                    commentDev: previewModalData.commentDev,
+                    ...currentRes,
+                    studentId: targetStudentId,
+                    commentSpeaking: previewModalData.commentSpeaking || '',
+                    commentListening: previewModalData.commentListening || '',
+                    commentRW: previewModalData.commentRW || '',
+                    commentDev: previewModalData.commentDev || '',
                   };
-                  
-                  // Update UI immediately
-                  setResults(results.map(res => res.studentId === previewModalData.student.id ? updatedRes : res));
-                  setPreviewModalData(null);
                   
                   // Save to Database immediately
                   try {
-                    await fetch('/api/exams/result', {
+                    const saveRes = await fetch('/api/exams/result', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
@@ -1131,21 +1209,37 @@ export default function ExamsPage() {
                         examDate: examDate,
                         results: [{
                           ...updatedRes,
-                          keywordSpeaking: aiKeywords[updatedRes.studentId]?.speaking || '',
-                          keywordListening: aiKeywords[updatedRes.studentId]?.listening || '',
-                          keywordRW: aiKeywords[updatedRes.studentId]?.rw || ''
+                          studentId: targetStudentId,
+                          keywordSpeaking: aiKeywords[targetStudentId]?.speaking || '',
+                          keywordListening: aiKeywords[targetStudentId]?.listening || '',
+                          keywordRW: aiKeywords[targetStudentId]?.rw || ''
                         }]
                       })
                     });
-                    setMessage({ type: 'success', text: 'Đã lưu nhận xét thành công!' });
-                    setTimeout(() => setMessage(null), 3000);
+                    const saveData = await saveRes.json();
+                    if (saveRes.ok && saveData.success) {
+                      // Update UI state immediately
+                      setResults(prev => prev.map(res => res.studentId === targetStudentId ? updatedRes : res));
+                      setPreviewModalData(null);
+                      setMessage({ type: 'success', text: `💾 Đã lưu nhận xét thành công cho ${previewModalData.student?.name || 'học viên'}!` });
+                      setTimeout(() => setMessage(null), 3000);
+                    } else {
+                      alert('Lỗi khi lưu nhận xét: ' + (saveData.error || 'Vui lòng kiểm tra lại kết nối'));
+                    }
                   } catch(e) {
-                    console.error("Lỗi lưu nhận xét", e);
+                    console.error("Lỗi lưu nhận xét:", e);
+                    alert('Lỗi kết nối máy chủ khi lưu nhận xét: ' + e.message);
+                  } finally {
+                    setIsSavingModalComment(false);
                   }
                 }} 
-                style={{ padding: '10px 25px', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}
+                style={{ padding: '10px 25px', borderRadius: '8px', border: 'none', background: isSavingModalComment ? '#94a3b8' : 'var(--color-primary)', color: 'white', cursor: isSavingModalComment ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                💾 Cập nhật & Hoàn thiện Nhận xét
+                {isSavingModalComment ? (
+                  <><i className="fa-solid fa-spinner fa-spin"></i> Đang lưu vào hệ thống...</>
+                ) : (
+                  <><i className="fa-solid fa-save"></i> 💾 Cập nhật & Lưu Nhận xét</>
+                )}
               </button>
             </div>
           </div>
