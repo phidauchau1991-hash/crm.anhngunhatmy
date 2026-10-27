@@ -31,6 +31,7 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
     finalAmount,
     transferContent,
     qrUrl,
+    qrDataUrl,
     orderTotalFee,
     orderPaidAmount,
     installmentAmount
@@ -376,11 +377,15 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
                 <div style={{ fontWeight: 'bold', color: '#0d88c4', marginBottom: '8px', fontSize: '13px', letterSpacing: '0.5px' }}>
                   QUÉT ĐỂ THANH TOÁN
                 </div>
-                {qrUrl ? (
-                  <img src={qrUrl} alt="VietQR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} crossOrigin="anonymous" />
+                {(qrDataUrl || qrUrl) ? (
+                  <img 
+                    src={qrDataUrl || qrUrl} 
+                    alt="VietQR" 
+                    style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} 
+                  />
                 ) : (
-                  <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                    VietQR Code
+                  <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    Đang tạo mã QR...
                   </div>
                 )}
                 <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>

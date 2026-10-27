@@ -53,6 +53,10 @@ export default function TuitionNoticeAction({ student }) {
   const [dueDate, setDueDate] = useState('');
   const [transferContent, setTransferContent] = useState('');
 
+  // TRỌNG TÂM 3: Mã VietQR Base64 (PNG) chống lỗi CORS và hiển thị 100%
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [isQrLoading, setIsQrLoading] = useState(false);
+
   // 1. Fetch dữ liệu lớp học và cấu hình khi mở Modal
   useEffect(() => {
     if (isModalOpen && classes.length === 0) {
@@ -244,10 +248,58 @@ export default function TuitionNoticeAction({ student }) {
   // Parse danh sách quà tặng
   const giftsArray = giftsText.split(',').map(s => s.trim()).filter(Boolean);
 
-  // TRỌNG TÂM 3: Tự động sinh mã VietQR đúng finalAmount và transferContent
+  // TRỌNG TÂM 3: Tự động tải mã VietQR Base64 (PNG) từ server để đảm bảo hiển thị 100% không bị chặn CORS
+  useEffect(() => {
+    if (finalAmount <= 0 || !transferContent) {
+      setQrDataUrl('');
+      return;
+    }
+
+    let isMounted = true;
+    setIsQrLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/vietqr?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}`);
+        const data = await res.json();
+        if (isMounted && data.success && data.qrDataURL) {
+          setQrDataUrl(data.qrDataURL);
+        }
+      } catch (err) {
+        console.error('Lỗi nạp mã VietQR:', err);
+      } finally {
+        if (isMounted) setIsQrLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [finalAmount, transferContent]);
+
+  // Đảm bảo mã QR đã tải xong trước khi chụp ảnh thư báo
+  const ensureQrReady = async () => {
+    if (finalAmount <= 0) return true;
+    if (qrDataUrl) return true;
+
+    try {
+      const res = await fetch(`/api/vietqr?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}`);
+      const data = await res.json();
+      if (data.success && data.qrDataURL) {
+        setQrDataUrl(data.qrDataURL);
+        await new Promise(r => setTimeout(r, 200));
+        return true;
+      }
+    } catch (e) {
+      console.error('Lỗi nạp nhanh QR:', e);
+    }
+    return false;
+  };
+
   const getQrUrl = () => {
     if (!targetClassCode || finalAmount <= 0) return '';
-    return `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
+    return qrDataUrl || `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
   };
 
   const templateData = {
@@ -279,6 +331,7 @@ export default function TuitionNoticeAction({ student }) {
     finalAmount,
     transferContent,
     qrUrl: getQrUrl(),
+    qrDataUrl,
     // Data for NEXT_INSTALLMENT
     orderTotalFee: targetOrder?.feeToPay || 0,
     orderPaidAmount: targetOrder?.amountPaid || 0,
@@ -296,6 +349,10 @@ export default function TuitionNoticeAction({ student }) {
     
     setIsGenerating(true);
     try {
+      await ensureQrReady();
+      // Chờ React vẽ ảnh Base64 lên DOM của templateRef
+      await new Promise(r => setTimeout(r, 200));
+
       const canvas = await html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false });
       canvas.toBlob(async (blob) => {
         try {
@@ -318,7 +375,7 @@ export default function TuitionNoticeAction({ student }) {
   };
 
   // Tải ảnh xuống
-  const handleDownloadImage = (preGeneratedCanvas) => {
+  const handleDownloadImage = async (preGeneratedCanvas) => {
     if (preGeneratedCanvas && preGeneratedCanvas.toDataURL) {
       downloadCanvas(preGeneratedCanvas);
       return;
@@ -332,13 +389,18 @@ export default function TuitionNoticeAction({ student }) {
     if (!templateRef.current) return;
     
     setIsGenerating(true);
-    html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false })
-      .then(downloadCanvas)
-      .catch(err => {
-        console.error(err);
-        alert('Có lỗi xảy ra khi tải ảnh thư báo.');
-      })
-      .finally(() => setIsGenerating(false));
+    try {
+      await ensureQrReady();
+      await new Promise(r => setTimeout(r, 200));
+
+      const canvas = await html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false });
+      downloadCanvas(canvas);
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi tải ảnh thư báo.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const downloadCanvas = (canvas) => {
@@ -764,6 +826,37 @@ export default function TuitionNoticeAction({ student }) {
                     {finalAmount.toLocaleString('vi-VN')} đ
                   </strong>
                 </div>
+              </div>
+
+              {/* Hộp xem trước trực quan Mã VietQR */}
+              <div style={{ background: finalAmount > 0 ? '#f0fdf4' : '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: finalAmount > 0 ? '1.5px solid #86efac' : '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {finalAmount > 0 ? (
+                  <>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', border: '1.5px solid #0d88c4', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {qrDataUrl ? (
+                        <img src={qrDataUrl} alt="QR Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      ) : (
+                        <div style={{ fontSize: '11px', textAlign: 'center', color: '#64748b', padding: '4px' }}>
+                          {isQrLoading ? <i className="fa-solid fa-spinner fa-spin" style={{ color: '#0d88c4' }}></i> : 'Chờ QR'}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '13px', color: qrDataUrl ? '#166534' : '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa-solid fa-qrcode"></i>
+                        {qrDataUrl ? 'Mã VietQR MB Bank: Sẵn sàng xuất thư ảnh ✅' : (isQrLoading ? 'Đang tạo mã VietQR tự động...' : 'Đang chuẩn bị mã VietQR...')}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
+                        Số tiền: <strong style={{ color: '#dc2626' }}>{finalAmount.toLocaleString('vi-VN')} đ</strong> | Cú pháp: <strong style={{ color: '#0d88c4' }}>{transferContent}</strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '13px', color: '#166534', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="fa-solid fa-circle-check"></i>
+                    Học phí đã được cấn trừ đủ (0 đ) - Thư báo sẽ tự động hiển thị thông báo hoàn tất không cần thu thêm.
+                  </div>
+                )}
               </div>
 
             </div>
