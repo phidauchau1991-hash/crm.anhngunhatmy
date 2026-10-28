@@ -50,7 +50,7 @@ async function deploy() {
     if (result.stderr) console.error(result.stderr);
 
     console.log('4. Đang đồng bộ cấu trúc bảng CSDL an toàn (Additive push)...');
-    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npx prisma db push');
+    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npx prisma generate && npx prisma db push');
     console.log(dbPushResult.stdout);
     if (dbPushResult.stderr) console.error(dbPushResult.stderr);
 

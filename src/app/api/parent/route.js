@@ -40,12 +40,42 @@ export async function GET(request) {
             createdAt: 'desc',
           },
         },
+        assessments: {
+          orderBy: { assessmentDate: 'desc' },
+        },
+        examResults: {
+          include: {
+            config: true,
+            class: true,
+          },
+          orderBy: { examDate: 'desc' },
+        },
       },
     });
 
     if (!student) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy học viên trong hệ thống.' }, { status: 404 });
     }
+
+    // Nạp thêm đánh giá thời kỳ Lead (nếu có bài kiểm tra đầu vào trước khi chuyển đổi)
+    let leadAssessments = [];
+    if (student.phone) {
+      try {
+        const matchedLead = await prisma.lead.findFirst({ where: { phone: student.phone } });
+        if (matchedLead) {
+          leadAssessments = await prisma.studentAssessment.findMany({
+            where: { leadId: matchedLead.id, studentId: null },
+            orderBy: { assessmentDate: 'desc' },
+          });
+        }
+      } catch (err) {
+        console.error('Lỗi truy vấn leadAssessments:', err);
+      }
+    }
+
+    const mergedAssessments = [...(student.assessments || []), ...leadAssessments].sort(
+      (a, b) => new Date(b.assessmentDate || b.createdAt) - new Date(a.assessmentDate || a.createdAt)
+    );
 
     // 2. Fetch attendance history
     const attendances = await prisma.attendance.findMany({
@@ -166,6 +196,45 @@ export async function GET(request) {
           notes: cert.notes || '',
         })),
         inventoryLogs,
+        assessments: mergedAssessments.map(a => {
+          let scores = null;
+          let keywords = null;
+          let comments = null;
+          try { scores = a.scores ? JSON.parse(a.scores) : null; } catch {}
+          try { keywords = a.keywords ? JSON.parse(a.keywords) : null; } catch {}
+          try { comments = a.comments ? JSON.parse(a.comments) : null; } catch {}
+          return {
+            id: a.id,
+            type: a.type,
+            title: a.title,
+            classCode: a.classCode,
+            assessmentDate: a.assessmentDate ? new Date(a.assessmentDate).toISOString().split('T')[0] : '',
+            totalScore: a.totalScore,
+            maxScore: a.maxScore,
+            scores,
+            keywords,
+            comments,
+            notes: a.notes || '',
+            assessorName: a.assessorName || 'Giáo viên',
+          };
+        }),
+        examResults: (student.examResults || []).map(e => {
+          let scores = null;
+          try { scores = e.scores ? JSON.parse(e.scores) : null; } catch {}
+          return {
+            id: e.id,
+            examName: e.config?.examName || 'Kỳ thi',
+            examType: e.config?.examType || 'Kỳ thi',
+            classCode: e.classCode,
+            examDate: e.examDate ? new Date(e.examDate).toISOString().split('T')[0] : '',
+            totalScore: e.totalScore,
+            maxScore: e.maxScore,
+            grade: e.grade || '',
+            teacherNotes: e.teacherNotes || '',
+            aiFeedback: e.aiFeedback || '',
+            scores,
+          };
+        }),
       },
     });
   } catch (error) {

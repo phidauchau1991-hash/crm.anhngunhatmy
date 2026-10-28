@@ -726,7 +726,7 @@ export default function LeadsPage() {
           isOpen={showReviewModal}
           onClose={() => { setShowReviewModal(false); setReviewLead(null); }}
           initialType="trial"
-          defaultStudent={{ name: reviewLead?.name, classCode: reviewLead?.trialClassCode || '' }}
+          defaultStudent={{ id: reviewLead?.id, leadId: reviewLead?.id, isLead: true, name: reviewLead?.name, classCode: reviewLead?.trialClassCode || '' }}
         />
       )}
 

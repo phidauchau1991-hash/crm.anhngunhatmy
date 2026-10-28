@@ -97,6 +97,7 @@ model Student {
   examResults     ExamResult[] // LiÃªn káº¿t tá»›i báº£ng Káº¿t quáº£ thi (Sprint 4)
   monthlyInvoices MonthlyInvoice[]
   tutoringPlans   TutoringPlan[]
+  assessments     StudentAssessment[]
 }
 
 model Enrollment {
@@ -182,6 +183,7 @@ model Lead {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   attendances    Attendance[] // LiÃªn káº¿t tá»›i báº£ng Äiá»ƒm danh há»c thá»­
+  assessments    StudentAssessment[]
 }
 
 model Inventory {
@@ -522,3 +524,59 @@ model AlertDismissal {
 }
 
 
+
+
+// ============================================
+// HỒ SƠ ĐÁNH GIÁ & TIẾN TRÌNH HỌC TẬP (ASSESSMENTS & PORTFOLIO)
+// ============================================
+
+model StudentAssessment {
+  id              Int       @id @default(autoincrement())
+  
+  // Liên kết Học viên chính thức hoặc Lead (Khách mới / Học thử)
+  studentId       String?   // Mã học viên (nếu đã là học viên)
+  student         Student?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  leadId          Int?      // Mã lead (nếu là khách mới / học thử)
+  lead            Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  classCode       String?   // Mã lớp học liên quan (nếu có)
+  
+  // Phân loại đánh giá:
+  // - PLACEMENT_TEST: Đánh giá năng lực đầu vào (Placement Test)
+  // - TRIAL_EVALUATION: Đánh giá học thử
+  // - PERIODIC_REVIEW: Nhận xét định kỳ
+  // - ADHOC_REVIEW: Nhận xét đột xuất
+  type            String    @default("PLACEMENT_TEST")
+  
+  title           String?   // Tiêu đề: "Đánh giá Năng lực Đầu vào", "Nhận xét Học thử", v.v.
+  assessmentDate  DateTime  @default(now())
+  assessorName    String?   // Giáo viên hoặc nhân viên đánh giá
+  
+  // Dữ liệu Điểm số (Lưu cả cấu trúc JSON và điểm tổng)
+  scores          String?   // JSON: { listening: { score, max, weight }, speaking: ..., rw: ..., total: ... }
+  totalScore      Float?    // Tổng điểm quy đổi (vd: 42.57)
+  maxScore        Float?    @default(100)
+  
+  // Từ khóa gợi ý của giáo viên (Lưu JSON)
+  // vd Placement: { lsKeywords, rwKeywords, devKeywords }
+  // vd Trial: { attitude, skills, potential }
+  // vd Adhoc: { speaking, listening, rw }
+  keywords        String?
+  
+  // Lời nhận xét chi tiết (Lưu JSON)
+  // vd Placement: { ls_comments, rw_comments, conclusion }
+  // vd Trial: { attitude, skills, potential, recommendation, advice }
+  // vd Adhoc: { speaking, listening, rw, dev }
+  comments        String?
+  
+  // Ghi chú hoặc lộ trình đề xuất ngắn
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([leadId])
+  @@index([type])
+  @@index([assessmentDate])
+}

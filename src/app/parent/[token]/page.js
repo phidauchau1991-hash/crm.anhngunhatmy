@@ -133,7 +133,7 @@ export default function ParentPortalPage() {
     );
   }
 
-  const { student, stats, enrollments, attendanceHistory, inventoryLogs } = data;
+  const { student, stats, enrollments = [], attendanceHistory = [], inventoryLogs = [], assessments = [], examResults = [] } = data;
   const currentEnrollment = enrollments[0]; // Active class enrollment
 
   return (
@@ -359,6 +359,218 @@ export default function ParentPortalPage() {
                     </div>
                   </div>
                 ))
+              )}
+
+              {/* KẾT QUẢ CÁC KỲ THI CHÍNH THỨC */}
+              {examResults && examResults.length > 0 && (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#FFCA29', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem 0' }}>
+                    <i className="fa-solid fa-graduation-cap"></i> Kết Quả Các Kỳ Thi Chính Thức ({examResults.length})
+                  </h3>
+                  {examResults.map((exam) => (
+                    <div key={exam.id} className="class-grade-card" style={{ borderLeft: '4px solid #FFCA29' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800', color: '#fff' }}>
+                            {exam.examName}
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
+                            Lớp {exam.classCode} {exam.examDate ? `• Ngày thi: ${new Date(exam.examDate).toLocaleDateString('vi-VN')}` : ''}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ background: '#0f172a', border: '1px solid #334155', color: '#FFCA29', fontSize: '1.25rem', fontWeight: '800', padding: '0.25rem 0.75rem', borderRadius: '8px' }}>
+                            {exam.totalScore ?? '-'}/{exam.maxScore || 100}
+                          </span>
+                          {exam.grade && (
+                            <span style={{ background: '#065f46', color: '#a7f3d0', fontSize: '0.75rem', fontWeight: '700', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
+                              {exam.grade}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Điểm thành phần nếu có */}
+                      {exam.scores && typeof exam.scores === 'object' && Object.keys(exam.scores).length > 0 && (
+                        <div className="grades-section" style={{ marginBottom: '1rem' }}>
+                          <div className="grade-metrics-grid">
+                            {Object.entries(exam.scores).map(([k, val]) => (
+                              <div key={k} className="metric-box">
+                                <label style={{ textTransform: 'capitalize' }}>{k}</label>
+                                <span className="score-val">{typeof val === 'object' ? (val.score ?? '-') : val}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Nhận xét giáo viên & AI */}
+                      {(exam.teacherNotes || exam.aiFeedback) && (
+                        <div className="teacher-remarks-box" style={{ marginTop: '0.75rem' }}>
+                          {exam.teacherNotes && (
+                            <div style={{ marginBottom: exam.aiFeedback ? '0.5rem' : 0 }}>
+                              <h4 style={{ fontSize: '0.8rem', color: '#FFCA29', margin: '0 0 0.25rem 0' }}>
+                                <i className="fa-solid fa-pen-nib"></i> Nhận xét từ Giáo viên chấm thi:
+                              </h4>
+                              <p className="remark-text">"{exam.teacherNotes}"</p>
+                            </div>
+                          )}
+                          {exam.aiFeedback && (
+                            <div>
+                              <h4 style={{ fontSize: '0.8rem', color: '#38bdf8', margin: '0 0 0.25rem 0' }}>
+                                <i className="fa-solid fa-wand-magic-sparkles"></i> Phân tích sư phạm AI:
+                              </h4>
+                              <p className="remark-text" style={{ color: '#cbd5e1' }}>{exam.aiFeedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ĐÁNH GIÁ NĂNG LỰC & NHẬN XÉT GIÁO VIÊN */}
+              {assessments && assessments.length > 0 && (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem 0' }}>
+                    <i className="fa-solid fa-file-signature"></i> Đánh Giá Năng Lực & Nhận Xét Định Kỳ ({assessments.length})
+                  </h3>
+                  {assessments.map((ass) => {
+                    const isPlacement = ass.type === 'PLACEMENT_TEST';
+                    const isTrial = ass.type === 'TRIAL_EVALUATION';
+                    const accentColor = isPlacement ? '#38bdf8' : isTrial ? '#a855f7' : '#34d399';
+
+                    return (
+                      <div key={ass.id} className="class-grade-card" style={{ borderLeft: `4px solid ${accentColor}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '0.2rem 0.5rem', borderRadius: '4px', background: isPlacement ? 'rgba(56, 189, 248, 0.2)' : isTrial ? 'rgba(168, 85, 247, 0.2)' : 'rgba(52, 211, 153, 0.2)', color: accentColor }}>
+                                {isPlacement ? 'Khảo Sát Năng Lực Đầu Vào' : isTrial ? 'Đánh Giá Quá Trình Học Thử' : 'Nhận Xét Định Kỳ / Đột Xuất'}
+                              </span>
+                              {ass.classCode && (
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Lớp {ass.classCode}</span>
+                              )}
+                            </div>
+                            <h4 style={{ margin: '0.4rem 0 0 0', fontSize: '1.05rem', fontWeight: '700', color: '#fff' }}>
+                              {ass.title}
+                            </h4>
+                          </div>
+                          {ass.assessmentDate && (
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              {new Date(ass.assessmentDate).toLocaleDateString('vi-VN')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Điểm khảo sát đầu vào */}
+                        {isPlacement && ass.scores && (
+                          <div className="grades-section" style={{ marginBottom: '1rem' }}>
+                            <div className="grade-metrics-grid">
+                              <div className="metric-box">
+                                <label>Nghe (Listening)</label>
+                                <span className="score-val">{ass.scores.listening?.score || '-'}/{ass.scores.listening?.max || 100}</span>
+                              </div>
+                              <div className="metric-box">
+                                <label>Nói (Speaking)</label>
+                                <span className="score-val">{ass.scores.speaking?.score || '-'}/{ass.scores.speaking?.max || 100}</span>
+                              </div>
+                              <div className="metric-box">
+                                <label>Đọc & Viết (Read/Write)</label>
+                                <span className="score-val">{ass.scores.rw?.score || '-'}/{ass.scores.rw?.max || 100}</span>
+                              </div>
+                              <div className="metric-box">
+                                <label>Tổng điểm quy đổi</label>
+                                <span className="score-val score-final">{ass.totalScore ?? '-'}/100</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Nhận xét chi tiết */}
+                        {ass.comments && typeof ass.comments === 'object' && (
+                          <div className="teacher-remarks-box" style={{ background: 'rgba(30, 41, 59, 0.7)', borderColor: '#334155' }}>
+                            {isPlacement && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {ass.comments.ls_comments && (
+                                  <div>
+                                    <strong style={{ color: '#38bdf8', fontSize: '0.78rem' }}>Nghe & Nói: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.ls_comments}</span>
+                                  </div>
+                                )}
+                                {ass.comments.rw_comments && (
+                                  <div>
+                                    <strong style={{ color: '#fbbf24', fontSize: '0.78rem' }}>Đọc & Viết: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.rw_comments}</span>
+                                  </div>
+                                )}
+                                {ass.comments.conclusion && (
+                                  <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                                    <strong style={{ color: '#38bdf8', fontSize: '0.78rem' }}>Định Hướng & Lộ Trình: </strong>
+                                    <span style={{ color: '#f8fafc', fontSize: '0.82rem' }}>{ass.comments.conclusion}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {isTrial && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {ass.comments.attitude && (
+                                  <div>
+                                    <strong style={{ color: '#a855f7', fontSize: '0.78rem' }}>Thái độ & Hòa nhập: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.attitude}</span>
+                                  </div>
+                                )}
+                                {ass.comments.skills && (
+                                  <div>
+                                    <strong style={{ color: '#38bdf8', fontSize: '0.78rem' }}>Kỹ năng nổi bật: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.skills}</span>
+                                  </div>
+                                )}
+                                {(ass.comments.recommendation || ass.comments.advice) && (
+                                  <div style={{ background: 'rgba(168, 85, 247, 0.1)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                                    <strong style={{ color: '#c084fc', fontSize: '0.78rem' }}>Lời khuyên cho Phụ huynh: </strong>
+                                    <span style={{ color: '#f8fafc', fontSize: '0.82rem' }}>{ass.comments.recommendation || ass.comments.advice}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {!isPlacement && !isTrial && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {ass.comments.speaking && (
+                                  <div>
+                                    <strong style={{ color: '#38bdf8', fontSize: '0.78rem' }}>Kỹ năng Nói: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.speaking}</span>
+                                  </div>
+                                )}
+                                {ass.comments.listening && (
+                                  <div>
+                                    <strong style={{ color: '#38bdf8', fontSize: '0.78rem' }}>Kỹ năng Nghe: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.listening}</span>
+                                  </div>
+                                )}
+                                {ass.comments.rw && (
+                                  <div>
+                                    <strong style={{ color: '#fbbf24', fontSize: '0.78rem' }}>Đọc & Viết: </strong>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{ass.comments.rw}</span>
+                                  </div>
+                                )}
+                                {ass.comments.dev && (
+                                  <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
+                                    <strong style={{ color: '#34d399', fontSize: '0.78rem' }}>Định hướng phát triển: </strong>
+                                    <span style={{ color: '#f8fafc', fontSize: '0.82rem' }}>{ass.comments.dev}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}

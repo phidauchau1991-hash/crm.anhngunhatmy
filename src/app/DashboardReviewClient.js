@@ -15,10 +15,18 @@ export default function DashboardReviewClient() {
       const name = searchParams.get('name') || '';
       const classCode = searchParams.get('classCode') || '';
       const sessions = searchParams.get('sessions') || '';
+      const leadId = searchParams.get('leadId') || '';
       
       setModalData({
         type: 'trial',
-        student: { name, classCode, milestone: sessions }
+        student: { 
+          id: leadId ? parseInt(leadId) : null, 
+          leadId: leadId ? parseInt(leadId) : null, 
+          isLead: true, 
+          name, 
+          classCode, 
+          milestone: sessions 
+        }
       });
       setIsModalOpen(true);
     }

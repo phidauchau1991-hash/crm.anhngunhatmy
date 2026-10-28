@@ -738,7 +738,7 @@ export default function DashboardPage() {
                         onClick={() => dismissAlerts(t.key)}
                         title="Đánh dấu đã xử lý - cảnh báo sẽ ẩn đi"
                         style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >✓ Đã xử lý</button><Link href={`/?action=review_trial&name=${encodeURIComponent(t.leadName || '')}&classCode=${encodeURIComponent(t.classCode || '')}&sessions=${t.totalSessions}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link></div>
+                      >✓ Đã xử lý</button><Link href={`/?action=review_trial&leadId=${t.leadId || ''}&name=${encodeURIComponent(t.leadName || '')}&classCode=${encodeURIComponent(t.classCode || '')}&sessions=${t.totalSessions}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700' }}>Viết NX</Link></div>
                     </div>
                   ))}
                 </div>

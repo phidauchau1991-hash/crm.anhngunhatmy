@@ -496,6 +496,7 @@ export async function POST(request) {
     if (convertLeadId) {
       const leadIdInt = parseInt(convertLeadId);
       if (!isNaN(leadIdInt)) {
+        // 3.5.1 Cập nhật điểm danh
         const migrated = await prisma.attendance.updateMany({
           where: { 
             leadId: leadIdInt,
@@ -504,6 +505,16 @@ export async function POST(request) {
           data: { studentId }
         });
         console.log(`[Lead→HV] Gộp ${migrated.count} bản ghi điểm danh từ Lead #${leadIdInt} vào HV ${studentId}`);
+
+        // 3.5.2 TỰ ĐỘNG CHUYỂN BÀI TEST ĐẦU VÀO & ĐÁNH GIÁ HỌC THỬ SANG HỒ SƠ HỌC VIÊN
+        const migratedAssessments = await prisma.studentAssessment.updateMany({
+          where: {
+            leadId: leadIdInt,
+            studentId: null
+          },
+          data: { studentId }
+        });
+        console.log(`[Lead→HV] Gộp ${migratedAssessments.count} bài test & đánh giá từ Lead #${leadIdInt} sang HV ${studentId}`);
         
         // Cập nhật trạng thái Lead thành "Đã chốt"
         await prisma.lead.update({
