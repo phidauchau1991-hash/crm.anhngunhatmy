@@ -49,6 +49,12 @@ async function deploy() {
     console.log(result.stdout);
     if (result.stderr) console.error(result.stderr);
 
+    console.log('3.1. Đang sao lưu CSDL an toàn trên VPS trước khi cập nhật...');
+    const backupCmd = 'TIMESTAMP=$(date +"%Y%m%d_%H%M%S") && cp /var/www/nhat-my-crm/dev.db /var/www/nhat-my-crm/dev.db.backup_$TIMESTAMP && echo "Đã tạo bản sao lưu VPS: dev.db.backup_$TIMESTAMP"';
+    const backupResult = await ssh.execCommand(backupCmd);
+    console.log(backupResult.stdout);
+    if (backupResult.stderr) console.error(backupResult.stderr);
+
     console.log('4. Đang đồng bộ cấu trúc bảng CSDL an toàn (Additive push)...');
     const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npx prisma generate && npx prisma db push');
     console.log(dbPushResult.stdout);
