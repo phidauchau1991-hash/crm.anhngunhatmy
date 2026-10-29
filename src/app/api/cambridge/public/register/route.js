@@ -152,7 +152,13 @@ export async function POST(request) {
     }
 
     // 6. Tạo đường dẫn chỉnh sửa thông tin cho phụ huynh
-    const origin = request.nextUrl.origin || 'http://localhost:3000';
+    const forwardedHost = request.headers.get('x-forwarded-host');
+    const host = forwardedHost || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || 'https';
+    let origin = 'https://crm.anhngunhatmy.edu.vn';
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+      origin = `${proto}://${host}`;
+    }
     const editUrl = `${origin}/cambridge/register?batchId=${batchId}&editId=${registration.id}`;
 
     const deadlineStr = batch.registrationDeadline
