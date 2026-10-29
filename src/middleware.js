@@ -21,7 +21,9 @@ export async function middleware(request) {
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith('/parent') ||
-    pathname.startsWith('/api/parent')
+    pathname.startsWith('/api/parent') ||
+    pathname.startsWith('/cambridge/register') ||
+    pathname.startsWith('/api/cambridge/public')
   ) {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
