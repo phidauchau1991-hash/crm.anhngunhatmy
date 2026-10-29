@@ -42,7 +42,7 @@ export default function CandidateModal({ isOpen, onClose, batch, candidate, onSa
         fee: candidate.fee || 1200000,
         notes: candidate.notes || ''
       });
-      setSelectedStudentName(candidate.student ? `${candidate.student.fullName} (${candidate.student.studentCode || ''})` : '');
+      setSelectedStudentName(candidate.student ? `${candidate.student.name || ''} (${candidate.student.id || ''})` : '');
     } else {
       const defaultLevel = 'STARTERS';
       const defaultFee = batch?.levelsConfig?.[defaultLevel] || DEFAULT_LEVELS_CONFIG[defaultLevel] || 1200000;
@@ -383,14 +383,16 @@ export default function CandidateModal({ isOpen, onClose, batch, candidate, onSa
               <input
                 type="text"
                 value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                placeholder="VD: Bùi Thảo Ngân"
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
+                placeholder="VD: CHÂU NHẬT TRƯỜNG"
                 style={{
                   width: '100%',
                   padding: '0.65rem 0.85rem',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  fontSize: '0.95rem'
+                  fontSize: '0.95rem',
+                  textTransform: 'uppercase',
+                  fontWeight: '600'
                 }}
                 required
               />
@@ -500,11 +502,9 @@ export default function CandidateModal({ isOpen, onClose, batch, candidate, onSa
                   background: 'white'
                 }}
               >
-                <option value="STARTERS">STARTERS (Pre A1)</option>
-                <option value="MOVERS">MOVERS (A1)</option>
-                <option value="FLYERS">FLYERS (A2)</option>
-                <option value="KET">KET (A2 Key)</option>
-                <option value="PET">PET (B1 Preliminary)</option>
+                {(batch?.activeLevels || ['STARTERS', 'MOVERS', 'FLYERS', 'KET', 'PET']).map(lvl => (
+                  <option key={lvl} value={lvl}>{lvl}</option>
+                ))}
               </select>
             </div>
 

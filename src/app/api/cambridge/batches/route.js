@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG, formatHotline } from '@/lib/cambridgeHelper';
+import { CAMBRIDGE_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
 
 // GET: Lấy danh sách toàn bộ các Đợt thi Cambridge kèm thống kê KPI
 export async function GET() {
@@ -39,17 +39,7 @@ export async function GET() {
         PET: batch.registrations.filter(r => r.level === 'PET').length,
       };
 
-      // Đảm bảo levelsConfig parse được
-      let parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-      try {
-        if (typeof batch.levelsConfig === 'string') {
-          parsedLevelsConfig = JSON.parse(batch.levelsConfig);
-        } else if (batch.levelsConfig && typeof batch.levelsConfig === 'object') {
-          parsedLevelsConfig = batch.levelsConfig;
-        }
-      } catch (e) {
-        parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-      }
+      const { activeLevels, fees } = parseBatchLevels(batch.levelsConfig);
 
       return {
         id: batch.id,
@@ -64,7 +54,8 @@ export async function GET() {
         bankAccount: batch.bankAccount || CAMBRIDGE_CONFIG.SO_TAI_KHOAN,
         bankAccountName: batch.bankAccountName || CAMBRIDGE_CONFIG.TEN_TAI_KHOAN_QR,
         bankName: batch.bankName || CAMBRIDGE_CONFIG.NGAN_HANG,
-        levelsConfig: parsedLevelsConfig,
+        activeLevels,
+        levelsConfig: fees,
         status: batch.status,
         notes: batch.notes,
         createdAt: batch.createdAt,

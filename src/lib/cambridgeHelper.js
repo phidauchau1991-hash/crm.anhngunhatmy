@@ -25,6 +25,44 @@ export const DEFAULT_LEVELS_CONFIG = {
   PET: 1600000
 };
 
+export const ALL_CAMBRIDGE_LEVELS = ['STARTERS', 'MOVERS', 'FLYERS', 'KET', 'PET'];
+
+/**
+ * Phân tích cấu hình cấp độ mở và biểu phí đợt thi (Hỗ trợ cấu hình chọn riêng cấp độ)
+ */
+export function parseBatchLevels(levelsConfig) {
+  const defaultFees = { ...DEFAULT_LEVELS_CONFIG };
+  if (!levelsConfig) {
+    return {
+      activeLevels: ALL_CAMBRIDGE_LEVELS,
+      fees: defaultFees
+    };
+  }
+
+  let obj = levelsConfig;
+  if (typeof levelsConfig === 'string') {
+    try {
+      obj = JSON.parse(levelsConfig);
+    } catch (e) {
+      obj = defaultFees;
+    }
+  }
+
+  if (obj && Array.isArray(obj.activeLevels)) {
+    return {
+      activeLevels: obj.activeLevels.length > 0 ? obj.activeLevels : ['STARTERS'],
+      fees: { ...defaultFees, ...(obj.fees || {}) }
+    };
+  }
+
+  // Dạng cũ: { STARTERS: 1200000, ... }
+  const activeKeys = Object.keys(obj).filter(k => ALL_CAMBRIDGE_LEVELS.includes(k) && Number(obj[k]) > 0);
+  return {
+    activeLevels: activeKeys.length > 0 ? activeKeys : ALL_CAMBRIDGE_LEVELS,
+    fees: { ...defaultFees, ...obj }
+  };
+}
+
 /**
  * Chuẩn hóa họ tên in hoa không dấu (Chuẩn Cambridge & Cú pháp chuyển khoản)
  */

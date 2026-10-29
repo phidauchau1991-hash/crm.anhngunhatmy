@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG } from '@/lib/cambridgeHelper';
+import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG, parseBatchLevels, ALL_CAMBRIDGE_LEVELS } from '@/lib/cambridgeHelper';
 
 export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
   const [formData, setFormData] = useState({
@@ -21,11 +21,15 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
     levelsConfig: { ...DEFAULT_LEVELS_CONFIG }
   });
 
+  const [activeLevels, setActiveLevels] = useState([...ALL_CAMBRIDGE_LEVELS]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (batch) {
+      const parsed = parseBatchLevels(batch.levelsConfig);
+      setActiveLevels(parsed.activeLevels);
+
       setFormData({
         title: batch.title || '',
         examDate: batch.examDate ? new Date(batch.examDate).toISOString().slice(0, 10) : '',
@@ -40,7 +44,7 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
         bankName: batch.bankName || CAMBRIDGE_CONFIG.NGAN_HANG,
         status: batch.status || 'OPEN',
         notes: batch.notes || '',
-        levelsConfig: { ...DEFAULT_LEVELS_CONFIG, ...(batch.levelsConfig || {}) }
+        levelsConfig: parsed.fees
       });
     } else {
       // Giá trị mặc định khi tạo mới
@@ -49,6 +53,7 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
       const defaultDeadline = new Date(defaultExamDate);
       defaultDeadline.setDate(defaultDeadline.getDate() - 10);
 
+      setActiveLevels([...ALL_CAMBRIDGE_LEVELS]);
       setFormData({
         title: `Kỳ thi Cambridge Quốc tế Tháng ${defaultExamDate.getMonth() + 1}/${defaultExamDate.getFullYear()}`,
         examDate: defaultExamDate.toISOString().slice(0, 10),
@@ -70,6 +75,22 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
   }, [batch, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleToggleLevel = (lvl) => {
+    setActiveLevels(prev => {
+      if (prev.includes(lvl)) {
+        if (prev.length <= 1) {
+          setError('Đợt thi phải mở ít nhất 1 cấp độ!');
+          return prev;
+        }
+        setError('');
+        return prev.filter(k => k !== lvl);
+      } else {
+        setError('');
+        return [...prev, lvl];
+      }
+    });
+  };
 
   const handleLevelFeeChange = (lvl, val) => {
     const num = parseInt(val.toString().replace(/[^0-9]/g, ''), 10) || 0;
@@ -98,16 +119,28 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
       setError('Vui lòng chọn hạn chót đăng ký');
       return;
     }
+    if (activeLevels.length === 0) {
+      setError('Vui lòng chọn ít nhất 1 cấp độ tổ chức thi');
+      return;
+    }
 
     setSaving(true);
     try {
       const url = batch ? `/api/cambridge/batches/${batch.id}` : '/api/cambridge/batches';
       const method = batch ? 'PUT' : 'POST';
 
+      const payload = {
+        ...formData,
+        levelsConfig: {
+          activeLevels,
+          fees: formData.levelsConfig
+        }
+      };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
@@ -357,7 +390,7 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
             </div>
           </div>
 
-          {/* Section 2: Biểu phí theo cấp độ */}
+          {/* Section 2: Chọn cấp độ tổ chức & Biểu phí */}
           <div style={{
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
@@ -365,32 +398,63 @@ export default function BatchModal({ isOpen, onClose, batch, onSaved }) {
             padding: '1.25rem',
             marginBottom: '1.25rem'
           }}>
-            <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: '#0c83c1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <i className="fa-solid fa-tags"></i> Biểu phí lệ phí thi theo từng cấp độ (VNĐ)
-            </h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#0c83c1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-tags"></i> Cấp độ tổ chức thi & Biểu phí (VNĐ)
+              </h4>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                * Tích chọn cấp độ mở trong đợt này ({activeLevels.length}/5 cấp độ)
+              </span>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-              {['STARTERS', 'MOVERS', 'FLYERS', 'KET', 'PET'].map((lvl) => (
-                <div key={lvl}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#475569', marginBottom: '3px' }}>
-                    {lvl}
-                  </label>
-                  <input
-                    type="text"
-                    value={(formData.levelsConfig[lvl] || 0).toLocaleString('vi-VN')}
-                    onChange={(e) => handleLevelFeeChange(lvl, e.target.value)}
+              {ALL_CAMBRIDGE_LEVELS.map((lvl) => {
+                const isActive = activeLevels.includes(lvl);
+                return (
+                  <div
+                    key={lvl}
                     style={{
-                      width: '100%',
-                      padding: '0.55rem 0.7rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: '#0f172a',
-                      background: 'white'
+                      background: isActive ? 'white' : '#f1f5f9',
+                      border: isActive ? '2px solid #0c83c1' : '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      opacity: isActive ? 1 : 0.6,
+                      transition: 'all 0.15s ease'
                     }}
-                  />
-                </div>
-              ))}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '6px' }}>
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={() => handleToggleLevel(lvl)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: isActive ? '#0c83c1' : '#64748b' }}>
+                        {lvl}
+                      </span>
+                    </label>
+
+                    <input
+                      type="text"
+                      disabled={!isActive}
+                      value={(formData.levelsConfig[lvl] || 0).toLocaleString('vi-VN')}
+                      onChange={(e) => handleLevelFeeChange(lvl, e.target.value)}
+                      placeholder={isActive ? 'Lệ phí' : 'Không mở'}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.6rem',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                        color: isActive ? '#10b981' : '#94a3b8',
+                        background: isActive ? 'white' : '#e2e8f0',
+                        cursor: isActive ? 'text' : 'not-allowed'
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 

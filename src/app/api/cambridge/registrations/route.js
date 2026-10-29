@@ -57,8 +57,8 @@ export async function GET(request) {
         student: {
           select: {
             id: true,
-            fullName: true,
-            studentCode: true,
+            name: true,
+            phone: true,
             status: true
           }
         }
@@ -118,8 +118,9 @@ export async function POST(request) {
       }
     }
 
-    // Chuẩn hóa tên không dấu
-    const fullNameNoTone = removeVietnameseTones(fullName);
+    // Chuẩn hóa tên viết hoa và không dấu theo chuẩn Cambridge & VN120
+    const fullNameUpper = fullName.trim().toUpperCase();
+    const fullNameNoTone = removeVietnameseTones(fullNameUpper);
     const transferContent = `CAM - ${fullNameNoTone}`;
 
     // Format ngày sinh
@@ -135,26 +136,31 @@ export async function POST(request) {
 
     // Tự động tìm học viên trong CRM nếu chưa truyền studentId
     let finalStudentId = studentId;
-    if (!finalStudentId && (parentPhone || fullName)) {
-      const matched = await prisma.student.findFirst({
-        where: {
-          OR: [
-            ...(parentPhone ? [{ parentPhone: parentPhone.replace(/[^0-9]/g, '') }, { phone: parentPhone.replace(/[^0-9]/g, '') }] : []),
-            { fullName: fullName.trim() }
-          ]
-        },
-        select: { id: true }
-      });
-      if (matched) {
-        finalStudentId = matched.id;
+    try {
+      if (!finalStudentId && (parentPhone || fullNameUpper)) {
+        const cleanPhone = parentPhone ? parentPhone.replace(/[^0-9]/g, '') : '';
+        const searchConditions = [];
+        if (cleanPhone) searchConditions.push({ phone: cleanPhone });
+        if (fullNameUpper) searchConditions.push({ name: fullNameUpper });
+        if (searchConditions.length > 0) {
+          const matched = await prisma.student.findFirst({
+            where: { OR: searchConditions },
+            select: { id: true }
+          });
+          if (matched) {
+            finalStudentId = matched.id;
+          }
+        }
       }
+    } catch (e) {
+      console.warn('Lỗi tìm kiếm học viên CRM:', e?.message);
     }
 
     const registration = await prisma.cambridgeRegistration.create({
       data: {
         batchId,
         studentId: finalStudentId,
-        fullName: fullName.trim(),
+        fullName: fullNameUpper,
         fullNameNoTone,
         gender: gender || 'MALE',
         dob: parsedDob,
@@ -169,7 +175,7 @@ export async function POST(request) {
       },
       include: {
         student: {
-          select: { id: true, fullName: true, studentCode: true }
+          select: { id: true, name: true, phone: true }
         }
       }
     });
@@ -272,7 +278,7 @@ export async function PATCH(request) {
       data: dataToUpdate,
       include: {
         student: {
-          select: { id: true, fullName: true, studentCode: true }
+          select: { id: true, name: true, phone: true }
         }
       }
     });

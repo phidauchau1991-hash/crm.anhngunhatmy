@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { removeVietnameseTones, formatHotline, renderRegistrationEmailHtml, DEFAULT_LEVELS_CONFIG, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
+import { removeVietnameseTones, formatHotline, renderRegistrationEmailHtml, parseBatchLevels, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
 import { sendEmail } from '@/lib/emailService';
 
 export async function POST(request) {
@@ -47,21 +47,14 @@ export async function POST(request) {
       }
     }
 
-    // 2. Tính lệ phí
-    let parsedLevels = DEFAULT_LEVELS_CONFIG;
-    try {
-      if (typeof batch.levelsConfig === 'string') {
-        parsedLevels = JSON.parse(batch.levelsConfig);
-      } else if (batch.levelsConfig && typeof batch.levelsConfig === 'object') {
-        parsedLevels = batch.levelsConfig;
-      }
-    } catch (e) {
-      parsedLevels = DEFAULT_LEVELS_CONFIG;
-    }
-    const fee = Number(parsedLevels[level]) || DEFAULT_LEVELS_CONFIG[level] || 1200000;
+    // 2. Tính lệ phí và kiểm tra cấp độ mở
+    const { activeLevels, fees } = parseBatchLevels(batch.levelsConfig);
+    const selectedLevel = activeLevels.includes(level) ? level : activeLevels[0] || 'STARTERS';
+    const fee = Number(fees[selectedLevel]) || 1200000;
 
-    // 3. Chuẩn hóa tên và ngày sinh
-    const fullNameNoTone = removeVietnameseTones(fullName);
+    // 3. Chuẩn hóa tên bắt buộc CHỮ IN HOA (Chuẩn VN120 & Cambridge)
+    const fullNameUpper = fullName.trim().toUpperCase();
+    const fullNameNoTone = removeVietnameseTones(fullNameUpper);
     const transferContent = `CAM - ${fullNameNoTone}`;
 
     let parsedDob = null;
@@ -99,50 +92,57 @@ export async function POST(request) {
       registration = await prisma.cambridgeRegistration.update({
         where: { id: idNum },
         data: {
-          fullName: fullName.trim(),
+          fullName: fullNameUpper,
           fullNameNoTone,
           gender,
           dob: parsedDob,
           dobStr,
           parentPhone: parentPhone ? parentPhone.trim() : null,
           parentEmail: parentEmail ? parentEmail.trim() : null,
-          level,
+          level: selectedLevel,
           fee,
           transferContent,
           notes: notes ? notes.trim() : null
         }
       });
     } else {
-      // 5. Nếu là đăng ký mới: Tự động tìm liên kết Student trong CRM
+      // 5. Nếu là đăng ký mới: Tự động tìm liên kết Student trong CRM an toàn
       let matchedStudentId = null;
-      if (parentPhone || fullName) {
+      try {
         const cleanPhone = parentPhone ? parentPhone.replace(/[^0-9]/g, '') : '';
-        const found = await prisma.student.findFirst({
-          where: {
-            OR: [
-              ...(cleanPhone ? [{ parentPhone: cleanPhone }, { phone: cleanPhone }] : []),
-              { fullName: fullName.trim() }
-            ]
-          },
-          select: { id: true }
-        });
-        if (found) {
-          matchedStudentId = found.id;
+        const searchConditions = [];
+        if (cleanPhone) {
+          searchConditions.push({ phone: cleanPhone });
         }
+        if (fullNameUpper) {
+          searchConditions.push({ name: fullNameUpper });
+        }
+
+        if (searchConditions.length > 0) {
+          const found = await prisma.student.findFirst({
+            where: { OR: searchConditions },
+            select: { id: true }
+          });
+          if (found) {
+            matchedStudentId = found.id;
+          }
+        }
+      } catch (errStudent) {
+        console.warn('Bỏ qua lỗi tìm kiếm học viên CRM:', errStudent?.message);
       }
 
       registration = await prisma.cambridgeRegistration.create({
         data: {
           batchId,
           studentId: matchedStudentId,
-          fullName: fullName.trim(),
+          fullName: fullNameUpper,
           fullNameNoTone,
           gender,
           dob: parsedDob,
           dobStr,
           parentPhone: parentPhone ? parentPhone.trim() : null,
           parentEmail: parentEmail ? parentEmail.trim() : null,
-          level,
+          level: selectedLevel,
           fee,
           paymentStatus: 'CHUA_DONG',
           transferContent,

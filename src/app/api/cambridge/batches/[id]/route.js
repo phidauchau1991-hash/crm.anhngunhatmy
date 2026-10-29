@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG, formatHotline } from '@/lib/cambridgeHelper';
+import { CAMBRIDGE_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
 
 // GET: Chi tiết 1 đợt thi Cambridge kèm toàn bộ thí sinh
 export async function GET(request, { params }) {
@@ -16,8 +16,8 @@ export async function GET(request, { params }) {
             student: {
               select: {
                 id: true,
-                fullName: true,
-                studentCode: true,
+                name: true,
+                phone: true,
                 status: true
               }
             }
@@ -30,22 +30,14 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy đợt thi' }, { status: 404 });
     }
 
-    let parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-    try {
-      if (typeof batch.levelsConfig === 'string') {
-        parsedLevelsConfig = JSON.parse(batch.levelsConfig);
-      } else if (batch.levelsConfig && typeof batch.levelsConfig === 'object') {
-        parsedLevelsConfig = batch.levelsConfig;
-      }
-    } catch (e) {
-      parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-    }
+    const { activeLevels, fees } = parseBatchLevels(batch.levelsConfig);
 
     return NextResponse.json({
       success: true,
       batch: {
         ...batch,
-        levelsConfig: parsedLevelsConfig
+        activeLevels,
+        levelsConfig: fees
       }
     });
   } catch (error) {

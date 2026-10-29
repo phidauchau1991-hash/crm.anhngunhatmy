@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG, formatHotline } from '@/lib/cambridgeHelper';
+import { CAMBRIDGE_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
 
 // GET: Lấy thông tin công khai của đợt thi Cambridge cho phụ huynh đăng ký
 export async function GET(request) {
@@ -50,16 +50,7 @@ export async function GET(request) {
       }
     }
 
-    let parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-    try {
-      if (typeof batch.levelsConfig === 'string') {
-        parsedLevelsConfig = JSON.parse(batch.levelsConfig);
-      } else if (batch.levelsConfig && typeof batch.levelsConfig === 'object') {
-        parsedLevelsConfig = batch.levelsConfig;
-      }
-    } catch (e) {
-      parsedLevelsConfig = DEFAULT_LEVELS_CONFIG;
-    }
+    const { activeLevels, fees } = parseBatchLevels(batch.levelsConfig);
 
     const examDateFormatted = batch.examDate
       ? new Date(batch.examDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -86,7 +77,8 @@ export async function GET(request) {
         bankAccount: batch.bankAccount || CAMBRIDGE_CONFIG.SO_TAI_KHOAN,
         bankAccountName: batch.bankAccountName || CAMBRIDGE_CONFIG.TEN_TAI_KHOAN_QR,
         bankName: batch.bankName || CAMBRIDGE_CONFIG.NGAN_HANG,
-        levelsConfig: parsedLevelsConfig,
+        activeLevels,
+        levelsConfig: fees,
         status: batch.status,
         isClosed
       }

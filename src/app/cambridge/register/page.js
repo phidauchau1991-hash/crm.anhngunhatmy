@@ -4,6 +4,14 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { removeVietnameseTones, formatHotline, CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG } from '@/lib/cambridgeHelper';
 
+const LEVEL_METADATA = {
+  STARTERS: { name: 'STARTERS', desc: 'Pre A1', target: 'Mầm non & Lớp 1-2' },
+  MOVERS: { name: 'MOVERS', desc: 'A1', target: 'Tiểu học (Lớp 3-4)' },
+  FLYERS: { name: 'FLYERS', desc: 'A2', target: 'Tiểu học (Lớp 4-5)' },
+  KET: { name: 'KET', desc: 'A2 Key', target: 'THCS (Lớp 6-7)' },
+  PET: { name: 'PET', desc: 'B1 Preliminary', target: 'THCS & THPT' }
+};
+
 function RegisterContent() {
   const searchParams = useSearchParams();
   const batchIdParam = searchParams.get('batchId') || '';
@@ -50,6 +58,17 @@ function RegisterContent() {
 
         setBatch(batchJson.batch);
 
+        // Đảm bảo cấp độ được chọn nằm trong danh sách cấp độ mở của đợt thi
+        const availableLevels = batchJson.batch.activeLevels || ['STARTERS', 'MOVERS', 'FLYERS', 'KET', 'PET'];
+        const initialLevel = availableLevels[0] || 'STARTERS';
+
+        if (!editIdParam) {
+          setFormData(prev => ({
+            ...prev,
+            level: availableLevels.includes(prev.level) ? prev.level : initialLevel
+          }));
+        }
+
         // Nếu có editId, tải dữ liệu thí sinh cũ
         if (editIdParam) {
           setIsEditMode(true);
@@ -92,6 +111,9 @@ function RegisterContent() {
 
   // Cấp độ và biểu phí
   const levelsConfig = batch?.levelsConfig || DEFAULT_LEVELS_CONFIG;
+  const activeLevels = (batch?.activeLevels && batch.activeLevels.length > 0)
+    ? batch.activeLevels
+    : ['STARTERS', 'MOVERS', 'FLYERS', 'KET', 'PET'];
   const currentFee = Number(levelsConfig[formData.level]) || DEFAULT_LEVELS_CONFIG[formData.level] || 1200000;
   const fullNameNoTone = removeVietnameseTones(formData.fullName);
   const transferContentPreview = `CAM - ${fullNameNoTone || 'HOTEN'}`;
@@ -236,11 +258,12 @@ function RegisterContent() {
           </div>
 
           <h1 style={{
-            margin: '0 0 6px 0',
-            fontSize: '1.65rem',
+            margin: '0 0 8px 0',
+            fontSize: 'clamp(1.25rem, 5.5vw, 1.75rem)',
             fontWeight: '800',
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: '0.5px',
+            whiteSpace: 'nowrap'
           }}>
             {CAMBRIDGE_CONFIG.TEN_NGAN}
           </h1>
@@ -431,12 +454,36 @@ function RegisterContent() {
 
               {/* QR Image */}
               {submitResult.qrDataURL ? (
-                <div style={{ display: 'inline-block', padding: '8px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                  <img
-                    src={submitResult.qrDataURL}
-                    alt="Mã VietQR Lệ phí thi"
-                    style={{ maxWidth: '240px', width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }}
-                  />
+                <div>
+                  <div style={{ display: 'inline-block', padding: '8px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <img
+                      src={submitResult.qrDataURL}
+                      alt="Mã VietQR Lệ phí thi"
+                      style={{ maxWidth: '240px', width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <a
+                      href={submitResult.qrDataURL}
+                      download={`VietQR_Cambridge_${submitResult.registration?.fullNameNoTone || 'NhatMy'}.png`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <i className="fa-solid fa-download"></i> Tải ảnh mã QR về máy
+                    </a>
+                  </div>
                 </div>
               ) : (
                 <div style={{ padding: '2rem', color: '#64748b' }}>Đang tạo mã QR...</div>
@@ -629,23 +676,25 @@ function RegisterContent() {
                 Kính gửi Quý Phụ huynh, nhằm chuẩn bị danh sách chính thức gửi <b>Hội đồng khảo thí Đại học Cambridge ({batch?.authorizedCenter || 'VN120'})</b>, kính mời Quý phụ huynh điền thông tin đăng ký cho con bên dưới.
               </div>
 
-              {/* Field 1: Họ và tên thí sinh */}
+              {/* Field 1: Họ và tên thí sinh (Bắt buộc chữ in hoa chuẩn VN120) */}
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
-                  1. Họ và tên học sinh (Tiếng Việt có dấu) <span style={{ color: '#ef4444' }}>*</span>
+                  1. Họ và tên học sinh (Bắt buộc chữ in hoa) <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="Ví dụ: Bùi Thảo Ngân"
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
+                  placeholder="Ví dụ: CHÂU NHẬT TRƯỜNG"
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
                     border: '1.5px solid #cbd5e1',
                     borderRadius: '10px',
                     fontSize: '1rem',
-                    color: '#0f172a'
+                    color: '#0f172a',
+                    textTransform: 'uppercase',
+                    fontWeight: 'bold'
                   }}
                   required
                 />
@@ -761,64 +810,99 @@ function RegisterContent() {
                 </div>
               </div>
 
-              {/* Field 6: Chọn cấp độ dự thi */}
+              {/* Field 6: Chọn cấp độ dự thi (Chỉ hiển thị các cấp độ được mở trong đợt thi này) */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
-                  6. Chọn cấp độ dự thi Cambridge <span style={{ color: '#ef4444' }}>*</span>
+                  6. Cấp độ dự thi Cambridge <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                  {[
-                    { key: 'STARTERS', name: 'STARTERS', desc: 'Pre A1' },
-                    { key: 'MOVERS', name: 'MOVERS', desc: 'A1' },
-                    { key: 'FLYERS', name: 'FLYERS', desc: 'A2' },
-                    { key: 'KET', name: 'KET', desc: 'A2 Key' },
-                    { key: 'PET', name: 'PET', desc: 'B1' },
-                  ].map(lvl => {
-                    const isSelected = formData.level === lvl.key;
-                    const feeVal = Number(levelsConfig[lvl.key]) || DEFAULT_LEVELS_CONFIG[lvl.key] || 1200000;
-                    return (
-                      <div
-                        key={lvl.key}
-                        onClick={() => setFormData({ ...formData, level: lvl.key })}
-                        style={{
-                          padding: '10px 8px',
-                          borderRadius: '10px',
-                          border: isSelected ? '2px solid #0c83c1' : '1px solid #cbd5e1',
-                          background: isSelected ? '#f0f9ff' : 'white',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div style={{ fontWeight: '800', color: isSelected ? '#0c83c1' : '#334155', fontSize: '0.95rem' }}>
-                          {lvl.name}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{lvl.desc}</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
-                          {feeVal.toLocaleString('vi-VN')} đ
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Selected Fee Display */}
-                <div style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '10px 14px',
-                  marginTop: '10px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '0.9rem'
-                }}>
-                  <span style={{ color: '#475569' }}>Lệ phí cấp độ <b>{formData.level}</b>:</span>
-                  <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#10b981' }}>
-                    {currentFee.toLocaleString('vi-VN')} VNĐ
-                  </span>
-                </div>
+                {activeLevels.length === 1 ? (
+                  /* Giao diện tinh gọn khi đợt thi chỉ tổ chức duy nhất 1 cấp độ (Ví dụ: Chỉ Starters) */
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '2px solid #10b981',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        ✓ Cấp độ áp dụng cho đợt thi này
+                      </div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#065f46', marginTop: '2px' }}>
+                        {activeLevels[0]} <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#047857' }}>({LEVEL_METADATA[activeLevels[0]]?.desc || 'Cambridge'})</span>
+                      </div>
+                      {LEVEL_METADATA[activeLevels[0]]?.target && (
+                        <div style={{ fontSize: '0.8rem', color: '#059669', marginTop: '2px' }}>
+                          Đối tượng: {LEVEL_METADATA[activeLevels[0]].target}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#047857' }}>Lệ phí niêm yết:</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#047857' }}>
+                        {(Number(levelsConfig[activeLevels[0]]) || 1200000).toLocaleString('vi-VN')} đ
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Giao diện chọn cấp độ khi đợt thi có từ 2 cấp độ trở lên */
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${activeLevels.length <= 3 ? '130px' : '110px'}, 1fr))`, gap: '8px' }}>
+                      {activeLevels.map(lvlKey => {
+                        const isSelected = formData.level === lvlKey;
+                        const meta = LEVEL_METADATA[lvlKey] || { name: lvlKey, desc: '' };
+                        const feeVal = Number(levelsConfig[lvlKey]) || DEFAULT_LEVELS_CONFIG[lvlKey] || 1200000;
+                        return (
+                          <div
+                            key={lvlKey}
+                            onClick={() => setFormData({ ...formData, level: lvlKey })}
+                            style={{
+                              padding: '10px 8px',
+                              borderRadius: '10px',
+                              border: isSelected ? '2px solid #0c83c1' : '1px solid #cbd5e1',
+                              background: isSelected ? '#f0f9ff' : 'white',
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              transition: 'all 0.15s ease',
+                              boxShadow: isSelected ? '0 2px 8px rgba(12,131,193,0.18)' : 'none'
+                            }}
+                          >
+                            <div style={{ fontWeight: '800', color: isSelected ? '#0c83c1' : '#334155', fontSize: '0.95rem' }}>
+                              {meta.name}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{meta.desc}</div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
+                              {feeVal.toLocaleString('vi-VN')} đ
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Selected Fee Display */}
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      marginTop: '10px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.9rem'
+                    }}>
+                      <span style={{ color: '#475569' }}>Lệ phí cấp độ <b>{formData.level}</b>:</span>
+                      <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#10b981' }}>
+                        {currentFee.toLocaleString('vi-VN')} VNĐ
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Field 7: Ghi chú */}
