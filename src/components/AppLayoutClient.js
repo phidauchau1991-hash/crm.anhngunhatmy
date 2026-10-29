@@ -34,6 +34,7 @@ export default function AppLayoutClient({ children, userRole, username, isGlobal
     { href: '/attendance', icon: 'fa-list-check', label: 'Điểm danh', roles: ['DIRECTOR', 'MANAGER', 'CSKH', 'ADVISOR', 'TEACHER'] },
     { href: '/tutoring', icon: 'fa-book-open-reader', label: 'Phụ đạo & Bù bài', roles: ['DIRECTOR', 'MANAGER', 'CSKH', 'ADVISOR', 'TEACHER'] },
     { href: '/exams', icon: 'fa-ranking-star', label: 'Đánh giá & Báo cáo', roles: ['DIRECTOR', 'MANAGER', 'CSKH', 'ADVISOR', 'TEACHER'] },
+    { href: '/cambridge', icon: 'fa-award', label: 'Khảo thí Cambridge', roles: ['DIRECTOR', 'MANAGER', 'CSKH', 'ADVISOR', 'ACCOUNTANT'] },
     { href: '/finance', icon: 'fa-wallet', label: 'Học phí theo khóa', roles: ['DIRECTOR', 'MANAGER', 'ACCOUNTANT', 'CSKH', 'ADVISOR'] },
     { href: '/finance/monthly', icon: 'fa-file-invoice-dollar', label: 'Học phí tháng', roles: ['DIRECTOR', 'MANAGER', 'ACCOUNTANT'] },
     { href: '/inventory', icon: 'fa-boxes-stacked', label: 'Quản lý kho', roles: ['DIRECTOR', 'MANAGER'] },

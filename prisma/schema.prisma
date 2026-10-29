@@ -588,7 +588,7 @@ model StudentAssessment {
 // ==========================================
 
 model CambridgeExamBatch {
-  id                    String    @id // Mã đợt thi: vd CAM_2026_12
+  id                    String    @id @default(cuid()) // Mã đợt thi: vd CAM_2026_12 hoặc auto cuid
   title                 String    // Tên đợt thi: vd "Kỳ thi Cambridge Quốc tế Tháng 12/2026"
   examDate              DateTime? // Ngày thi chính thức
   registrationDeadline  DateTime? // Hạn chót đăng ký
