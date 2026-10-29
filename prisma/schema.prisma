@@ -98,6 +98,7 @@ model Student {
   monthlyInvoices MonthlyInvoice[]
   tutoringPlans   TutoringPlan[]
   assessments     StudentAssessment[]
+  cambridgeRegistrations CambridgeRegistration[]
 }
 
 model Enrollment {
@@ -579,4 +580,78 @@ model StudentAssessment {
   @@index([leadId])
   @@index([type])
   @@index([assessmentDate])
+}
+
+
+// ==========================================
+// HỆ THỐNG KHẢO THÍ CHỨNG CHỈ QUỐC TẾ CAMBRIDGE (VN120)
+// ==========================================
+
+model CambridgeExamBatch {
+  id                    String    @id // Mã đợt thi: vd CAM_2026_12
+  title                 String    // Tên đợt thi: vd "Kỳ thi Cambridge Quốc tế Tháng 12/2026"
+  examDate              DateTime? // Ngày thi chính thức
+  registrationDeadline  DateTime? // Hạn chót đăng ký
+  closeHour             String?   @default("23:59") // Giờ đóng form
+  hotline               String?   @default("0911.767.069")
+  authorizedCenter      String?   @default("VN120") // Hội đồng khảo thí ủy quyền
+  companyName           String?   @default("CÔNG TY TNHH NGOẠI NGỮ TRI THỨC VIỆT")
+  centerName            String?   @default("TRUNG TÂM ANH NGỮ NHẬT MỸ")
+  bankAccount           String?   @default("6119916886")
+  bankAccountName       String?   @default("CONG TY TNHH NGOAI NGU TRI THUC VIET")
+  bankName              String?   @default("MB")
+  levelsConfig          String    // JSON: { "STARTERS": 1200000, "MOVERS": 1300000, ... }
+  status                String    @default("OPEN") // OPEN (Đang mở), CLOSED (Đã đóng), COMPLETED (Đã thi xong)
+  notes                 String?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  registrations         CambridgeRegistration[]
+}
+
+model CambridgeRegistration {
+  id                  Int                   @id @default(autoincrement())
+  batchId             String
+  batch               CambridgeExamBatch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  studentId           String?
+  student             Student?              @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  // Thông tin thí sinh chuẩn VN120 & Cambridge
+  fullName            String                // Tên tiếng Việt có dấu
+  fullNameNoTone      String                // In hoa không dấu: BUI THAO NGAN
+  gender              String                // MALE / FEMALE
+  dob                 DateTime?             // Ngày tháng năm sinh
+  dobStr              String?               // Chuỗi dd/MM/yyyy
+  parentPhone         String?               // SĐT phụ huynh
+  parentEmail         String?               // Email nhận xác nhận & biên lai
+  level               String                // STARTERS, MOVERS, FLYERS, KET, PET
+  fee                 Float                 // Lệ phí thi
+
+  // Quản lý thanh toán & Biên lai điện tử
+  paymentStatus       String                @default("CHUA_DONG") // CHUA_DONG, DA_DONG
+  paymentDate         DateTime?             // Thời điểm kế toán xác nhận
+  receiptCode         String?               // Mã biên lai: BL-CAM-yyMMdd-xx
+  receiptSentAt       DateTime?             // Thời gian gửi email biên lai
+  receiptSentBy       String?               // Kế toán / Admin duyệt
+  transferContent     String?               // CAM - BUI THAO NGAN
+
+  // Kết quả khảo thí từ Cambridge
+  listeningScore      String?               // vd: 4 khiên
+  readingWritingScore String?               // vd: 5 khiên
+  speakingScore       String?               // vd: 5 khiên
+  totalScore          String?               // vd: 14 khiên (14/15)
+  grade               String?               // Pass with Merit / Distinction...
+  certificateNumber   String?               // Số hiệu chứng chỉ
+  certificateDate     DateTime?             // Ngày cấp chứng chỉ
+  certificateUrl      String?               // Link ảnh scan chứng chỉ
+
+  notes               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([batchId])
+  @@index([studentId])
+  @@index([level])
+  @@index([paymentStatus])
 }
