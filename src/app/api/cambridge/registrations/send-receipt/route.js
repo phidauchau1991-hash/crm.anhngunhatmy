@@ -114,14 +114,19 @@ export async function POST(request) {
 
       if (emailResult.success) {
         sentCount++;
-        const sentTime = new Date();
-        await prisma.cambridgeRegistration.update({
-          where: { id: candidate.id },
-          data: {
-            receiptSentAt: sentTime,
-            receiptSentBy: requestUser
-          }
-        });
+        const isSimulated = !!emailResult.simulated;
+
+        // Chỉ lưu vết thời gian gửi thực tế khi không phải chế độ giả lập
+        if (!isSimulated) {
+          const sentTime = new Date();
+          await prisma.cambridgeRegistration.update({
+            where: { id: candidate.id },
+            data: {
+              receiptSentAt: sentTime,
+              receiptSentBy: requestUser
+            }
+          });
+        }
 
         results.push({
           id: candidate.id,
@@ -129,8 +134,8 @@ export async function POST(request) {
           email,
           receiptCode,
           status: 'SUCCESS',
-          simulated: !!emailResult.simulated,
-          sentAt: sentTime
+          simulated: isSimulated,
+          sentAt: isSimulated ? null : new Date()
         });
       } else {
         failedCount++;
@@ -144,11 +149,17 @@ export async function POST(request) {
       }
     }
 
+    const hasSimulated = results.some(r => r.simulated);
+
     return NextResponse.json({
       success: true,
       total: candidates.length,
       sent: sentCount,
       failed: failedCount,
+      isSimulated: hasSimulated,
+      message: hasSimulated
+        ? 'LƯU Ý: Máy chủ hiện chưa cấu hình tài khoản gửi Email (SMTP). Hệ thống đang chạy ở chế độ mô phỏng, email chưa thực sự gửi ra hộp thư Internet của phụ huynh!'
+        : `Đã gửi thành công ${sentCount} email biên lai điện tử!`,
       details: results
     });
   } catch (error) {

@@ -5,11 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import { removeVietnameseTones, formatHotline, CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG } from '@/lib/cambridgeHelper';
 
 const LEVEL_METADATA = {
-  STARTERS: { name: 'STARTERS', desc: 'Pre A1', target: 'Mầm non & Lớp 1-2' },
-  MOVERS: { name: 'MOVERS', desc: 'A1', target: 'Tiểu học (Lớp 3-4)' },
-  FLYERS: { name: 'FLYERS', desc: 'A2', target: 'Tiểu học (Lớp 4-5)' },
-  KET: { name: 'KET', desc: 'A2 Key', target: 'THCS (Lớp 6-7)' },
-  PET: { name: 'PET', desc: 'B1 Preliminary', target: 'THCS & THPT' }
+  STARTERS: { name: 'STARTERS', desc: 'Pre A1' },
+  MOVERS: { name: 'MOVERS', desc: 'A1' },
+  FLYERS: { name: 'FLYERS', desc: 'A2' },
+  KET: { name: 'KET', desc: 'A2 Key' },
+  PET: { name: 'PET', desc: 'B1 Preliminary' }
 };
 
 function RegisterContent() {
@@ -396,42 +396,74 @@ function RegisterContent() {
               </div>
             </div>
 
-            {/* Candidate Summary Card */}
+            {/* Candidate Summary Card (Thiết kế dòng xếp tầng tối ưu cho mobile) */}
             <div style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: '12px',
               padding: '1.25rem',
-              marginBottom: '1.5rem'
+              marginBottom: '1.5rem',
+              textAlign: 'left'
             }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Thông tin thí sinh đăng ký:
+              <div style={{
+                fontSize: '0.78rem',
+                fontWeight: '800',
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid #e2e8f0',
+                whiteSpace: 'nowrap'
+              }}>
+                Thông tin thí sinh đăng ký
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.9rem' }}>
-                <div>
-                  <span style={{ color: '#64748b' }}>Họ tên trên chứng chỉ:</span><br />
-                  <b style={{ color: '#0c83c1', fontSize: '1rem' }}>{submitResult.registration?.fullNameNoTone}</b>
+
+              {/* 1. Họ và tên tiếng Việt */}
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '2px' }}>
+                  Họ và tên tiếng Việt:
                 </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Họ tên tiếng Việt:</span><br />
-                  <b>{submitResult.registration?.fullName}</b>
+                <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {submitResult.registration?.fullName}
                 </div>
+              </div>
+
+              {/* 2. Tên in trên chứng chỉ Cambridge */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '2px' }}>
+                  Họ tên in trên chứng chỉ Cambridge:
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0c83c1', fontFamily: 'monospace', letterSpacing: '0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {submitResult.registration?.fullNameNoTone}
+                </div>
+              </div>
+
+              {/* 3. Cấp độ & Ngày sinh */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0' }}>
                 <div>
-                  <span style={{ color: '#64748b' }}>Cấp độ dự thi:</span><br />
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '2px' }}>
+                    Cấp độ dự thi:
+                  </div>
                   <span style={{
+                    display: 'inline-block',
                     background: '#e0f2fe',
                     color: '#0369a1',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontWeight: 'bold',
-                    fontSize: '0.8rem'
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    fontWeight: '800',
+                    fontSize: '0.85rem'
                   }}>
                     {submitResult.registration?.level}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b' }}>Ngày sinh:</span><br />
-                  <b>{submitResult.registration?.dobStr || '---'}</b>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '2px' }}>
+                    Ngày sinh:
+                  </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
+                    {submitResult.registration?.dobStr || '---'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -489,39 +521,48 @@ function RegisterContent() {
                 <div style={{ padding: '2rem', color: '#64748b' }}>Đang tạo mã QR...</div>
               )}
 
-              {/* Bank Transfer Details with 1-Click Copy */}
+              {/* Bank Transfer Details with 1-Click Copy (Thiết kế dòng xếp tầng tối ưu cho mobile) */}
               <div style={{
                 textAlign: 'left',
                 background: 'white',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
-                padding: '14px',
-                marginTop: '1rem',
-                fontSize: '0.875rem'
+                border: '1px solid #cbd5e1',
+                borderRadius: '12px',
+                padding: '16px',
+                marginTop: '1.25rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ color: '#64748b' }}>Ngân hàng thụ hưởng:</span>
-                  <b>{submitResult.bankInfo?.bankName} (MB Bank)</b>
+                {/* 1. Ngân hàng thụ hưởng */}
+                <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '2px' }}>
+                    Ngân hàng thụ hưởng:
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                    MB Bank (Ngân hàng TMCP Quân Đội)
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ color: '#64748b' }}>Số tài khoản:</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <b style={{ color: '#0c83c1', fontSize: '1.05rem', fontFamily: 'monospace' }}>
+                {/* 2. Số tài khoản */}
+                <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
+                    Số tài khoản nhận phí:
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0c83c1', fontFamily: 'monospace', letterSpacing: '1px', whiteSpace: 'nowrap' }}>
                       {submitResult.bankInfo?.accountNo}
-                    </b>
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleCopy(submitResult.bankInfo?.accountNo, 'stk')}
                       style={{
-                        padding: '2px 8px',
+                        padding: '5px 12px',
                         background: '#e0f2fe',
-                        border: 'none',
+                        border: '1px solid #bae6fd',
                         color: '#0369a1',
-                        borderRadius: '4px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {copySuccess === 'stk' ? '✓ Đã chép' : 'Chép STK'}
@@ -529,29 +570,45 @@ function RegisterContent() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ color: '#64748b' }}>Chủ tài khoản:</span>
-                  <b style={{ fontSize: '0.8rem', textAlign: 'right' }}>{submitResult.bankInfo?.accountName}</b>
+                {/* 3. Chủ tài khoản */}
+                <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '2px' }}>
+                    Chủ tài khoản:
+                  </div>
+                  <div style={{
+                    fontSize: 'clamp(0.75rem, 3.8vw, 0.95rem)',
+                    fontWeight: '800',
+                    color: '#1e293b',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {submitResult.bankInfo?.accountName}
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ color: '#64748b' }}>Số tiền lệ phí:</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <b style={{ color: '#10b981', fontSize: '1.1rem' }}>
+                {/* 4. Số tiền lệ phí */}
+                <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
+                    Số tiền lệ phí thi:
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#10b981', whiteSpace: 'nowrap' }}>
                       {(submitResult.bankInfo?.amount || 0).toLocaleString('vi-VN')} đ
-                    </b>
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleCopy(String(submitResult.bankInfo?.amount), 'sotien')}
                       style={{
-                        padding: '2px 8px',
+                        padding: '5px 12px',
                         background: '#ecfdf5',
-                        border: 'none',
+                        border: '1px solid #a7f3d0',
                         color: '#047857',
-                        borderRadius: '4px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {copySuccess === 'sotien' ? '✓ Đã chép' : 'Chép tiền'}
@@ -559,24 +616,38 @@ function RegisterContent() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#64748b' }}>Nội dung chuyển khoản:</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ background: '#fef3c7', color: '#92400e', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                {/* 5. Nội dung chuyển khoản */}
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
+                    Nội dung chuyển khoản (bắt buộc đúng cú pháp):
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      background: '#fef3c7',
+                      color: '#92400e',
+                      fontWeight: '900',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontFamily: 'monospace',
+                      fontSize: 'clamp(0.85rem, 3.8vw, 1.05rem)',
+                      whiteSpace: 'nowrap',
+                      border: '1px dashed #f59e0b'
+                    }}>
                       {submitResult.bankInfo?.transferContent}
-                    </span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleCopy(submitResult.bankInfo?.transferContent, 'noidung')}
                       style={{
-                        padding: '2px 8px',
+                        padding: '6px 12px',
                         background: '#fef3c7',
-                        border: 'none',
+                        border: '1px solid #fcd34d',
                         color: '#92400e',
-                        borderRadius: '4px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {copySuccess === 'noidung' ? '✓ Đã chép' : 'Chép cú pháp'}
@@ -713,101 +784,104 @@ function RegisterContent() {
                 )}
               </div>
 
-              {/* Field 2 & 3: Giới tính & Ngày sinh */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
-                    2. Giới tính <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {[
-                      { val: 'MALE', label: 'Nam' },
-                      { val: 'FEMALE', label: 'Nữ' }
-                    ].map(g => (
-                      <button
-                        type="button"
-                        key={g.val}
-                        onClick={() => setFormData({ ...formData, gender: g.val })}
-                        style={{
-                          flex: 1,
-                          padding: '0.7rem',
-                          borderRadius: '8px',
-                          border: formData.gender === g.val ? '2px solid #0c83c1' : '1px solid #cbd5e1',
-                          background: formData.gender === g.val ? '#f0f9ff' : 'white',
-                          color: formData.gender === g.val ? '#0c83c1' : '#475569',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem'
-                        }}
-                      >
-                        {formData.gender === g.val && <i className="fa-solid fa-check" style={{ marginRight: '4px' }}></i>}
-                        {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
-                    3. Ngày sinh <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.95rem'
-                    }}
-                    required
-                  />
+              {/* Field 2: Giới tính (Thiết kế dòng riêng thoáng đãng) */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
+                  2. Giới tính <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {[
+                    { val: 'MALE', label: 'Nam' },
+                    { val: 'FEMALE', label: 'Nữ' }
+                  ].map(g => (
+                    <button
+                      type="button"
+                      key={g.val}
+                      onClick={() => setFormData({ ...formData, gender: g.val })}
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        borderRadius: '10px',
+                        border: formData.gender === g.val ? '2px solid #0c83c1' : '1.5px solid #cbd5e1',
+                        background: formData.gender === g.val ? '#f0f9ff' : 'white',
+                        color: formData.gender === g.val ? '#0c83c1' : '#475569',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '0.95rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {formData.gender === g.val && <i className="fa-solid fa-check" style={{ marginRight: '6px' }}></i>}
+                      {g.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Field 4 & 5: SĐT & Email Phụ huynh */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
-                    4. SĐT Phụ huynh (Zalo) <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.parentPhone}
-                    onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
-                    placeholder="0911767069"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.95rem'
-                    }}
-                    required
-                  />
-                </div>
+              {/* Field 3: Ngày sinh (Dòng riêng 100% không bị hụt) */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
+                  3. Ngày tháng năm sinh của thí sinh <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.dob}
+                  onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    color: '#0f172a',
+                    background: 'white'
+                  }}
+                  required
+                />
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
-                    5. Email Phụ huynh <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.parentEmail}
-                    onChange={(e) => setFormData({ ...formData, parentEmail: e.target.value })}
-                    placeholder="email@gmail.com"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.95rem'
-                    }}
-                    required
-                  />
-                </div>
+              {/* Field 4: SĐT Phụ huynh (Dòng riêng 100% không bị hụt) */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
+                  4. Số điện thoại Phụ huynh (Zalo) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.parentPhone}
+                  onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                  placeholder="Ví dụ: 0775516982"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    color: '#0f172a'
+                  }}
+                  required
+                />
+              </div>
+
+              {/* Field 5: Email Phụ huynh (Dòng riêng 100% không bị hụt) */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px' }}>
+                  5. Email Phụ huynh (Nhận phiếu đăng ký & biên lai) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  value={formData.parentEmail}
+                  onChange={(e) => setFormData({ ...formData, parentEmail: e.target.value })}
+                  placeholder="Ví dụ: phuhuynh@gmail.com"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    color: '#0f172a'
+                  }}
+                  required
+                />
               </div>
 
               {/* Field 6: Chọn cấp độ dự thi (Chỉ hiển thị các cấp độ được mở trong đợt thi này) */}
@@ -817,35 +891,32 @@ function RegisterContent() {
                 </label>
 
                 {activeLevels.length === 1 ? (
-                  /* Giao diện tinh gọn khi đợt thi chỉ tổ chức duy nhất 1 cấp độ (Ví dụ: Chỉ Starters) */
+                  /* Giao diện tinh gọn, cân đối khi đợt thi chỉ mở duy nhất 1 cấp độ */
                   <div style={{
                     background: '#f0fdf4',
                     border: '2px solid #10b981',
                     borderRadius: '12px',
                     padding: '14px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
                     boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)'
                   }}>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        ✓ Cấp độ áp dụng cho đợt thi này
-                      </div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#065f46', marginTop: '2px' }}>
-                        {activeLevels[0]} <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#047857' }}>({LEVEL_METADATA[activeLevels[0]]?.desc || 'Cambridge'})</span>
-                      </div>
-                      {LEVEL_METADATA[activeLevels[0]]?.target && (
-                        <div style={{ fontSize: '0.8rem', color: '#059669', marginTop: '2px' }}>
-                          Đối tượng: {LEVEL_METADATA[activeLevels[0]].target}
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        ✓ CẤP ĐỘ ÁP DỤNG ĐỢT THI NÀY
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#065f46', background: '#dcfce7', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                        {LEVEL_METADATA[activeLevels[0]]?.desc || 'Cambridge'}
+                      </span>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#047857' }}>Lệ phí niêm yết:</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: '900', color: '#047857' }}>
-                        {(Number(levelsConfig[activeLevels[0]]) || 1200000).toLocaleString('vi-VN')} đ
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: '900', color: '#065f46', letterSpacing: '0.5px' }}>
+                        {activeLevels[0]}
+                      </div>
+                      <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#047857', marginRight: '6px' }}>Lệ phí:</span>
+                        <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#047857', whiteSpace: 'nowrap' }}>
+                          {(Number(levelsConfig[activeLevels[0]]) || 1200000).toLocaleString('vi-VN')} đ
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -876,7 +947,7 @@ function RegisterContent() {
                               {meta.name}
                             </div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{meta.desc}</div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px', whiteSpace: 'nowrap' }}>
                               {feeVal.toLocaleString('vi-VN')} đ
                             </div>
                           </div>

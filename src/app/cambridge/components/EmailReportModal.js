@@ -80,7 +80,28 @@ export default function EmailReportModal({ isOpen, onClose, reportData }) {
 
         {/* Content */}
         <div style={{ padding: '1.5rem' }}>
-          {message && (
+          {reportData.isSimulated && (
+            <div style={{
+              padding: '0.85rem 1rem',
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              color: '#92400e',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              fontSize: '0.875rem',
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-triangle-exclamation" style={{ color: '#d97706' }}></i>
+                CHẾ ĐỘ MÔ PHỎNG (CHƯA CẤU HÌNH TÀI KHOẢN GỬI MAIL SMTP):
+              </div>
+              <div>
+                Hệ thống CRM hiện chưa được cấu hình tài khoản Email gửi thư trong file môi trường. Thư chưa thực sự được gửi ra hộp thư Internet của người nhận. Sau khi quản trị viên cung cấp thông tin Email và Mật khẩu ứng dụng, hệ thống sẽ gửi thư thực tế ngay lập tức.
+              </div>
+            </div>
+          )}
+
+          {message && !reportData.isSimulated && (
             <div style={{
               padding: '0.85rem 1rem',
               background: '#f0f9ff',
