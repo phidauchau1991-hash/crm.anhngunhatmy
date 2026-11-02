@@ -46,14 +46,15 @@ function getTransporter() {
  * @param {Array} [options.attachments] - File đính kèm (nếu có)
  * @returns {Promise<{success: boolean, simulated?: boolean, messageId?: string, error?: string}>}
  */
-export async function sendEmail({ to, subject, htmlBody, attachments = [] }) {
+export async function sendEmail({ to, subject, htmlBody, attachments = [], from, replyTo }) {
   try {
     if (!to || !to.includes('@')) {
       return { success: false, error: 'Địa chỉ email người nhận không hợp lệ' };
     }
 
     const transporter = getTransporter();
-    const fromAddress = process.env.SMTP_FROM || (process.env.SMTP_USER ? `"Anh Ngữ Nhật Mỹ" <${process.env.SMTP_USER}>` : '"Anh Ngữ Nhật Mỹ" <cambridge@nhatmy.edu.vn>');
+    const fromAddress = from || process.env.SMTP_FROM || (process.env.SMTP_USER ? `"Khảo Thí Cambridge - Anh Ngữ Nhật Mỹ" <${process.env.SMTP_USER}>` : '"Khảo Thí Cambridge - Anh Ngữ Nhật Mỹ" <cambridge@anhngunhatmy.edu.vn>');
+    const replyToAddress = replyTo || process.env.SMTP_REPLY_TO || 'cambridge@anhngunhatmy.edu.vn';
 
     if (!transporter) {
       console.log(`[EmailService - SIMULATED MODE] Gửi thư thành công (Mô phỏng):`);
@@ -69,6 +70,7 @@ export async function sendEmail({ to, subject, htmlBody, attachments = [] }) {
 
     const info = await transporter.sendMail({
       from: fromAddress,
+      replyTo: replyToAddress,
       to,
       subject,
       html: htmlBody,
