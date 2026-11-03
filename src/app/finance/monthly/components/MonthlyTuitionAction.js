@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './MonthlyNoticeTemplate';
 
 export default function MonthlyTuitionAction({ record, inlinePreview = false }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const templateRef = useRef(null);
 
   // Helper tính toán tháng liền kề
@@ -39,14 +40,28 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
   // Tạo nội dung chuyển khoản và URL VietQR đồng bộ
   const nameNoAccent = record.studentName?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D") || '';
   const firstName = nameNoAccent.trim().split(' ').pop().toUpperCase();
-  const transferContent = `Hoc phi thang ${targetNoticeMonth} ${record.studentName}`;
+  const transferContent = `${firstName} HP THANG ${targetNoticeMonth.replace('/', '')}`;
   
-  const qrUrl = `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`;
+  const fallbackQrUrl = `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`;
+
+  useEffect(() => {
+    if (!inlinePreview && !isModalOpen) return;
+    let isMounted = true;
+    fetch(`/api/vietqr?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (isMounted && res.success && res.qrDataURL) {
+          setQrDataUrl(res.qrDataURL);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [inlinePreview, isModalOpen, finalAmount, transferContent]);
 
   const noticeData = {
     ...record,
     debtMonth: actualDebtMonth,
-    qrUrl,
+    qrUrl: qrDataUrl || fallbackQrUrl,
   };
 
   const handleCopyImage = async () => {

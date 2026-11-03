@@ -142,7 +142,7 @@ export default function TuitionNoticeAction({ student }) {
     }
 
     // D. TRỌNG TÂM 1: Tự động điền ngày học & khung giờ học theo ca (SHIFT_HOURS_CONFIG)
-    const scheduleDetails = getClassScheduleDetails(targetClass.code, targetClass.schedule);
+    const scheduleDetails = getClassScheduleDetails(targetClass.code, targetClass.scheduleRaw || targetClass.schedule);
     if (scheduleDetails.daysDisplay) {
       setStudyDays(scheduleDetails.daysDisplay);
     }

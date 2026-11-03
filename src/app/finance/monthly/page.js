@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import * as htmlToImage from 'html-to-image';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
+import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
-// Helper parse Ngày học và Giờ học từ ClassCode & Schedule
+// Helper parse Ngày học và Giờ học từ ClassCode & Schedule (Đồng bộ 100% với SHIFT_HOURS_CONFIG)
 function getScheduleInfo(classCode, schedule) {
   let days = '—';
   let shiftTime = '—';
@@ -28,12 +29,12 @@ function getScheduleInfo(classCode, schedule) {
 
   if (shiftTime === '—' && classCode) {
     const parts = classCode.split('_');
-    const rawShift = parts.length >= 5 ? parts[4].toLowerCase() : '';
-    if (rawShift === '01' || rawShift === 'ca1') shiftTime = 'Ca 1 (17:30 - 19:00)';
-    else if (rawShift === '02' || rawShift === 'ca2') shiftTime = 'Ca 2 (19:15 - 20:45)';
-    else if (rawShift === '03' || rawShift === 'ca3') shiftTime = 'Ca 3 (08:00 - 09:30)';
-    else if (rawShift === '04' || rawShift === 'ca4') shiftTime = 'Ca 4 (09:45 - 11:15)';
-    else if (rawShift) shiftTime = 'Ca ' + rawShift.toUpperCase();
+    if (parts.length >= 4) {
+      const shiftCode = extractClassShiftCode(classCode);
+      const shiftLabel = parseShift(shiftCode);
+      const hours = getShiftTime(schedule || parts[3], shiftCode);
+      shiftTime = hours ? `${shiftLabel} (${hours})` : shiftLabel;
+    }
   }
 
   return { days, shiftTime };
@@ -163,6 +164,8 @@ export default function MonthlyBillingPage() {
   const previewTemplateRef = useRef(null);
   // Ref bản in ẩn chụp toàn bộ chiều cao thư báo (100% full height không bao giờ bị cắt)
   const hiddenPrintRef = useRef(null);
+  // Mã VietQR (Base64) do máy chủ CRM tự tải về => hiển thị 100%, không phụ thuộc trình duyệt/mạng của người dùng
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   // Xóa học viên: Xác nhận xóa vĩnh viễn (demo) vs rút khỏi tháng
   const [deleteTarget, setDeleteTarget] = useState(null); // { enrollmentId, studentName, studentId, classCode }
@@ -636,11 +639,57 @@ export default function MonthlyBillingPage() {
         .toUpperCase()} HP THANG ${targetNoticeMonth.replace('/', '')}`
     : '';
 
-  const dynamicQrUrl = activeRecord
-    ? `https://img.vietqr.io/image/MB-6119916886-compact2.jpg?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(
-        calculatedTransferContent
-      )}&accountName=CONG TY TNHH NGOAI NGU TRI THUC VIET`
-    : '';
+  // Link dự phòng (chỉ dùng khi chưa kịp nạp mã Base64 từ máy chủ)
+  const fallbackQrUrl =
+    activeRecord && calculatedTotalToPay > 0
+      ? `https://img.vietqr.io/image/970422-6119916886-compact2.png?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(
+          calculatedTransferContent
+        )}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`
+      : '';
+  const dynamicQrUrl = calculatedTotalToPay > 0 ? qrDataUrl || fallbackQrUrl : '';
+
+  // Tự động tải mã VietQR Base64 từ server mỗi khi đổi số tiền / nội dung chuyển khoản
+  useEffect(() => {
+    if (!previewModalOpen || !activeRecord || calculatedTotalToPay <= 0 || !calculatedTransferContent) {
+      setQrDataUrl('');
+      return undefined;
+    }
+    let alive = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/vietqr?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(calculatedTransferContent)}`
+        );
+        const data = await res.json();
+        if (alive && data.success && data.qrDataURL) {
+          setQrDataUrl(data.qrDataURL);
+        }
+      } catch (err) {
+        console.error('Lỗi nạp mã VietQR thư báo tháng:', err);
+      }
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [previewModalOpen, activeRecord?.studentId, calculatedTotalToPay, calculatedTransferContent]);
+
+  // Đảm bảo mã QR đã sẵn sàng trước khi chụp ảnh thư báo (tránh ảnh bị thiếu QR)
+  const ensureQrReady = async () => {
+    if (calculatedTotalToPay <= 0 || qrDataUrl) return;
+    try {
+      const res = await fetch(
+        `/api/vietqr?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(calculatedTransferContent)}`
+      );
+      const data = await res.json();
+      if (data.success && data.qrDataURL) {
+        setQrDataUrl(data.qrDataURL);
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    } catch (err) {
+      console.error('Lỗi nạp nhanh QR:', err);
+    }
+  };
 
   const dynamicNoticeData = activeRecord
     ? {
@@ -693,10 +742,11 @@ export default function MonthlyBillingPage() {
 
   // Copy Ảnh Thư Báo Dán Zalo - Chụp từ hiddenPrintRef để lấy 100% chiều cao thật, không bao giờ bị cắt dẹp
   const handleCopyPreviewImage = async () => {
-    const el = hiddenPrintRef.current || previewTemplateRef.current;
-    if (!el) return;
     setCopyingPreview(true);
     try {
+      await ensureQrReady();
+      const el = hiddenPrintRef.current || previewTemplateRef.current;
+      if (!el) throw new Error('Không tìm thấy nội dung thư báo');
       const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
       if (!blob) throw new Error('Không tạo được ảnh (blob rỗng)');
       try {
@@ -715,9 +765,10 @@ export default function MonthlyBillingPage() {
   };
 
   const handleDownloadPreviewImage = async () => {
-    const el = hiddenPrintRef.current || previewTemplateRef.current;
-    if (!el) return;
     try {
+      await ensureQrReady();
+      const el = hiddenPrintRef.current || previewTemplateRef.current;
+      if (!el) return;
       const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
       const filename = `ThuBao_${activeRecord?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${targetNoticeMonth?.replace('/', '_') || 'NA'}.png`;
       

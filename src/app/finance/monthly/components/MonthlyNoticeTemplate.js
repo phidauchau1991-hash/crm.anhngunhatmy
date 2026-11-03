@@ -176,10 +176,15 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
                 QUÉT ĐỂ THANH TOÁN
               </div>
               {qrUrl ? (
-                <img src={qrUrl} alt="QR Code" style={{ width: '100%', height: 'auto', display: 'block' }} crossOrigin="anonymous" />
+                <img
+                  src={qrUrl}
+                  alt="QR Code"
+                  style={{ width: '100%', height: 'auto', display: 'block' }}
+                  {...(qrUrl.startsWith('data:') ? {} : { crossOrigin: 'anonymous' })}
+                />
               ) : (
-                <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  QR Code
+                <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '13px', color: '#475569', padding: '10px', boxSizing: 'border-box' }}>
+                  {totalToPay > 0 ? 'Đang tạo mã QR...' : 'Không phát sinh khoản cần thanh toán'}
                 </div>
               )}
               <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>

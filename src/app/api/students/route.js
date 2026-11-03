@@ -358,7 +358,11 @@ export async function POST(request) {
       customFee,
       customReason,
       paymentPolicy,
-      convertLeadId
+      convertLeadId,
+      enrollmentMode,
+      billingType,
+      monthlyRate,
+      monthlySessions
     } = body;
 
     if (!name) {
@@ -415,19 +419,32 @@ export async function POST(request) {
 
     // 3. Nếu chọn lớp, thực hiện Xếp lớp & Tạo hóa đơn Học phí
     if (classCode && classCode !== 'none') {
+      const classInfo = await prisma.class.findUnique({
+        where: { code: classCode },
+      });
+
+      const isMonthlyMode =
+        enrollmentMode === 'MONTHLY' ||
+        billingType === 'MONTHLY_PREPAID' ||
+        billingType === 'MONTHLY_POSTPAID' ||
+        classInfo?.level === 'MONTHLY';
+
+      const finalBillingType = isMonthlyMode
+        ? (billingType === 'MONTHLY_POSTPAID' ? 'MONTHLY_POSTPAID' : 'MONTHLY_PREPAID')
+        : 'COURSE';
+
       await prisma.enrollment.create({
         data: {
           studentId,
           classCode,
           status: 'Đang học',
+          billingType: finalBillingType,
+          monthlyRate: isMonthlyMode ? (parseFloat(monthlyRate) || 0) : 0,
+          monthlySessions: isMonthlyMode ? (parseInt(monthlySessions, 10) || 8) : null,
         },
       });
 
-      const classInfo = await prisma.class.findUnique({
-        where: { code: classCode },
-      });
-
-      if (classInfo) {
+      if (classInfo && !isMonthlyMode) {
         const courseConfig = await prisma.courseConfig.findUnique({
           where: { level: classInfo.level },
         });

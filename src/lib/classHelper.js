@@ -5,24 +5,32 @@ export function isWeekendSchedule(schedule) {
   return s.includes('7') || s.includes('CN') || s.includes('CHỦ NHẬT') || s.includes('CHU NHAT') || s.includes('T7');
 }
 
-// Bảng cấu hình khung giờ học chuẩn cố định của Hệ thống Anh Ngữ Nhật Mỹ
+// ============================================================================
+// BẢNG KHUNG GIỜ CA HỌC CHUẨN - NGUỒN DUY NHẤT (Single Source of Truth)
+// Mọi nơi trong CRM (chọn ca khi mở lớp, thư chuyển lớp, thư học thử, danh sách lớp,
+// học viên tháng...) đều lấy giờ học từ bảng này. Muốn đổi giờ chỉ cần sửa tại đây.
+// Chốt theo thông tin Quản lý cung cấp ngày 25/10/2026.
+// ============================================================================
 export const SHIFT_HOURS_CONFIG = {
-  // 1. Các ngày trong tuần (Thứ Hai đến thứ Sáu, ví dụ: 24, 35, 246...)
+  // 1. Các ngày trong tuần (Thứ 2-4, Thứ 3-5, 246, ... chỉ học buổi tối)
   WEEKDAY: {
-    Ca1: { shift: 'Ca 1', hours: '17:30 - 19:00', label: 'Ca 1 (17:30 - 19:00)' },
-    Ca2: { shift: 'Ca 2', hours: '19:00 - 20:30', label: 'Ca 2 (19:00 - 20:30)' },
-    Ca3: { shift: 'Ca 3', hours: '17:45 - 19:15', label: 'Ca 3 (17:45 - 19:15)' },
-    Ca4: { shift: 'Ca 4', hours: '19:30 - 21:00', label: 'Ca 4 (19:30 - 21:00)' },
+    Ca1: { shift: 'Ca 1', hours: '17:45 - 19:15', period: 'Tối' },
+    Ca2: { shift: 'Ca 2', hours: '19:30 - 21:00', period: 'Tối' },
   },
   // 2. Cuối tuần (Thứ Bảy & Chủ Nhật - học sinh tiểu học nghỉ học, học gần như cả ngày)
   WEEKEND: {
-    Ca1: { shift: 'Ca 1', hours: '08:00 - 09:30', label: 'Ca 1 (08:00 - 09:30 - Sáng)' },
-    Ca2: { shift: 'Ca 2', hours: '09:30 - 11:00', label: 'Ca 2 (09:30 - 11:00 - Sáng)' },
-    Ca3: { shift: 'Ca 3', hours: '15:30 - 17:00', label: 'Ca 3 (15:30 - 17:00 - Chiều)' },
-    Ca4: { shift: 'Ca 4', hours: '17:30 - 19:00', label: 'Ca 4 (17:30 - 19:00 - Chiều tối)' },
-    Ca5: { shift: 'Ca 5', hours: '19:00 - 20:30', label: 'Ca 5 (19:00 - 20:30 - Tối)' },
+    Ca1: { shift: 'Ca 1', hours: '07:45 - 09:15', period: 'Sáng' },
+    Ca2: { shift: 'Ca 2', hours: '09:30 - 11:00', period: 'Sáng' },
+    Ca3: { shift: 'Ca 3', hours: '13:45 - 15:15', period: 'Đầu giờ chiều' },
+    Ca4: { shift: 'Ca 4', hours: '15:30 - 17:00', period: 'Chiều' },
+    Ca5: { shift: 'Ca 5', hours: '17:00 - 18:30', period: 'Chiều tối' },
   }
 };
+
+// Tạo nhãn hiển thị dạng "Ca 1 (07:45 - 09:15 - Sáng)" từ bảng cấu hình trên
+function buildShiftOption(code, cfg) {
+  return { value: code, label: `${cfg.shift} (${cfg.hours} - ${cfg.period})` };
+}
 
 // Hàm chuẩn hóa tên Ca học (K1, K2, Ca 1, Ca 2, 01, 02...)
 export function parseShift(rawShift) {
@@ -70,38 +78,26 @@ export function extractClassShiftCode(classCode) {
 // Lấy danh sách các Ca học phù hợp kèm khung giờ chuẩn theo Lịch học tuần
 export function getAvailableShifts(schedule) {
   const isWeekend = isWeekendSchedule(schedule);
-  if (isWeekend) {
-    return [
-      { value: 'Ca1', label: 'Ca 1 (07:45 - 09:15 - Sáng)' },
-      { value: 'Ca2', label: 'Ca 2 (09:30 - 11:00 - Sáng)' },
-      { value: 'Ca3', label: 'Ca 3 (13:45 - 15:15 - Đầu giờ chiều)' },
-      { value: 'Ca4', label: 'Ca 4 (15:30 - 17:00 - Chiều)' },
-      { value: 'Ca5', label: 'Ca 5 (17:00 - 18:30 - Chiều tối)' },
-    ];
+  const config = isWeekend ? SHIFT_HOURS_CONFIG.WEEKEND : SHIFT_HOURS_CONFIG.WEEKDAY;
+  const options = Object.entries(config).map(([code, cfg]) => buildShiftOption(code, cfg));
+  if (!isWeekend) {
+    // Tùy chọn mở rộng nếu có lớp học ngoại lệ (giờ nhập tay)
+    options.push({ value: 'Ca3', label: 'Ca 3 (Khung giờ khác)' });
+    options.push({ value: 'Ca4', label: 'Ca 4 (Khung giờ khác)' });
   }
-  return [
-    { value: 'Ca1', label: 'Ca 1 (17:45 - 19:15 - Tối)' },
-    { value: 'Ca2', label: 'Ca 2 (19:30 - 21:00 - Tối)' },
-    // Tùy chọn mở rộng nếu có lớp học ngoại lệ
-    { value: 'Ca3', label: 'Ca 3 (Khung giờ khác)' },
-    { value: 'Ca4', label: 'Ca 4 (Khung giờ khác)' },
-  ];
+  return options;
 }
 
 // Trích xuất khung giờ học từ Lịch học tuần và Ca học
+// Chỉ tra đúng bảng của nhóm ngày (trong tuần / cuối tuần). Ca không có trong bảng => trả về '' để nhập tay,
+// tuyệt đối không "mượn" giờ của nhóm ngày khác (tránh hiển thị sai giờ học).
 export function getShiftTime(schedule, shiftCode) {
   const normShift = extractClassShiftCode(`___${shiftCode || 'Ca1'}`);
   const isWeekend = isWeekendSchedule(schedule);
   const primaryConfig = isWeekend ? SHIFT_HOURS_CONFIG.WEEKEND : SHIFT_HOURS_CONFIG.WEEKDAY;
-  
+
   if (primaryConfig[normShift]) {
     return primaryConfig[normShift].hours;
-  }
-  if (SHIFT_HOURS_CONFIG.WEEKEND[normShift]) {
-    return SHIFT_HOURS_CONFIG.WEEKEND[normShift].hours;
-  }
-  if (SHIFT_HOURS_CONFIG.WEEKDAY[normShift]) {
-    return SHIFT_HOURS_CONFIG.WEEKDAY[normShift].hours;
   }
   return '';
 }
@@ -121,6 +117,21 @@ export function formatScheduleDisplay(schedule) {
 
 // Trích xuất toàn diện Lịch học & Giờ học từ Mã lớp và Lịch học
 export function getClassScheduleDetails(classCode, scheduleRaw) {
+  // Hỗ trợ lớp học theo tháng có định dạng "Thứ 7, Chủ Nhật | 15h -> 17h"
+  if (scheduleRaw && String(scheduleRaw).includes('|')) {
+    const pipeParts = String(scheduleRaw).split('|');
+    const daysDisplay = pipeParts[0].trim();
+    const hours = pipeParts.slice(1).join(' | ').trim();
+    return {
+      schedule: daysDisplay,
+      shiftCode: '',
+      shiftName: '',
+      hours,
+      daysDisplay,
+      fullDisplay: hours ? `${daysDisplay} (${hours})` : daysDisplay,
+    };
+  }
+
   let schedule = scheduleRaw;
   const parts = (classCode || '').split('_');
   if (!schedule && parts.length >= 4) {

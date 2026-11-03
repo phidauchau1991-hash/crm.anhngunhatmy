@@ -53,6 +53,7 @@ export default function StudentsPage() {
   // Dữ liệu cho Cascading Dropdowns & Kho
   const [courseConfigs, setCourseConfigs] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [monthlyClasses, setMonthlyClasses] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [filteredCapDos, setFilteredCapDos] = useState([]);
   const [filteredLevels, setFilteredLevels] = useState([]);
@@ -67,6 +68,10 @@ export default function StudentsPage() {
     nationalId: '',
     specialPolicyType: 'Không giảm',
     specialPolicyValue: '0',
+    enrollmentMode: 'COURSE', // 'COURSE' | 'MONTHLY'
+    billingType: 'MONTHLY_PREPAID',
+    monthlyRate: '1.200.000',
+    monthlySessions: '8',
     program: '',
     level: '',
     classCode: '',
@@ -210,6 +215,7 @@ export default function StudentsPage() {
       const resultClasses = await resClasses.json();
       if (resultClasses.success) {
         setClasses(resultClasses.data.filter(c => c.level !== 'MONTHLY'));
+        setMonthlyClasses(resultClasses.data.filter(c => c.level === 'MONTHLY'));
       }
 
       const resInventory = await fetch('/api/inventory');
@@ -246,6 +252,7 @@ export default function StudentsPage() {
       }
 
       if (convertName) {
+        const decodedTrialClass = convertTrialClass ? decodeURIComponent(convertTrialClass) : '';
         setFormData(prev => ({
           ...prev,
           name: decodeURIComponent(convertName),
@@ -253,7 +260,7 @@ export default function StudentsPage() {
           dob: convertDob ? decodeURIComponent(convertDob) : '',
           address: convertAddress ? decodeURIComponent(convertAddress) : '',
           convertLeadId: convertLeadId || '',
-          classCode: convertTrialClass ? decodeURIComponent(convertTrialClass) : prev.classCode,
+          classCode: decodedTrialClass || prev.classCode,
         }));
         setIsModalOpen(true);
         
@@ -263,6 +270,36 @@ export default function StudentsPage() {
       }
     }
   }, [classes]);
+
+  // Tự động nhận diện Lớp học thử (nếu từ Chăm sóc học viên chuyển sang) là Lớp theo Khóa hay Lớp theo Tháng
+  useEffect(() => {
+    if (!isModalOpen || !formData.classCode) return;
+    const isMonthlyCls = monthlyClasses.some(c => c.code === formData.classCode);
+    if (isMonthlyCls && formData.enrollmentMode !== 'MONTHLY') {
+      setFormData(prev => ({ ...prev, enrollmentMode: 'MONTHLY' }));
+      return;
+    }
+    const courseCls = classes.find(c => c.code === formData.classCode);
+    if (courseCls && !formData.level && courseConfigs.length > 0) {
+      const cfg = courseConfigs.find(c => c.level === courseCls.level);
+      if (cfg) {
+        const configsUnderProgram = courseConfigs.filter(c => c.program === cfg.program);
+        const uniqueCapDos = Array.from(new Set(configsUnderProgram.map(c => c.capDo)));
+        const configsUnderCapDo = courseConfigs.filter(c => c.program === cfg.program && c.capDo === cfg.capDo);
+        const clsUnderLevel = classes.filter(c => c.level === cfg.level);
+        setFilteredCapDos(uniqueCapDos);
+        setFilteredLevels(configsUnderCapDo);
+        setFilteredClasses(clsUnderLevel);
+        setFormData(prev => ({
+          ...prev,
+          enrollmentMode: 'COURSE',
+          program: cfg.program,
+          capDo: cfg.capDo,
+          level: cfg.level,
+        }));
+      }
+    }
+  }, [isModalOpen, formData.classCode, classes, monthlyClasses, courseConfigs]);
 
   // Format số tiền mặt hàng nghìn (hỗ trợ cả số âm)
   const formatNumber = (val) => {
@@ -771,16 +808,29 @@ export default function StudentsPage() {
       return;
     }
 
-    if (parseNumber(formData.promoDiscount) > 0 && !formData.promoReason.trim()) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập "Lý do giảm thêm" để đối soát.' });
-      setSubmitting(false);
-      return;
-    }
+    if (formData.enrollmentMode === 'MONTHLY') {
+      if (!formData.classCode) {
+        setMessage({ type: 'error', text: 'Vui lòng chọn Lớp học kèm / theo tháng.' });
+        setSubmitting(false);
+        return;
+      }
+      if (parseNumber(formData.monthlyRate) <= 0) {
+        setMessage({ type: 'error', text: 'Vui lòng nhập mức Học phí tháng hợp lệ.' });
+        setSubmitting(false);
+        return;
+      }
+    } else {
+      if (parseNumber(formData.promoDiscount) > 0 && !formData.promoReason.trim()) {
+        setMessage({ type: 'error', text: 'Vui lòng nhập "Lý do giảm thêm" để đối soát.' });
+        setSubmitting(false);
+        return;
+      }
 
-    if (parseNumber(formData.customFee) > 0 && !formData.customReason.trim()) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập "Lý do thu khác" khi áp dụng học phí thỏa thuận.' });
-      setSubmitting(false);
-      return;
+      if (parseNumber(formData.customFee) > 0 && !formData.customReason.trim()) {
+        setMessage({ type: 'error', text: 'Vui lòng nhập "Lý do thu khác" khi áp dụng học phí thỏa thuận.' });
+        setSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -794,15 +844,24 @@ export default function StudentsPage() {
           amountPaid: parseNumber(formData.amountPaid),
           customFee: parseNumber(formData.customFee),
           customReason: formData.customReason,
+          monthlyRate: parseNumber(formData.monthlyRate),
+          monthlySessions: parseInt(formData.monthlySessions, 10) || 8,
         }),
       });
 
       const result = await res.json();
       if (result.success) {
-        setMessage({ type: 'success', text: `Thêm học viên thành công! Mã số: ${result.data.id}` });
+        setMessage({
+          type: 'success',
+          text: formData.enrollmentMode === 'MONTHLY'
+            ? `Thêm học viên thành công! Mã số: ${result.data.id} (Đã đồng bộ sang mục Học phí tháng)`
+            : `Thêm học viên thành công! Mã số: ${result.data.id}`
+        });
         setFormData({
           name: '', phone: '', dob: '', address: '', nationalId: '', specialPolicyType: 'Không giảm',
-          specialPolicyValue: '0', program: '', level: '', classCode: '', amountPaid: '0', promoType: '', promoDiscount: '0', promoReason: '',
+          specialPolicyValue: '0', enrollmentMode: 'COURSE', billingType: 'MONTHLY_PREPAID',
+          monthlyRate: '1.200.000', monthlySessions: '8',
+          program: '', level: '', classCode: '', amountPaid: '0', promoType: '', promoDiscount: '0', promoReason: '',
           customFee: '0', customReason: '', giftInventoryId: '', giftQuantity: 1, giftNotes: 'Tặng quà khi nhập học',
           paymentPolicy: 'Đóng trước',
           capDo: '',
@@ -1123,7 +1182,7 @@ export default function StudentsPage() {
           <label htmlFor="filter-class"><i className="fa-solid fa-chalkboard-user"></i> Lớp học:</label>
           <ClassSelect 
             id="filter-class" 
-            classes={classes}
+            classes={[...classes, ...monthlyClasses]}
             value={classFilter} 
             onChange={(e) => setClassFilter(e.target.value)} 
             placeholder="Tất cả lớp học"
@@ -1351,124 +1410,131 @@ export default function StudentsPage() {
                 {/* Xếp lớp & Học phí */}
                 <div className="form-section">
                   <h3><i className="fa-solid fa-graduation-cap"></i> Xếp lớp & Học phí</h3>
-                  <div className="form-grid-3">
-                    <div className="form-group">
-                      <label>1. Độ tuổi (DO_TUOI)</label>
-                      <select name="program" value={formData.program} onChange={handleProgramChange}>
-                        <option value="">-- Chọn --</option>
-                        {uniquePrograms.map(prog => (
-                          <option key={prog} value={prog}>{prog}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>2. Cấp độ (CAP_DO)</label>
-                      <select name="capDo" value={formData.capDo} onChange={handleCapDoChange} disabled={!formData.program}>
-                        <option value="">-- Chọn --</option>
-                        {filteredCapDos.map(cd => (
-                          <option key={cd} value={cd}>{cd}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>3. Khóa học (KHOA_HOC)</label>
-                      <select name="level" value={formData.level} onChange={handleLevelChange} disabled={!formData.capDo}>
-                        <option value="">-- Chọn --</option>
-                        {filteredLevels.map(cfg => (
-                          <option key={cfg.id} value={cfg.level}>{cfg.level}</option>
-                        ))}
-                      </select>
-                    </div>
+                  
+                  {/* Chuyển đổi linh hoạt: Học theo Khóa vs Học theo Tháng / Học kèm đặc biệt */}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', background: '#f1f5f9', padding: '0.35rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, enrollmentMode: 'COURSE', classCode: '' }))}
+                      style={{
+                        flex: 1,
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '0.82rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        background: formData.enrollmentMode !== 'MONTHLY' ? 'var(--color-primary)' : 'transparent',
+                        color: formData.enrollmentMode !== 'MONTHLY' ? '#fff' : '#475569',
+                        boxShadow: formData.enrollmentMode !== 'MONTHLY' ? '0 2px 6px rgba(13,136,196,0.25)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <i className="fa-solid fa-layer-group"></i> Học theo Khóa chuẩn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        enrollmentMode: 'MONTHLY',
+                        classCode: monthlyClasses.some(c => c.code === prev.classCode) ? prev.classCode : (monthlyClasses[0]?.code || '')
+                      }))}
+                      style={{
+                        flex: 1,
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '0.82rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        background: formData.enrollmentMode === 'MONTHLY' ? '#059669' : 'transparent',
+                        color: formData.enrollmentMode === 'MONTHLY' ? '#fff' : '#475569',
+                        boxShadow: formData.enrollmentMode === 'MONTHLY' ? '0 2px 6px rgba(5,150,105,0.25)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <i className="fa-solid fa-calendar-check"></i> Học Kèm / Đóng theo Tháng
+                    </button>
                   </div>
-                  <div className="form-group" style={{ marginTop: '1rem' }}>
-                    <label>4. Lớp học</label>
-                    <ClassSelect 
-                      name="classCode" 
-                      classes={filteredClasses}
-                      value={formData.classCode} 
-                      onChange={handleInputChange} 
-                      disabled={!formData.level}
-                      placeholder="Chờ xếp lớp"
-                    />
-                    {selectedClassInfo && (
-                      <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                        <i className="fa-solid fa-circle-info"></i> Lớp đã học {selectedClassInfo.sessionsTaught} buổi - Còn lại {selectedClassInfo.sessionsRemaining} buổi - Tổng {selectedClassInfo.totalSessions} buổi.
-                      </p>
-                    )}
-                  </div>
 
-                  {formData.level && (
-                    <div className="fee-preview-box">
-                      <h4><i className="fa-solid fa-receipt"></i> Tóm tắt học phí</h4>
-                      <div className="fee-row">
-                        <span>Học phí khóa gốc:</span>
-                        <span>{courseDetails.price.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      {selectedClassInfo && (
-                        <div className="fee-row text-primary" style={{ fontWeight: '600' }}>
-                          <span>Học phí khấu trừ ({selectedClassInfo.sessionsRemaining} buổi còn lại):</span>
-                          <span>{proRatedPrice.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
-                        </div>
-                      )}
-                      {fixedDiscountVal > 0 && (
-                        <div className="fee-row text-danger">
-                          <span>Giảm giá đặc biệt:</span>
-                          <span>-{fixedDiscountVal.toLocaleString('vi-VN')}đ</span>
-                        </div>
-                      )}
-                      <div className="form-grid-2" style={{ marginTop: '0.5rem' }}>
-                        <div className="form-group">
-                          <label>Giảm thêm (Seasonal)</label>
-                          <input type="text" name="promoDiscount" value={formData.promoDiscount} onChange={handleCurrencyChange} />
-                        </div>
-                        <div className="form-group">
-                          <label>Thực đóng đợt này</label>
-                          <input type="text" name="amountPaid" value={formData.amountPaid} onChange={handleCurrencyChange} />
-                        </div>
+                  {formData.enrollmentMode === 'MONTHLY' ? (
+                    <div className="fee-preview-box animated-scale" style={{ background: '#f0fdf4', border: '1px solid #86efac', padding: '1rem' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <i className="fa-solid fa-circle-check"></i>
+                        <span>Dành cho lớp Học kèm đặc biệt, Luyện thi TOEIC, B1, Cấp 3... Tự động đồng bộ sang mục <strong>Quản lý Học phí Tháng</strong>!</span>
                       </div>
 
-                      <div className="form-grid-2" style={{ marginTop: '0.5rem' }}>
-                        <div className="form-group">
-                          <label>Học phí thỏa thuận / Thực thu</label>
-                          <input type="text" name="customFee" value={formData.customFee} onChange={handleCurrencyChange} placeholder="Ghi đè học phí..." />
-                        </div>
-                        <div className="form-group">
-                          <label>Lý do thu khác {customFeeVal > 0 && <span className="text-danger">*</span>}</label>
-                          <input type="text" name="customReason" value={formData.customReason} onChange={handleInputChange} required={customFeeVal > 0} placeholder="VD: Dạy kèm bù riêng..." />
-                        </div>
-                      </div>
-
-                      {promoDiscountVal > 0 && (
-                        <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                          <label style={{ color: 'var(--color-danger)' }}>Lý do giảm thêm *</label>
-                          <input type="text" name="promoReason" value={formData.promoReason} onChange={handleInputChange} required placeholder="Giải trình lý do giảm giá" />
-                        </div>
-                      )}
-
-                      <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                        <label>Chính sách đóng phí tháng</label>
-                        <select name="paymentPolicy" value={formData.paymentPolicy} onChange={handleInputChange}>
-                          <option value="Đóng trước">Đóng trước (Thu trước học phí khi vào tháng)</option>
-                          <option value="Đóng sau">Đóng sau (Thu học phí sau khi học xong tháng)</option>
+                      <div className="form-group">
+                        <label>1. Chọn Lớp Học Kèm / Lớp Tháng *</label>
+                        <select
+                          name="classCode"
+                          value={formData.classCode}
+                          onChange={handleInputChange}
+                          required
+                          style={{ fontWeight: '700', color: '#065f46', border: '1px solid #34d399', background: '#fff' }}
+                        >
+                          <option value="">-- Chọn lớp học kèm / lớp tháng --</option>
+                          {monthlyClasses.map(cls => (
+                            <option key={cls.code} value={cls.code}>
+                              {cls.code} {cls.teacherName ? `(${cls.teacherName})` : ''} {cls.schedule ? `- ${cls.schedule}` : ''}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
-                      <div className="fee-total-rows">
-                        <div className="fee-row total-fee">
-                          <span>Phải đóng:</span>
-                          <span>{finalFeeToPay.toLocaleString('vi-VN')}đ</span>
+                      <div className="form-grid-2" style={{ marginTop: '0.75rem' }}>
+                        <div className="form-group">
+                          <label>2. Hình thức thu học phí tháng *</label>
+                          <select
+                            name="billingType"
+                            value={formData.billingType || 'MONTHLY_PREPAID'}
+                            onChange={handleInputChange}
+                          >
+                            <option value="MONTHLY_PREPAID">Thu đầu tháng (Đóng trước)</option>
+                            <option value="MONTHLY_POSTPAID">Thu cuối tháng (Đóng sau theo buổi thực học)</option>
+                          </select>
                         </div>
-                        <div className="fee-row debt-fee">
-                          <span>Công nợ còn lại:</span>
-                          <span className={remainingDebt > 0 ? "text-danger" : "text-success"}>
-                            {remainingDebt.toLocaleString('vi-VN')}đ
-                          </span>
+                        <div className="form-group">
+                          <label>3. Số buổi tiêu chuẩn / tháng *</label>
+                          <input
+                            type="number"
+                            name="monthlySessions"
+                            min="1"
+                            max="31"
+                            value={formData.monthlySessions || '8'}
+                            onChange={handleInputChange}
+                            placeholder="VD: 8"
+                          />
                         </div>
                       </div>
 
-                      {/* Vật tư cấp phát kèm theo */}
-                      <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed var(--color-border)' }}>
-                        <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-primary-dark)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                        <label>4. Mức học phí 1 tháng (VND) *</label>
+                        <input
+                          type="text"
+                          name="monthlyRate"
+                          value={formData.monthlyRate || ''}
+                          onChange={handleCurrencyChange}
+                          placeholder="VD: 1.200.000"
+                          required
+                          style={{ fontWeight: '800', color: '#047857', fontSize: '1rem' }}
+                        />
+                        <p className="field-note" style={{ color: '#047857', marginTop: '0.3rem' }}>
+                          <i className="fa-solid fa-calculator"></i> Đơn giá tương đương: <strong>{Math.round(parseNumber(formData.monthlyRate) / (parseInt(formData.monthlySessions, 10) || 8)).toLocaleString('vi-VN')}đ / buổi</strong>
+                        </p>
+                      </div>
+
+                      {/* Vật tư cấp phát kèm theo cho học viên tháng */}
+                      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed #86efac' }}>
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: '#065f46', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <i className="fa-solid fa-gift"></i> Quà tặng / Giáo trình cấp phát (Tùy chọn)
                         </h4>
                         <div className="form-grid-2">
@@ -1501,6 +1567,160 @@ export default function StudentsPage() {
                         </div>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="form-grid-3">
+                        <div className="form-group">
+                          <label>1. Độ tuổi (DO_TUOI)</label>
+                          <select name="program" value={formData.program} onChange={handleProgramChange}>
+                            <option value="">-- Chọn --</option>
+                            {uniquePrograms.map(prog => (
+                              <option key={prog} value={prog}>{prog}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>2. Cấp độ (CAP_DO)</label>
+                          <select name="capDo" value={formData.capDo} onChange={handleCapDoChange} disabled={!formData.program}>
+                            <option value="">-- Chọn --</option>
+                            {filteredCapDos.map(cd => (
+                              <option key={cd} value={cd}>{cd}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>3. Khóa học (KHOA_HOC)</label>
+                          <select name="level" value={formData.level} onChange={handleLevelChange} disabled={!formData.capDo}>
+                            <option value="">-- Chọn --</option>
+                            {filteredLevels.map(cfg => (
+                              <option key={cfg.id} value={cfg.level}>{cfg.level}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginTop: '1rem' }}>
+                        <label>4. Lớp học</label>
+                        <ClassSelect 
+                          name="classCode" 
+                          classes={filteredClasses}
+                          value={formData.classCode} 
+                          onChange={handleInputChange} 
+                          disabled={!formData.level}
+                          placeholder="Chờ xếp lớp"
+                        />
+                        {selectedClassInfo && (
+                          <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                            <i className="fa-solid fa-circle-info"></i> Lớp đã học {selectedClassInfo.sessionsTaught} buổi - Còn lại {selectedClassInfo.sessionsRemaining} buổi - Tổng {selectedClassInfo.totalSessions} buổi.
+                          </p>
+                        )}
+                      </div>
+
+                      {formData.level && (
+                        <div className="fee-preview-box">
+                          <h4><i className="fa-solid fa-receipt"></i> Tóm tắt học phí</h4>
+                          <div className="fee-row">
+                            <span>Học phí khóa gốc:</span>
+                            <span>{courseDetails.price.toLocaleString('vi-VN')}đ</span>
+                          </div>
+                          {selectedClassInfo && (
+                            <div className="fee-row text-primary" style={{ fontWeight: '600' }}>
+                              <span>Học phí khấu trừ ({selectedClassInfo.sessionsRemaining} buổi còn lại):</span>
+                              <span>{proRatedPrice.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                            </div>
+                          )}
+                          {fixedDiscountVal > 0 && (
+                            <div className="fee-row text-danger">
+                              <span>Giảm giá đặc biệt:</span>
+                              <span>-{fixedDiscountVal.toLocaleString('vi-VN')}đ</span>
+                            </div>
+                          )}
+                          <div className="form-grid-2" style={{ marginTop: '0.5rem' }}>
+                            <div className="form-group">
+                              <label>Giảm thêm (Seasonal)</label>
+                              <input type="text" name="promoDiscount" value={formData.promoDiscount} onChange={handleCurrencyChange} />
+                            </div>
+                            <div className="form-group">
+                              <label>Thực đóng đợt này</label>
+                              <input type="text" name="amountPaid" value={formData.amountPaid} onChange={handleCurrencyChange} />
+                            </div>
+                          </div>
+
+                          <div className="form-grid-2" style={{ marginTop: '0.5rem' }}>
+                            <div className="form-group">
+                              <label>Học phí thỏa thuận / Thực thu</label>
+                              <input type="text" name="customFee" value={formData.customFee} onChange={handleCurrencyChange} placeholder="Ghi đè học phí..." />
+                            </div>
+                            <div className="form-group">
+                              <label>Lý do thu khác {customFeeVal > 0 && <span className="text-danger">*</span>}</label>
+                              <input type="text" name="customReason" value={formData.customReason} onChange={handleInputChange} required={customFeeVal > 0} placeholder="VD: Dạy kèm bù riêng..." />
+                            </div>
+                          </div>
+
+                          {promoDiscountVal > 0 && (
+                            <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                              <label style={{ color: 'var(--color-danger)' }}>Lý do giảm thêm *</label>
+                              <input type="text" name="promoReason" value={formData.promoReason} onChange={handleInputChange} required placeholder="Giải trình lý do giảm giá" />
+                            </div>
+                          )}
+
+                          <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                            <label>Chính sách đóng phí tháng</label>
+                            <select name="paymentPolicy" value={formData.paymentPolicy} onChange={handleInputChange}>
+                              <option value="Đóng trước">Đóng trước (Thu trước học phí khi vào tháng)</option>
+                              <option value="Đóng sau">Đóng sau (Thu học phí sau khi học xong tháng)</option>
+                            </select>
+                          </div>
+
+                          <div className="fee-total-rows">
+                            <div className="fee-row total-fee">
+                              <span>Phải đóng:</span>
+                              <span>{finalFeeToPay.toLocaleString('vi-VN')}đ</span>
+                            </div>
+                            <div className="fee-row debt-fee">
+                              <span>Công nợ còn lại:</span>
+                              <span className={remainingDebt > 0 ? "text-danger" : "text-success"}>
+                                {remainingDebt.toLocaleString('vi-VN')}đ
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Vật tư cấp phát kèm theo */}
+                          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed var(--color-border)' }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-primary-dark)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <i className="fa-solid fa-gift"></i> Quà tặng / Giáo trình cấp phát (Tùy chọn)
+                            </h4>
+                            <div className="form-grid-2">
+                              <div className="form-group">
+                                <label>Chọn vật tư / giáo trình</label>
+                                <select 
+                                  name="giftInventoryId"
+                                  value={formData.giftInventoryId} 
+                                  onChange={handleInputChange}
+                                >
+                                  <option value="">-- Không tặng / cấp phát --</option>
+                                  {inventoryItems.map(item => (
+                                    <option key={item.id} value={item.id} disabled={item.currentStock <= 0}>
+                                      {item.name} (Tồn: {item.currentStock})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label>Số lượng</label>
+                                <input 
+                                  type="number" 
+                                  name="giftQuantity"
+                                  min="1" 
+                                  value={formData.giftQuantity} 
+                                  onChange={handleInputChange} 
+                                  disabled={!formData.giftInventoryId}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1884,7 +2104,7 @@ export default function StudentsPage() {
                           <label>Chọn Lớp học muốn xếp / chuyển tới *</label>
                           <ClassSelect 
                             name="newClassCode" 
-                            classes={classes}
+                            classes={[...classes, ...monthlyClasses]}
                             value={editForm.newClassCode} 
                             onChange={handleEditInputChange} 
                             required

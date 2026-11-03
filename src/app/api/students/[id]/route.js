@@ -390,15 +390,43 @@ export async function PUT(request, { params }) {
       }
 
       const currentEnrollment = student.enrollments[0];
+      const newClass = await prisma.class.findUnique({
+        where: { code: newClassCode },
+      });
+      if (!newClass) {
+        return NextResponse.json({ success: false, error: 'Không tìm thấy lớp học mới' }, { status: 400 });
+      }
+
+      // Nếu lớp mới là Lớp Học Kèm / Đóng Theo Tháng (level === 'MONTHLY')
+      if (newClass.level === 'MONTHLY') {
+        await prisma.$transaction(async (tx) => {
+          if (currentEnrollment && currentEnrollment.classCode !== newClassCode) {
+            await tx.enrollment.update({
+              where: { id: currentEnrollment.id },
+              data: { status: 'Đã chuyển lớp' },
+            });
+          }
+          await tx.enrollment.create({
+            data: {
+              studentId: id,
+              classCode: newClassCode,
+              status: 'Đang học',
+              billingType: 'MONTHLY_PREPAID',
+              monthlyRate: currentEnrollment?.monthlyRate || 1200000,
+              monthlySessions: currentEnrollment?.monthlySessions || 8,
+            },
+          });
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Đã xếp học viên vào lớp học theo tháng "${newClassCode}" thành công!`,
+          data: { newClassCode },
+        });
+      }
       
       // Nếu học sinh chưa có lớp nào, thực hiện Xếp lớp khởi điểm trực tiếp (tính học phí khấu trừ)
       if (!currentEnrollment) {
-        const newClass = await prisma.class.findUnique({
-          where: { code: newClassCode },
-        });
-        if (!newClass) {
-          return NextResponse.json({ success: false, error: 'Không tìm thấy lớp học mới' }, { status: 400 });
-        }
         const newConfig = await prisma.courseConfig.findUnique({
           where: { level: newClass.level },
         });
@@ -523,9 +551,6 @@ export async function PUT(request, { params }) {
       const debtOld = financialDifference < 0 ? Math.abs(financialDifference) : 0;
 
       // B. Lấy thông tin lớp mới để tính học phí phải đóng
-      const newClass = await prisma.class.findUnique({
-        where: { code: newClassCode },
-      });
       const newConfig = await prisma.courseConfig.findUnique({
         where: { level: newClass.level },
       });

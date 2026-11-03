@@ -27,8 +27,10 @@ export default function ClassSelect({ classes, value, onChange, placeholder = "-
     if (isEnded) {
       endedClasses.push(c);
     } else {
-      // Lấy capDo từ API, nếu không có thì fallback
-      const groupName = c.capDo || 'Khác';
+      // Lấy capDo từ API, nếu là lớp học theo tháng (MONTHLY) thì gom vào nhóm riêng dễ nhận diện
+      const groupName = c.level === 'MONTHLY'
+        ? 'Lớp Học Kèm / Đóng Theo Tháng'
+        : (c.capDo || 'Khác');
       if (!activeGroups[groupName]) activeGroups[groupName] = [];
       activeGroups[groupName].push(c);
     }
@@ -39,7 +41,7 @@ export default function ClassSelect({ classes, value, onChange, placeholder = "-
       <option value="">{placeholder}</option>
       
       {Object.keys(activeGroups).sort().map(group => (
-        <optgroup key={group} label={`--- Cấp độ ${group} ---`}>
+        <optgroup key={group} label={group.startsWith('Lớp') ? `--- ${group} ---` : `--- Cấp độ ${group} ---`}>
           {activeGroups[group].map(c => (
             <option key={c.code} value={c.code}>
               {formatClassCode(c.code)} {c.teacherName ? `- ${c.teacherName}` : ''}
