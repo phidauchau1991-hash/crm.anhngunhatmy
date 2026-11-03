@@ -2,9 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 
+const OFFICIAL_VN120_EMAIL = 'thien.vn120@sit.edu.vn';
+const TEST_ADMIN_EMAIL = 'phidau.chau.1991@gmail.com';
+const OFFICIAL_CC_EMAIL = 'phanthitrucmy@gmail.com, cambridge@anhngunhatmy.edu.vn';
+
 export default function SendVN120Modal({ isOpen, onClose, batch, registrations = [], onSuccess }) {
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [ccEmail, setCcEmail] = useState('cambridge@anhngunhatmy.edu.vn');
+  const [recipientEmail, setRecipientEmail] = useState(OFFICIAL_VN120_EMAIL);
+  const [ccEmail, setCcEmail] = useState(OFFICIAL_CC_EMAIL);
   const [filter, setFilter] = useState('paid'); // 'paid' or 'all'
   const [customMessage, setCustomMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -15,9 +19,11 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
       setErrorMsg('');
       setIsLoading(false);
       setCustomMessage('');
-      // Gợi ý email nếu chưa có
       if (!recipientEmail) {
-        setRecipientEmail('');
+        setRecipientEmail(OFFICIAL_VN120_EMAIL);
+      }
+      if (ccEmail === undefined) {
+        setCcEmail(OFFICIAL_CC_EMAIL);
       }
     }
   }, [isOpen]);
@@ -28,10 +34,22 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
   const totalCount = registrations.length;
   const currentCount = filter === 'paid' ? paidCount : totalCount;
 
+  const isTestMode = recipientEmail.toLowerCase().includes('phidau') || recipientEmail.toLowerCase().includes('test');
+
+  const handleSelectPreset = (mode) => {
+    if (mode === 'test') {
+      setRecipientEmail(TEST_ADMIN_EMAIL);
+      setCcEmail(''); // Không CC khi test theo chỉ đạo của Quản lý
+    } else {
+      setRecipientEmail(OFFICIAL_VN120_EMAIL);
+      setCcEmail(OFFICIAL_CC_EMAIL);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!recipientEmail || !recipientEmail.includes('@')) {
-      setErrorMsg('Vui lòng nhập địa chỉ email hợp lệ của Hội đồng VN120!');
+      setErrorMsg('Vui lòng nhập địa chỉ email hợp lệ của người nhận!');
       return;
     }
 
@@ -44,7 +62,8 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
       return;
     }
 
-    const confirmMsg = `Xác nhận gửi email danh sách ${currentCount} thí sinh đợt thi "${batch.title}" đến địa chỉ: ${recipientEmail}?`;
+    const targetType = isTestMode ? 'THỬ NGHIỆM NỘI BỘ' : 'CHÍNH THỨC CHO HỘI ĐỒNG VN120';
+    const confirmMsg = `Xác nhận gửi email [${targetType}] danh sách ${currentCount} thí sinh đợt thi "${batch.title}" đến địa chỉ: ${recipientEmail}?`;
     if (!window.confirm(confirmMsg)) return;
 
     setIsLoading(true);
@@ -57,7 +76,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
         body: JSON.stringify({
           batchId: batch.id,
           recipientEmail: recipientEmail.trim(),
-          ccEmail: ccEmail.trim(),
+          ccEmail: ccEmail ? ccEmail.trim() : '',
           filter,
           customMessage: customMessage.trim()
         })
@@ -70,7 +89,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
         }
         onClose();
       } else {
-        setErrorMsg(data.error || 'Có lỗi xảy ra khi gửi email tới Hội đồng');
+        setErrorMsg(data.error || 'Có lỗi xảy ra khi gửi email');
       }
     } catch (err) {
       console.error(err);
@@ -99,27 +118,30 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
         backgroundColor: '#ffffff',
         borderRadius: '16px',
         width: '100%',
-        maxWidth: '560px',
+        maxWidth: '580px',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         overflow: 'hidden',
         border: '1px solid #e2e8f0'
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #0c83c1 0%, #0369a1 100%)',
+          background: isTestMode
+            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+            : 'linear-gradient(135deg, #0c83c1 0%, #0369a1 100%)',
           padding: '1.25rem 1.5rem',
           color: '#ffffff',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          transition: 'background 0.3s'
         }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <i className="fa-solid fa-paper-plane"></i>
-              Gửi Danh Sách Cho Hội Đồng VN120
+              <i className={isTestMode ? "fa-solid fa-flask" : "fa-solid fa-paper-plane"}></i>
+              {isTestMode ? 'Gửi Thử Nghiệm Danh Sách (Kiểm Tra)' : 'Gửi Danh Sách Cho Hội Đồng VN120'}
             </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
-              Gửi trực tiếp từ email chuyên trách: <b>cambridge@anhngunhatmy.edu.vn</b>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', opacity: 0.95 }}>
+              Gửi trực tiếp từ hòm thư chính thức: <b>cambridge@anhngunhatmy.edu.vn</b>
             </p>
           </div>
           <button
@@ -143,7 +165,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}>
           {errorMsg && (
             <div style={{
               background: '#fef2f2',
@@ -161,6 +183,56 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
               <span>{errorMsg}</span>
             </div>
           )}
+
+          {/* Quick presets (Chọn nhanh mục tiêu gửi) */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', marginBottom: '6px' }}>
+              CHỌN NHANH CHẾ ĐỘ GỬI:
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('test')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: isTestMode ? '2px solid #f59e0b' : '1px solid #e2e8f0',
+                  background: isTestMode ? '#fffbeb' : '#f8fafc',
+                  color: isTestMode ? '#b45309' : '#475569',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+              >
+                🧪 Gửi Thử Cho Quản Lý
+                <div style={{ fontSize: '0.72rem', fontWeight: 'normal', color: '#64748b', marginTop: '2px' }}>
+                  {TEST_ADMIN_EMAIL}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('official')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: !isTestMode ? '2px solid #0c83c1' : '1px solid #e2e8f0',
+                  background: !isTestMode ? '#f0f9ff' : '#f8fafc',
+                  color: !isTestMode ? '#0369a1' : '#475569',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+              >
+                🏛️ Gửi Chính Thức VN120
+                <div style={{ fontSize: '0.72rem', fontWeight: 'normal', color: '#64748b', marginTop: '2px' }}>
+                  {OFFICIAL_VN120_EMAIL}
+                </div>
+              </button>
+            </div>
+          </div>
 
           {/* Thông tin đợt thi */}
           <div style={{
@@ -182,7 +254,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
           {/* Bộ lọc thí sinh gửi */}
           <div style={{ marginBottom: '1.25rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
-              Đối tượng thí sinh gửi Hội đồng:
+              Đối tượng thí sinh đưa vào file Excel:
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div
@@ -227,17 +299,49 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
             </div>
           </div>
 
-          {/* Email người nhận tại Hội đồng VN120 */}
+          {/* Email người nhận */}
           <div style={{ marginBottom: '1.1rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
-              Email Hội đồng khảo thí VN120 <span style={{ color: '#ef4444' }}>*</span>
+              Email Người Nhận (To) <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               type="email"
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
-              placeholder="Ví dụ: cambridge.vn120@gmail.com hoặc hoidongthi@vn120.edu.vn"
+              placeholder="thien.vn120@sit.edu.vn"
               required
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '8px',
+                border: isTestMode ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+            {isTestMode ? (
+              <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '4px', fontWeight: 'bold' }}>
+                ⚠️ Chế độ TEST: Gửi trực tiếp đến hòm thư Quản lý để đối soát.
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                Email chuyên trách tiếp nhận thí sinh của Hội đồng Cambridge VN120 (Thầy Thiện).
+              </div>
+            )}
+          </div>
+
+          {/* Email CC lưu vết */}
+          <div style={{ marginBottom: '1.1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
+              Email Đồng Kính Gửi (CC Nội Bộ):
+            </label>
+            <input
+              type="text"
+              value={ccEmail}
+              onChange={(e) => setCcEmail(e.target.value)}
+              placeholder="Để trống nếu không muốn CC"
               disabled={isLoading}
               style={{
                 width: '100%',
@@ -250,31 +354,8 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
               }}
             />
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-              Nhập hòm thư phụ trách nhận hồ sơ dự thi của Hội đồng Đại học Cambridge VN120.
+              {isTestMode ? 'Để trống nếu không muốn gửi bản sao lưu cho ai khác.' : 'Đồng kính gửi cho Quản lý & hòm thư cambridge@anhngunhatmy.edu.vn.'}
             </div>
-          </div>
-
-          {/* Email CC lưu vết */}
-          <div style={{ marginBottom: '1.1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
-              Email đồng kính gửi (CC lưu trữ nội bộ):
-            </label>
-            <input
-              type="text"
-              value={ccEmail}
-              onChange={(e) => setCcEmail(e.target.value)}
-              placeholder="cambridge@anhngunhatmy.edu.vn"
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.9rem',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
           </div>
 
           {/* File đính kèm thông báo */}
@@ -291,7 +372,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
           }}>
             <i className="fa-solid fa-file-excel" style={{ color: '#10b981', fontSize: '1.25rem' }}></i>
             <div>
-              Đính kèm tự động: <b>Danh_sach_Cambridge_VN120.xlsx</b> ({currentCount} dòng dữ liệu chuẩn hóa)
+              Đính kèm tự động: <b>Danh_sach_Cambridge_VN120.xlsx</b> (Chuẩn 100% biểu mẫu kẻ ô, màu chữ đỏ VN120)
             </div>
           </div>
 
@@ -304,7 +385,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
               rows={2}
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              placeholder="Ví dụ: Trung tâm đã thu đủ hồ sơ và hình thẻ 3x4 của các thí sinh..."
+              placeholder="Ví dụ: Trung tâm xin gửi danh sách đăng ký đợt 1..."
               disabled={isLoading}
               style={{
                 width: '100%',
@@ -345,7 +426,9 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
                 padding: '0.65rem 1.5rem',
                 borderRadius: '8px',
                 border: 'none',
-                background: isLoading || currentCount === 0 ? '#94a3b8' : 'linear-gradient(135deg, #0c83c1 0%, #0284c7 100%)',
+                background: isLoading || currentCount === 0
+                  ? '#94a3b8'
+                  : (isTestMode ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #0c83c1 0%, #0284c7 100%)'),
                 color: '#ffffff',
                 fontWeight: 'bold',
                 fontSize: '0.875rem',
@@ -353,7 +436,7 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 6px -1px rgba(12, 131, 193, 0.3)'
+                boxShadow: isTestMode ? '0 4px 6px -1px rgba(245, 158, 11, 0.3)' : '0 4px 6px -1px rgba(12, 131, 193, 0.3)'
               }}
             >
               {isLoading ? (
@@ -363,8 +446,8 @@ export default function SendVN120Modal({ isOpen, onClose, batch, registrations =
                 </>
               ) : (
                 <>
-                  <i className="fa-solid fa-paper-plane"></i>
-                  Gửi Cho Hội Đồng VN120 ({currentCount})
+                  <i className={isTestMode ? "fa-solid fa-flask" : "fa-solid fa-paper-plane"}></i>
+                  {isTestMode ? `Gửi Thử Nghiệm (${currentCount})` : `Gửi Hội Đồng VN120 (${currentCount})`}
                 </>
               )}
             </button>
