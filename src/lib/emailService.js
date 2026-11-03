@@ -46,7 +46,7 @@ function getTransporter() {
  * @param {Array} [options.attachments] - File đính kèm (nếu có)
  * @returns {Promise<{success: boolean, simulated?: boolean, messageId?: string, error?: string}>}
  */
-export async function sendEmail({ to, subject, htmlBody, attachments = [], from, replyTo }) {
+export async function sendEmail({ to, cc, bcc, subject, htmlBody, attachments = [], from, replyTo }) {
   try {
     if (!to || !to.includes('@')) {
       return { success: false, error: 'Địa chỉ email người nhận không hợp lệ' };
@@ -59,6 +59,7 @@ export async function sendEmail({ to, subject, htmlBody, attachments = [], from,
     if (!transporter) {
       console.log(`[EmailService - SIMULATED MODE] Gửi thư thành công (Mô phỏng):`);
       console.log(`  -> Người nhận: ${to}`);
+      if (cc) console.log(`  -> CC: ${cc}`);
       console.log(`  -> Tiêu đề: ${subject}`);
       console.log(`  -> Thời gian: ${new Date().toISOString()}`);
       return {
@@ -68,14 +69,18 @@ export async function sendEmail({ to, subject, htmlBody, attachments = [], from,
       };
     }
 
-    const info = await transporter.sendMail({
+    const mailOptions = {
       from: fromAddress,
       replyTo: replyToAddress,
       to,
       subject,
       html: htmlBody,
       attachments
-    });
+    };
+    if (cc) mailOptions.cc = cc;
+    if (bcc) mailOptions.bcc = bcc;
+
+    const info = await transporter.sendMail(mailOptions);
 
     console.log(`[EmailService] Thư đã được gửi thành công: ${info.messageId} -> ${to}`);
     return {

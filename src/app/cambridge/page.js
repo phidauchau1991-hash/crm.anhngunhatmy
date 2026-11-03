@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import BatchModal from './components/BatchModal';
 import CandidateModal from './components/CandidateModal';
 import EmailReportModal from './components/EmailReportModal';
+import SendVN120Modal from './components/SendVN120Modal';
 import { formatHotline, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
 
 export default function CambridgePage() {
@@ -32,6 +33,8 @@ export default function CambridgePage() {
   const [isEmailReportOpen, setIsEmailReportOpen] = useState(false);
   const [emailReportData, setEmailReportData] = useState(null);
   const [isSendingEmails, setIsSendingEmails] = useState(false);
+
+  const [isSendVN120Open, setIsSendVN120Open] = useState(false);
 
   // Toast notification
   const [toast, setToast] = useState(null);
@@ -969,6 +972,7 @@ export default function CambridgePage() {
           <button
             onClick={handleExportVN120}
             disabled={!currentBatch || registrations.length === 0}
+            title="Tải file Excel danh sách thí sinh chuẩn form Hội đồng VN120 về máy tính"
             style={{
               padding: '0.55rem 1.1rem',
               borderRadius: '8px',
@@ -985,6 +989,29 @@ export default function CambridgePage() {
             }}
           >
             <i className="fa-solid fa-file-excel"></i> Xuất File Chuẩn VN120
+          </button>
+
+          {/* Gửi Email Hội Đồng VN120 */}
+          <button
+            onClick={() => setIsSendVN120Open(true)}
+            disabled={!currentBatch || registrations.length === 0}
+            title="Đính kèm file Excel và gửi trực tiếp đến email Hội đồng khảo thí VN120"
+            style={{
+              padding: '0.55rem 1.1rem',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #0c83c1 0%, #0369a1 100%)',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '0.875rem',
+              cursor: !currentBatch || registrations.length === 0 ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(12, 131, 193, 0.25)'
+            }}
+          >
+            <i className="fa-solid fa-paper-plane"></i> Gửi Email Hội Đồng VN120
           </button>
         </div>
       </div>
@@ -1328,6 +1355,16 @@ export default function CambridgePage() {
         isOpen={isEmailReportOpen}
         onClose={() => setIsEmailReportOpen(false)}
         reportData={emailReportData}
+      />
+
+      <SendVN120Modal
+        isOpen={isSendVN120Open}
+        onClose={() => setIsSendVN120Open(false)}
+        batch={currentBatch}
+        registrations={registrations}
+        onSuccess={(data) => {
+          showToast(`Đã gửi thành công danh sách ${data.candidateCount} thí sinh kèm file Excel tới Hội đồng thi (${data.recipientEmail})!`);
+        }}
       />
     </div>
   );
