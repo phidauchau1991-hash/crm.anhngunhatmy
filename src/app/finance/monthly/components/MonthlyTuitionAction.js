@@ -61,7 +61,7 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
   const noticeData = {
     ...record,
     debtMonth: actualDebtMonth,
-    qrUrl: qrDataUrl || fallbackQrUrl,
+    qrUrl: qrDataUrl,
   };
 
   const handleCopyImage = async () => {

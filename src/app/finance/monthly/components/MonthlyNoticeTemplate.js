@@ -79,7 +79,8 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
               src="/logo.png" 
               alt="Logo" 
               style={{ width: '110px', height: 'auto' }} 
-              crossOrigin="anonymous"
+              loading="eager"
+              decoding="sync"
             />
           </div>
           <div style={{ flex: 1, textAlign: 'center', paddingRight: '150px' }}>
@@ -180,16 +181,14 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
                   src={qrUrl}
                   alt="QR Code"
                   style={{ width: '100%', height: 'auto', display: 'block' }}
-                  {...(qrUrl.startsWith('data:') ? {} : { crossOrigin: 'anonymous' })}
+                  loading="eager"
+                  decoding="sync"
                 />
               ) : (
                 <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '13px', color: '#475569', padding: '10px', boxSizing: 'border-box' }}>
                   {totalToPay > 0 ? 'Đang tạo mã QR...' : 'Không phát sinh khoản cần thanh toán'}
                 </div>
               )}
-              <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
-                <img src="https://img.vietqr.io/image/napas-logo.png" alt="NAPAS" style={{ height: '16px' }} crossOrigin="anonymous" onError={(e) => e.target.style.display='none'} />
-              </div>
             </div>
           </div>
         </div>

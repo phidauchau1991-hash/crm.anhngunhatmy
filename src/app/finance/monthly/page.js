@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import * as htmlToImage from 'html-to-image';
+import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
@@ -639,15 +639,6 @@ export default function MonthlyBillingPage() {
         .toUpperCase()} HP THANG ${targetNoticeMonth.replace('/', '')}`
     : '';
 
-  // Link dự phòng (chỉ dùng khi chưa kịp nạp mã Base64 từ máy chủ)
-  const fallbackQrUrl =
-    activeRecord && calculatedTotalToPay > 0
-      ? `https://img.vietqr.io/image/970422-6119916886-compact2.png?amount=${calculatedTotalToPay}&addInfo=${encodeURIComponent(
-          calculatedTransferContent
-        )}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`
-      : '';
-  const dynamicQrUrl = calculatedTotalToPay > 0 ? qrDataUrl || fallbackQrUrl : '';
-
   // Tự động tải mã VietQR Base64 từ server mỗi khi đổi số tiền / nội dung chuyển khoản
   useEffect(() => {
     if (!previewModalOpen || !activeRecord || calculatedTotalToPay <= 0 || !calculatedTransferContent) {
@@ -667,12 +658,15 @@ export default function MonthlyBillingPage() {
       } catch (err) {
         console.error('Lỗi nạp mã VietQR thư báo tháng:', err);
       }
-    }, 250);
+    }, 150);
     return () => {
       alive = false;
       clearTimeout(timer);
     };
   }, [previewModalOpen, activeRecord?.studentId, calculatedTotalToPay, calculatedTransferContent]);
+
+  // Chỉ sử dụng chuỗi Base64 PNG nội bộ cho qrUrl để không bao giờ dính lỗi CORS khi chụp ảnh
+  const dynamicQrUrl = calculatedTotalToPay > 0 ? qrDataUrl : '';
 
   // Đảm bảo mã QR đã sẵn sàng trước khi chụp ảnh thư báo (tránh ảnh bị thiếu QR)
   const ensureQrReady = async () => {
@@ -740,58 +734,80 @@ export default function MonthlyBillingPage() {
     }
   };
 
+  // Helper tạo Blob PNG từ một DOM element bằng html2canvas (đồng bộ 100% với TuitionNoticeAction)
+  const captureElementToPngBlob = async (el) => {
+    if (!el) throw new Error('Không tìm thấy vùng nội dung cần chụp ảnh');
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error('Không tạo được dữ liệu ảnh PNG'));
+      }, 'image/png', 1);
+    });
+  };
+
   // Copy Ảnh Thư Báo Dán Zalo - Chụp từ hiddenPrintRef để lấy 100% chiều cao thật, không bao giờ bị cắt dẹp
   const handleCopyPreviewImage = async () => {
     setCopyingPreview(true);
     try {
       await ensureQrReady();
+      // Chờ DOM cập nhật ảnh QR Base64
+      await new Promise((r) => setTimeout(r, 150));
       const el = hiddenPrintRef.current || previewTemplateRef.current;
       if (!el) throw new Error('Không tìm thấy nội dung thư báo');
-      const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
-      if (!blob) throw new Error('Không tạo được ảnh (blob rỗng)');
+
+      const blob = await captureElementToPngBlob(el);
       try {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        alert('Đã copy ảnh Thư Báo vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
-      } catch (err) {
-        // Fallback cho điện thoại hoặc thiết bị không hỗ trợ ghi ảnh vào clipboard
-        handleDownloadPreviewImage();
+        alert('✅ Đã copy ảnh Thư Báo vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay cho phụ huynh.');
+      } catch (clipErr) {
+        console.warn('Clipboard write fallback to download:', clipErr);
+        // Fallback cho điện thoại hoặc trình duyệt hạn chế quyền clipboard sau async
+        await handleDownloadPreviewImage(blob);
       }
     } catch (err) {
-      console.error(err);
-      alert('Có lỗi khi tạo ảnh thư báo: ' + err.message);
+      console.error('Lỗi chụp ảnh thư báo:', err);
+      const errMsg = err instanceof Error ? err.message : (err?.type ? `Lỗi tải tài nguyên ảnh (${err.type})` : String(err));
+      alert('Có lỗi khi tạo ảnh thư báo: ' + errMsg);
     } finally {
       setCopyingPreview(false);
     }
   };
 
-  const handleDownloadPreviewImage = async () => {
+  const handleDownloadPreviewImage = async (preGeneratedBlob = null) => {
     try {
-      await ensureQrReady();
-      const el = hiddenPrintRef.current || previewTemplateRef.current;
-      if (!el) return;
-      const blob = await htmlToImage.toBlob(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
-      const filename = `ThuBao_${activeRecord?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${targetNoticeMonth?.replace('/', '_') || 'NA'}.png`;
-      
-      // Hỗ trợ chia sẻ trực tiếp (Share) trên điện thoại (đặc biệt là iPhone, Zalo)
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
-        const file = new File([blob], filename, { type: 'image/png' });
-        await navigator.share({
-          files: [file],
-          title: 'Thư báo học phí',
-          text: 'Gửi phụ huynh thư báo học phí'
-        });
-        return;
+      let blob = preGeneratedBlob instanceof Blob ? preGeneratedBlob : null;
+      if (!blob) {
+        await ensureQrReady();
+        await new Promise((r) => setTimeout(r, 150));
+        const el = hiddenPrintRef.current || previewTemplateRef.current;
+        if (!el) return;
+        blob = await captureElementToPngBlob(el);
       }
-      
-      // Fallback: Tải xuống bình thường
-      const dataUrl = await htmlToImage.toPng(el, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+
+      const filename = `ThuBao_${activeRecord?.studentName?.replace(/\s+/g, '_') || 'HV'}_Thang_${targetNoticeMonth?.replace('/', '_') || 'NA'}.png`;
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = filename;
-      link.href = dataUrl;
+      link.href = url;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (err) {
-      console.error(err);
-      alert('Có lỗi khi tải ảnh thư báo.');
+      console.error('Lỗi tải ảnh thư báo:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert('Có lỗi khi tải ảnh thư báo: ' + errMsg);
     }
   };
 
@@ -899,44 +915,33 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Copy Ảnh Phiếu thu - dùng htmlToImage
+  // Copy Ảnh Phiếu thu - dùng html2canvas
   const copyReceiptImage = async () => {
     if (!receiptRef.current || copyingReceipt) return;
     setCopyingReceipt(true);
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const blob = await htmlToImage.toBlob(receiptRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: '#ffffff'
-      });
-      if (!blob) throw new Error('Không tạo được ảnh');
+      const blob = await captureElementToPngBlob(receiptRef.current);
 
       if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
         throw new Error('Trình duyệt không hỗ trợ copy ảnh vào clipboard. Vui lòng bấm nút Tải Ảnh.');
       }
 
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      alert('Đã copy Phiếu thu điện tử vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay.');
+      alert('✅ Đã copy Phiếu thu điện tử vào Clipboard! Hãy mở Zalo và dán (Ctrl+V) ngay.');
     } catch (err) {
       console.error('Lỗi copy phiếu thu:', err);
-      alert(err.message || 'Có lỗi khi tạo ảnh phiếu thu.');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert(errMsg || 'Có lỗi khi tạo ảnh phiếu thu.');
     } finally {
       setCopyingReceipt(false);
     }
   };
 
-  // Tải Ảnh Phiếu thu trực tiếp về máy tính (bỏ navigator.share để không mở popup Share Charm trên Windows)
+  // Tải Ảnh Phiếu thu trực tiếp về máy tính
   const downloadReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const blob = await htmlToImage.toBlob(receiptRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: '#ffffff'
-      });
-      if (!blob) throw new Error('Không tạo được ảnh');
+      const blob = await captureElementToPngBlob(receiptRef.current);
 
       const studentNameClean = (eReceiptData?.studentName || 'HocVien')
         .normalize('NFD')
@@ -2495,7 +2500,6 @@ export default function MonthlyBillingPage() {
             width: '850px',
             pointerEvents: 'none',
             zIndex: -99999,
-            opacity: 0,
           }}
         >
           <div ref={hiddenPrintRef} style={{ width: '800px', backgroundColor: '#ffffff', color: '#1e293b' }}>

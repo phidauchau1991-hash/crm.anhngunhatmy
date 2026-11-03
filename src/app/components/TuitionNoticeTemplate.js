@@ -382,15 +382,14 @@ const TuitionNoticeTemplate = forwardRef(({ data }, ref) => {
                     src={qrDataUrl || qrUrl} 
                     alt="VietQR" 
                     style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} 
+                    loading="eager"
+                    decoding="sync"
                   />
                 ) : (
                   <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px' }}>
                     Đang tạo mã QR...
                   </div>
                 )}
-                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
-                  <img src="https://img.vietqr.io/image/napas-logo.png" alt="NAPAS" style={{ height: '14px' }} crossOrigin="anonymous" onError={(e) => e.target.style.display='none'} />
-                </div>
               </div>
             </div>
           )}
