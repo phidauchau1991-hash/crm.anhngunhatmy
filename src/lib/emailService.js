@@ -53,7 +53,7 @@ export async function sendEmail({ to, subject, htmlBody, attachments = [], from,
     }
 
     const transporter = getTransporter();
-    const fromAddress = from || process.env.SMTP_FROM || (process.env.SMTP_USER ? `"Khảo Thí Cambridge - Anh Ngữ Nhật Mỹ" <${process.env.SMTP_USER}>` : '"Khảo Thí Cambridge - Anh Ngữ Nhật Mỹ" <cambridge@anhngunhatmy.edu.vn>');
+    const fromAddress = from || process.env.SMTP_FROM || '"Khảo Thí Cambridge - Anh Ngữ Nhật Mỹ" <cambridge@anhngunhatmy.edu.vn>';
     const replyToAddress = replyTo || process.env.SMTP_REPLY_TO || 'cambridge@anhngunhatmy.edu.vn';
 
     if (!transporter) {
