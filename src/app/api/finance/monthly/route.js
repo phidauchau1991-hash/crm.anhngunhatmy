@@ -133,7 +133,13 @@ export async function GET(request) {
 
       if (enr.billingType === 'MONTHLY_PREPAID') {
         liveCurrentFee = monthlyRate;
-        liveExcessMissing = (actualSessions - monthlySessions) * feePerSession;
+        // Nếu học viên mới vào (chưa từng có hóa đơn tháng trước) và số buổi học thực tế ít hơn số buổi chuẩn:
+        // Đây là trường hợp học viên mới vào học thử cuối tháng, KHÔNG được cấn trừ âm (hoàn tiền) các buổi chưa học!
+        if (!prevInvoice && actualSessions < monthlySessions) {
+          liveExcessMissing = 0;
+        } else {
+          liveExcessMissing = (actualSessions - monthlySessions) * feePerSession;
+        }
         liveTotalToPay = liveCurrentFee + effectivePreviousDebt + liveExcessMissing;
       } else {
         // POSTPAID (Đóng sau)

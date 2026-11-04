@@ -120,7 +120,9 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
             
             {billingType === 'MONTHLY_PREPAID' ? (
               <>
-                <li style={{ marginBottom: '8px' }}>Học phí dư/thiếu sau tháng {reviewedMonth}: <strong style={{ color: excessMissing > 0 ? '#ea580c' : excessMissing < 0 ? '#16a34a' : '#475569' }}>{formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : excessMissing < 0 ? '(Dư)' : ''}</strong></li>
+                {Number(excessMissing) !== 0 && (
+                  <li style={{ marginBottom: '8px' }}>Học phí dư/thiếu sau tháng {reviewedMonth}: <strong style={{ color: excessMissing > 0 ? '#ea580c' : excessMissing < 0 ? '#16a34a' : '#475569' }}>{formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : excessMissing < 0 ? '(Dư)' : ''}</strong></li>
+                )}
                 <li style={{ marginBottom: '8px' }}>Học phí {committedSessions} buổi của tháng {targetNoticeMonth}: <strong>{formatCurrency(currentFee)}</strong></li>
               </>
             ) : (

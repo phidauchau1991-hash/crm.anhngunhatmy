@@ -62,11 +62,13 @@ function getAdjacentMonthsHelper(my) {
 }
 
 // Soạn tin nhắn Zalo súc tích, phụ huynh nhìn 3 giây là nắm đầy đủ, gần gũi thân thiện
-function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '', customDebtMonth = '') {
+function generateZaloMessage(record, adjustedDebt = null, currentMonthYear = '', customDebtMonth = '', customExcess = null) {
   if (!record) return '';
   const previousDebt = adjustedDebt !== null ? parseFloat(adjustedDebt) || 0 : record.previousDebt || 0;
   const currentFee = record.currentFee !== undefined && record.currentFee !== null ? record.currentFee : (record.monthlyRate || 0);
-  const excess = record.excessMissing || 0;
+  const excess = customExcess !== null && customExcess !== undefined && !isNaN(parseFloat(customExcess))
+    ? parseFloat(customExcess)
+    : (record.excessMissing || 0);
   const total = currentFee + previousDebt + excess;
   const monthStr = record.monthYear || currentMonthYear || '';
 
@@ -158,6 +160,7 @@ export default function MonthlyBillingPage() {
   const [activeRecord, setActiveRecord] = useState(null);
   const [adjustedDebt, setAdjustedDebt] = useState('');
   const [adjustedDebtMonth, setAdjustedDebtMonth] = useState('');
+  const [adjustedExcess, setAdjustedExcess] = useState('');
   const [savingDebt, setSavingDebt] = useState(false);
   const [copyingPreview, setCopyingPreview] = useState(false);
   const [copyingZaloText, setCopyingZaloText] = useState(false);
@@ -609,6 +612,7 @@ export default function MonthlyBillingPage() {
   const handleOpenNoticeModal = (record) => {
     setActiveRecord(record);
     setAdjustedDebt(String(record.previousDebt || 0));
+    setAdjustedExcess(record.excessMissing !== undefined && record.excessMissing !== null ? String(record.excessMissing) : '0');
     const months = getAdjacentMonthsHelper(record.monthYear || monthYear);
     let savedDebtMonth = '';
     if (record.notes && record.notes.includes('Nợ cũ tháng')) {
@@ -624,7 +628,9 @@ export default function MonthlyBillingPage() {
   const targetNoticeMonth = activeRecord?.billingType === 'MONTHLY_PREPAID' ? currentMonths.next : currentMonths.current;
   const currentDebtNum = parseFloat(adjustedDebt) || 0;
   const currentFeeNum = activeRecord ? (activeRecord.currentFee !== undefined && activeRecord.currentFee !== null ? activeRecord.currentFee : (activeRecord.monthlyRate || 0)) : 0;
-  const excessNum = activeRecord ? activeRecord.excessMissing || 0 : 0;
+  const excessNum = activeRecord?.billingType === 'MONTHLY_PREPAID'
+    ? (adjustedExcess !== '' && !isNaN(parseFloat(adjustedExcess)) ? parseFloat(adjustedExcess) : (activeRecord?.excessMissing || 0))
+    : (activeRecord?.excessMissing || 0);
   const calculatedTotalToPay = currentFeeNum + currentDebtNum + excessNum;
 
   const calculatedTransferContent = activeRecord
@@ -691,6 +697,7 @@ export default function MonthlyBillingPage() {
         monthYear: activeRecord.monthYear || monthYear,
         debtMonth: adjustedDebtMonth || currentMonths.prev,
         previousDebt: currentDebtNum,
+        excessMissing: excessNum,
         totalToPay: calculatedTotalToPay,
         qrUrl: dynamicQrUrl,
       }
@@ -812,7 +819,7 @@ export default function MonthlyBillingPage() {
   };
 
   const handleCopyZaloMessage = async () => {
-    const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev);
+    const text = generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev, excessNum);
     setCopyingZaloText(true);
     try {
       await navigator.clipboard.writeText(text);
@@ -2321,11 +2328,58 @@ export default function MonthlyBillingPage() {
                   onClick={handleSaveAdjustedDebt}
                   disabled={savingDebt}
                   style={{ borderColor: '#D97706', color: '#D97706', fontWeight: '700', padding: '4px 10px' }}
-                  title="Lưu số nợ này vào hóa đơn của tháng"
+                  title="Lưu số nợ & cấn trừ này vào hóa đơn của tháng"
                 >
-                  {savingDebt ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-save"></i>} Lưu nợ
+                  {savingDebt ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-save"></i>} Lưu điều chỉnh
                 </button>
               </div>
+
+              {/* Tùy chọn Bù trừ dư/thiếu (đặc biệt cho học viên học thử hoặc vào mới) */}
+              {activeRecord.billingType === 'MONTHLY_PREPAID' && (
+                <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.45rem', borderTop: '1px dashed #FCD34D' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#92400E', fontWeight: '700' }}>
+                      Cấn trừ dư/thiếu sau tháng {currentMonths.current}:
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setAdjustedExcess('0')}
+                      style={{
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        border: '1px solid #7dd3fc',
+                        fontWeight: '700',
+                        fontSize: '0.78rem',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                      title="Bấm để không cấn trừ các buổi học thử (đưa về 0đ)"
+                    >
+                      <i className="fa-solid fa-wand-magic-sparkles"></i> 0đ (Học thử / Không cấn trừ)
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={adjustedExcess}
+                      onChange={(e) => setAdjustedExcess(e.target.value)}
+                      placeholder="0"
+                      style={{
+                        width: '130px',
+                        fontWeight: '800',
+                        fontSize: '0.95rem',
+                        textAlign: 'right',
+                        color: Number(excessNum) < 0 ? '#16a34a' : Number(excessNum) > 0 ? '#ea580c' : '#475569',
+                      }}
+                    />
+                    <span style={{ fontWeight: '700', color: '#92400E' }}>đ</span>
+                  </div>
+                </div>
+              )}
 
               {/* Tóm tắt nhanh số tiền mới */}
               <div style={{ width: '100%', borderTop: '1px dashed #FCD34D', paddingTop: '0.35rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -2419,7 +2473,7 @@ export default function MonthlyBillingPage() {
                   borderRadius: '6px',
                 }}
               >
-                {generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev)}
+                {generateZaloMessage(activeRecord, currentDebtNum, monthYear, adjustedDebtMonth || currentMonths.prev, excessNum)}
               </pre>
             </div>
 
