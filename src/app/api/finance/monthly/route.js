@@ -83,12 +83,14 @@ export async function GET(request) {
 
       let autoCarryDebt = 0;
       if (prevInvoice) {
-        // Nợ còn lại của tháng trước = totalToPay - amountPaid
-        const remaining = Math.max(0, (prevInvoice.totalToPay || 0) - (prevInvoice.amountPaid || 0));
-        autoCarryDebt += remaining;
-
-        if (enr.billingType === 'MONTHLY_PREPAID') {
-          autoCarryDebt += (prevInvoice.excessMissing || 0);
+        // Nợ còn lại của tháng trước:
+        // Nếu hóa đơn tháng trước đã đánh dấu PAID hoặc đã đóng đủ tiền thì công nợ = 0
+        if (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0)) {
+          autoCarryDebt = 0;
+        } else {
+          // Ngược lại, nợ còn lại của tháng trước = totalToPay - amountPaid
+          const remaining = Math.max(0, (prevInvoice.totalToPay || 0) - (prevInvoice.amountPaid || 0));
+          autoCarryDebt += remaining;
         }
       }
 
@@ -108,11 +110,18 @@ export async function GET(request) {
       const feePerSession = (monthlyRate && monthlySessions) ? monthlyRate / monthlySessions : 0;
 
       // 🔒 NGUYÊN TẮC BẢO VỆ NỢ CŨ (ANTI-OVERWRITE):
-      // Nếu hóa đơn hiện tại đã được khóa (previousDebtLocked = true) hoặc có nợ cũ > 0 mà tháng trước chưa có invoice,
-      // TUYỆT ĐỐI KHÔNG ghi đè về 0! Giữ nguyên previousDebt đã lưu.
+      // Nếu hóa đơn tháng trước đã thanh toán đủ (PAID), mà hóa đơn hiện tại chưa thanh toán (UNPAID và amountPaid === 0),
+      // thì nợ cũ tự động kết chuyển phải là 0đ (loại trừ nợ cũ ảo do dữ liệu cũ).
       let effectivePreviousDebt = autoCarryDebt;
       if (currentInvoice) {
-        if (currentInvoice.previousDebtLocked || (currentInvoice.previousDebt > 0 && !prevInvoice)) {
+        if (
+          prevInvoice &&
+          (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0)) &&
+          currentInvoice.status === 'UNPAID' &&
+          (currentInvoice.amountPaid || 0) === 0
+        ) {
+          effectivePreviousDebt = 0;
+        } else if (currentInvoice.previousDebtLocked || (currentInvoice.previousDebt > 0 && !prevInvoice)) {
           effectivePreviousDebt = currentInvoice.previousDebt;
         }
       }
@@ -156,7 +165,8 @@ export async function GET(request) {
         if (currentInvoice.status === 'UNPAID' && amountPaid === 0 && !currentInvoice.isLocked) {
           if (
             currentInvoice.actualSessions !== actualSessions ||
-            currentInvoice.totalToPay !== liveTotalToPay
+            currentInvoice.totalToPay !== liveTotalToPay ||
+            currentInvoice.previousDebt !== effectivePreviousDebt
           ) {
             needsUpdate = true;
             currentFee = liveCurrentFee;
