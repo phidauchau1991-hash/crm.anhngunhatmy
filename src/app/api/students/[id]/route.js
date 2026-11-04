@@ -163,22 +163,41 @@ export async function PUT(request, { params }) {
 
     const now = new Date();
 
-    // LUỒNG THANH TOÁN: Thu tiền học phí (Kết hợp bán giáo trình/vật tư tùy chọn)
+    // LUỒNG THANH TOÁN: Thu tiền học phí (Kết hợp bán/tặng giáo trình & tặng phẩm)
     if (action === 'collectTuition' || action === 'payment') {
-      const { amountPaid, collectAmount: collectAmtInput, paymentMethod, notes, includeItem, itemId, itemPrice, itemQuantity } = body;
+      const { 
+        amountPaid, 
+        collectAmount: collectAmtInput, 
+        paymentMethod, 
+        notes, 
+        includeItem, 
+        itemId, 
+        itemPrice, 
+        itemQuantity,
+        itemDistributionType,
+        includeGift,
+        giftId,
+        giftQuantity
+      } = body;
+
       const rawVal = String(amountPaid !== undefined && amountPaid !== null && amountPaid !== '' ? amountPaid : (collectAmtInput || '0')).replace(/[^0-9-]/g, '');
       const collectAmount = parseFloat(rawVal) || 0;
-      const itemPriceVal = parseFloat(String(itemPrice || '0').replace(/[^0-9-]/g, '')) || 0;
+      const isBookGift = itemDistributionType === 'TANG_KEM_KHOA';
+      const itemPriceVal = isBookGift ? 0 : (parseFloat(String(itemPrice || '0').replace(/[^0-9-]/g, '')) || 0);
       const itemQtyVal = parseInt(itemQuantity) || 1;
+      const giftQtyVal = parseInt(giftQuantity) || 1;
 
-      if (collectAmount <= 0 && (!includeItem || itemPriceVal <= 0)) {
-        return NextResponse.json({ success: false, error: 'Số tiền thu đợt này phải lớn hơn 0' }, { status: 400 });
+      if (collectAmount <= 0 && (!includeItem || itemPriceVal <= 0) && !includeGift) {
+        return NextResponse.json({ success: false, error: 'Số tiền thu đợt này hoặc vật tư cấp phát phải hợp lệ' }, { status: 400 });
       }
 
-      const totalItemCost = (includeItem && itemId) ? (itemPriceVal * itemQtyVal) : 0;
+      const totalItemCost = (includeItem && itemId && !isBookGift) ? (itemPriceVal * itemQtyVal) : 0;
       const tuitionPayment = Math.max(0, collectAmount - totalItemCost);
 
       const updatedOrders = [];
+      const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const receiptCode = `PT-${timestamp.slice(2, 8)}-${randomStr}`;
 
       await prisma.$transaction(async (tx) => {
         // 1. Thu tiền học phí (Ưu tiên đơn hàng chỉ định targetOrderId, sau đó theo thứ tự FIFO)
@@ -241,7 +260,7 @@ export async function PUT(request, { params }) {
           }
         }
 
-        // 2. Xuất bán Giáo trình / Vật tư tùy chọn kèm theo
+        // 2. Xuất bán hoặc Tặng kèm Giáo trình / Sách
         if (includeItem && itemId && itemQtyVal > 0) {
           const inv = await tx.inventory.findUnique({ where: { id: itemId } });
           if (!inv) throw new Error(`Không tìm thấy vật tư có mã ${itemId}`);
@@ -249,21 +268,21 @@ export async function PUT(request, { params }) {
             throw new Error(`Vật tư [${inv.name}] không đủ tồn kho (Còn: ${inv.currentStock}, Yêu cầu: ${itemQtyVal})`);
           }
 
-          const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-          const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-          const receiptCode = `PX-${timestamp}-${randomStr}`;
+          const pxCode = `PX-${timestamp}-${randomStr}`;
 
           // Tạo log kho
           await tx.inventoryLog.create({
             data: {
-              receiptCode,
+              receiptCode: pxCode,
               type: itemPriceVal > 0 ? 'XUAT_BAN' : 'XUAT_TANG',
               inventoryId: itemId,
               quantity: -itemQtyVal,
               targetType: 'STUDENT',
               targetName: student.name,
               studentId: id,
-              notes: `Xuất bán/tặng kèm đợt thu học phí${notes ? `. ${notes}` : ''}`,
+              notes: isBookGift 
+                ? `Tặng kèm giáo trình theo khóa học (${inv.name} x${itemQtyVal})${notes ? `. ${notes}` : ''}`
+                : `Xuất bán giáo trình kèm đợt thu học phí (${inv.name} x${itemQtyVal})${notes ? `. ${notes}` : ''}`,
             }
           });
 
@@ -299,12 +318,42 @@ export async function PUT(request, { params }) {
             updatedOrders.push(itemOrder);
           }
         }
+
+        // 3. Xuất Tặng phẩm ghi danh / tri ân (Balo, Áo thun, Bình nước...) nếu có chọn
+        if (includeGift && giftId && giftQtyVal > 0) {
+          const giftInv = await tx.inventory.findUnique({ where: { id: giftId } });
+          if (!giftInv) throw new Error(`Không tìm thấy quà tặng có mã ${giftId}`);
+          if (giftInv.currentStock < giftQtyVal) {
+            throw new Error(`Quà tặng [${giftInv.name}] không đủ tồn kho (Còn: ${giftInv.currentStock}, Yêu cầu: ${giftQtyVal})`);
+          }
+
+          const giftPxCode = `PXG-${timestamp}-${randomStr}`;
+
+          await tx.inventoryLog.create({
+            data: {
+              receiptCode: giftPxCode,
+              type: 'XUAT_TANG',
+              inventoryId: giftId,
+              quantity: -giftQtyVal,
+              targetType: 'STUDENT',
+              targetName: student.name,
+              studentId: id,
+              notes: `Tặng phẩm ghi danh / tri ân học viên (${giftInv.name} x${giftQtyVal})${notes ? `. ${notes}` : ''}`,
+            }
+          });
+
+          await tx.inventory.update({
+            where: { id: giftId },
+            data: { currentStock: { decrement: giftQtyVal } }
+          });
+        }
       });
 
       return NextResponse.json({ 
         success: true, 
         message: `Ghi nhận thu tiền thành công!`,
-        data: updatedOrders 
+        data: updatedOrders,
+        receiptCode
       });
     }
 

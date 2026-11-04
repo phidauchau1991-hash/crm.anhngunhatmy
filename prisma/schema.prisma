@@ -190,31 +190,36 @@ model Lead {
 model Inventory {
   id           String         @id // ID_Vat_Tu (e.g., TP_01, GT_01)
   name         String
-  category     String // Táº·ng pháº©m, GiÃ¡o trÃ¬nh, Váº­t pháº©m
-  threshold    Int            @default(5) // Má»©c cáº£nh bÃ¡o tá»“n tá»‘i thiá»ƒu
+  category     String // Tặng phẩm, Giáo trình, Vật phẩm
+  unit         String         @default("Cái") // ĐVT: Cái, Bộ, Cuốn...
+  unitCost     Float          @default(0) // Giá vốn nhập vào (VND)
+  unitPrice    Float          @default(0) // Giá bán niêm yết (VND)
+  threshold    Int            @default(5) // Mức cảnh báo tồn tối thiểu
   alertSent    Boolean        @default(false)
   currentStock Int            @default(0)
-  branchId     String         @default("CN1_BinhDuong") // Chi nhÃ¡nh chá»©a kho
+  branchId     String         @default("CN1_BinhDuong") // Chi nhánh chứa kho
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   logs         InventoryLog[]
 }
 
 model InventoryLog {
-  id          Int       @id @default(autoincrement())
-  receiptCode String? // MÃ£ phiáº¿u (VD: PX-001, PN-002) - dÃ¹ng Ä‘á»ƒ gom nhÃ³m giao dá»‹ch
-  type        String // XUAT_TANG, XUAT_MUON, NHAP_TRA, NHAP_MOI, KIEM_KE
-  inventoryId String
-  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  quantity    Int // Sá»‘ lÆ°á»£ng nháº­p (+) hoáº·c xuáº¥t (-)
+  id           Int       @id @default(autoincrement())
+  receiptCode  String? // Mã phiếu (VD: PX-001, PN-002) - dùng để gom nhóm giao dịch
+  type         String // XUAT_TANG, XUAT_BAN, XUAT_MUON, NHAP_TRA, NHAP_MOI, KIEM_KE
+  inventoryId  String
+  inventory    Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  quantity     Int // Số lượng nhập (+) hoặc xuất (-)
+  unitCost     Float     @default(0) // Đơn giá vốn tại thời điểm phát sinh (VND)
+  campaignName String? // Tên Chiến dịch / Sự kiện Marketing tiếp thị
 
-  // ThÃ´ng tin Ä‘á»‘i tÆ°á»£ng
+  // Thông tin đối tượng
   targetType String? // STUDENT, TEACHER, STAFF, SYSTEM, SUPPLIER
-  targetName String? // TÃªn ngÆ°á»i nháº­n/tráº£/nhÃ  cung cáº¥p
-  studentId  String? // Link tá»›i báº£ng Student náº¿u lÃ  há»c viÃªn (targetType = STUDENT)
+  targetName String? // Tên người nhận/trả/nhà cung cấp
+  studentId  String? // Link tới bảng Student nếu là học viên (targetType = STUDENT)
   student    Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
-  notes     String? // Ghi chÃº chi tiáº¿t
+  notes     String? // Ghi chú chi tiết
   createdAt DateTime @default(now())
 }
 

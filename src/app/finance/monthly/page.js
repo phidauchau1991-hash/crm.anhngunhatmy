@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
+import PaidStamp from '@/components/PaidStamp';
 import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
 // Helper parse Ngày học và Giờ học từ ClassCode & Schedule (Đồng bộ 100% với SHIFT_HOURS_CONFIG)
@@ -2998,10 +2999,11 @@ export default function MonthlyBillingPage() {
 
                     <div
                       style={{
-                        padding: '1.5rem 1.75rem',
+                        padding: '1.5rem 1.75rem 2.25rem 1.75rem',
                         textAlign: 'left',
                         color: '#1E293B',
-                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
+                        position: 'relative',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
@@ -3036,6 +3038,9 @@ export default function MonthlyBillingPage() {
                             }}
                           >
                             PHIẾU THU ĐIỆN TỬ
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
+                            Số: PT-T{(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-{(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}
                           </div>
                         </div>
                       </div>
@@ -3137,6 +3142,20 @@ export default function MonthlyBillingPage() {
                           {Number(eReceiptData.amountThisTime || 0).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
+
+                      {/* Footer */}
+                      <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
+                        <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh & Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
+                      </div>
+
+                      {/* CON DẤU MỘC ĐỎ ĐIỆN TỬ "ĐÃ THU TIỀN / PAID" */}
+                      <PaidStamp
+                        date={eReceiptData.date}
+                        time={eReceiptData.time}
+                        receiptCode={`PT-T${(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-${(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}`}
+                        size={142}
+                        style={{ right: '12px', bottom: '22px' }}
+                      />
                     </div>
                   </div>
 

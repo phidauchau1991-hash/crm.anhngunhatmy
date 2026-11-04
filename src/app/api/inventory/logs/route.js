@@ -14,11 +14,11 @@ export async function GET(request) {
     const logs = await prisma.inventoryLog.findMany({
       where,
       include: {
-        inventory: { select: { name: true, category: true } },
+        inventory: { select: { name: true, category: true, unit: true, unitCost: true, unitPrice: true } },
         student: { select: { name: true } }
       },
       orderBy: { createdAt: 'desc' },
-      take: 100, // Limit for UI performance
+      take: 150, // Limit for UI performance
     });
 
     return NextResponse.json({ success: true, data: logs });
@@ -33,7 +33,7 @@ export async function POST(request) {
     const body = await request.json();
     // type: XUAT_TANG, XUAT_MUON, NHAP_TRA, NHAP_MOI, KIEM_KE
     // targetType: STUDENT, TEACHER, STAFF, SYSTEM, SUPPLIER
-    const { type, targetType, targetName, studentId, notes, items, amountCollected, paymentMethod } = body;
+    const { type, targetType, targetName, studentId, notes, items, amountCollected, paymentMethod, campaignName } = body;
 
     if (!type || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: 'Thiếu thông tin loại phiếu hoặc danh sách vật tư' }, { status: 400 });
@@ -58,16 +58,22 @@ export async function POST(request) {
         }
 
         const actualQuantity = isExport ? -item.quantity : item.quantity;
+        const inv = await tx.inventory.findUnique({ where: { id: item.inventoryId } });
+        if (!inv) throw new Error(`Không tìm thấy vật tư có mã ${item.inventoryId}`);
 
         // 1. Kiểm tra tồn kho trước khi xuất
         if (isExport) {
-          const inv = await tx.inventory.findUnique({ where: { id: item.inventoryId } });
-          if (!inv) throw new Error(`Không tìm thấy vật tư có mã ${item.inventoryId}`);
           if (inv.currentStock < item.quantity) {
             throw new Error(`Vật tư [${inv.name}] không đủ tồn kho (Còn: ${inv.currentStock}, Yêu cầu: ${item.quantity})`);
           }
           itemNames.push(`${inv.name} (x${item.quantity})`);
         }
+
+        const logUnitCost = item.unitCost !== undefined && item.unitCost !== null && item.unitCost !== ''
+          ? (parseFloat(String(item.unitCost).replace(/[^0-9.-]/g, '')) || 0)
+          : (inv.unitCost || 0);
+
+        const logCampaign = item.campaignName || campaignName || null;
 
         // 2. Tạo log
         const log = await tx.inventoryLog.create({
@@ -76,6 +82,8 @@ export async function POST(request) {
             type,
             inventoryId: item.inventoryId,
             quantity: actualQuantity,
+            unitCost: logUnitCost,
+            campaignName: logCampaign,
             targetType: targetType || 'SYSTEM',
             targetName: targetName || null,
             studentId: studentId || null,
@@ -84,14 +92,19 @@ export async function POST(request) {
         });
         createdLogs.push(log);
 
-        // 3. Cập nhật tồn kho
+        // 3. Cập nhật tồn kho (và cập nhật giá vốn nếu nhập mới có giá mới)
+        const updateData = {
+          currentStock: {
+            increment: actualQuantity
+          }
+        };
+        if (type === 'NHAP_MOI' && item.unitCost && parseFloat(item.unitCost) > 0) {
+          updateData.unitCost = logUnitCost;
+        }
+
         await tx.inventory.update({
           where: { id: item.inventoryId },
-          data: {
-            currentStock: {
-              increment: actualQuantity
-            }
-          }
+          data: updateData
         });
       }
 

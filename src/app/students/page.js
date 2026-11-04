@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
+import PaidStamp from '@/components/PaidStamp';
 
 const getNormalizedStatus = (st) => {
   if (!st) return 'Đang học';
@@ -108,15 +109,19 @@ export default function StudentsPage() {
     manualReason: '',
   });
 
-  // Form Thu học phí (Tích hợp bán giáo trình đi kèm)
+  // Form Thu học phí (Tích hợp bán/tặng giáo trình & quà tặng ghi danh)
   const [paymentForm, setPaymentForm] = useState({
     collectAmount: '',
     paymentMethod: 'Chuyển khoản',
     notes: '',
     includeItem: false,
     itemId: '',
+    itemDistributionType: 'TANG_KEM_KHOA', // 'TANG_KEM_KHOA' | 'BAN'
     itemPrice: '0',
     itemQuantity: 1,
+    includeGift: false,
+    giftId: '',
+    giftQuantity: 1,
   });
 
   // Form Cấp phát vật tư / Bán mới / Mua lại
@@ -634,38 +639,63 @@ export default function StudentsPage() {
     }
   };
 
+  const captureReceiptCanvas = async () => {
+    if (!receiptRef.current) return null;
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    return await html2canvas(receiptRef.current, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+  };
+
   const copyReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
+      const canvas = await captureReceiptCanvas();
+      if (!canvas) throw new Error('Không tạo được vùng ảnh');
       canvas.toBlob(async (blob) => {
         try {
+          if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
+            throw new Error('Clipboard không được hỗ trợ');
+          }
           await navigator.clipboard.write([
             new ClipboardItem({ 'image/png': blob })
           ]);
-          alert('Đã copy hình ảnh phiếu thu vào Clipboard!');
+          alert('✅ Đã copy hình ảnh Phiếu thu điện tử vào Clipboard! Hãy mở Zalo/Facebook và dán (Ctrl+V) ngay.');
         } catch (err) {
           console.error(err);
-          alert('Trình duyệt không hỗ trợ copy ảnh trực tiếp (Yêu cầu HTTPS). Vui lòng dùng nút Tải Ảnh.');
+          alert('Trình duyệt không hỗ trợ copy ảnh trực tiếp vào Clipboard (yêu cầu HTTPS/quyền). Vui lòng dùng nút "Tải Ảnh".');
         }
-      });
+      }, 'image/png', 1);
     } catch (err) {
       console.error(err);
-      alert('Có lỗi khi tạo ảnh phiếu thu');
+      alert('Có lỗi khi tạo ảnh phiếu thu: ' + (err?.message || err));
     }
   };
 
   const downloadReceiptImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, logging: false });
+      const canvas = await captureReceiptCanvas();
+      if (!canvas) throw new Error('Không tạo được vùng ảnh');
+      const studentNameClean = (eReceiptData?.studentName || 'HocVien')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .replace(/\s+/g, '_');
       const link = document.createElement('a');
-      link.download = `PhieuThu_${eReceiptData.studentName.replace(/\s+/g, '_')}.png`;
+      link.download = `PhieuThu_${studentNameClean}_${(eReceiptData?.receiptCode || '2026').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
       console.error(err);
-      alert('Có lỗi khi tải ảnh');
+      alert('Có lỗi khi tải ảnh: ' + (err?.message || err));
     }
   };
 
@@ -675,6 +705,9 @@ export default function StudentsPage() {
     setMessage({ type: '', text: '' });
 
     try {
+      const isBookGift = paymentForm.itemDistributionType === 'TANG_KEM_KHOA';
+      const parsedItemPrice = isBookGift ? 0 : parseNumber(paymentForm.itemPrice);
+
       const res = await fetch(`/api/students/${selectedStudentId}`, {
         method: 'PUT',
         headers: {
@@ -687,14 +720,18 @@ export default function StudentsPage() {
           notes: paymentForm.notes,
           includeItem: paymentForm.includeItem,
           itemId: paymentForm.itemId,
-          itemPrice: parseNumber(paymentForm.itemPrice),
+          itemDistributionType: paymentForm.itemDistributionType || 'TANG_KEM_KHOA',
+          itemPrice: parsedItemPrice,
           itemQuantity: paymentForm.itemQuantity,
+          includeGift: paymentForm.includeGift,
+          giftId: paymentForm.giftId,
+          giftQuantity: paymentForm.giftQuantity || 1,
         }),
       });
 
       const result = await res.json();
       if (result.success) {
-        setMessage({ type: 'success', text: `Ghi nhận thu tiền học phí & giáo trình thành công!` });
+        setMessage({ type: 'success', text: `Ghi nhận thu tiền học phí & giáo trình/tặng phẩm thành công!` });
         fetchStudents();
         fetchConfigsAndClasses();
         
@@ -703,29 +740,68 @@ export default function StudentsPage() {
         const oldDebt = editStudentData?.orders?.reduce((sum, o) => sum + ((o.feeToPay || 0) - (o.amountPaid || 0)), 0) || 0;
         const totalPaid = parseNumber(paymentForm.collectAmount);
         
+        const receiptItems = [];
+
+        // 1. Giáo trình
         let bookCost = 0;
         let bookName = '';
-        if (paymentForm.includeItem) {
-          bookCost = parseNumber(paymentForm.itemPrice) * (parseInt(paymentForm.itemQuantity, 10) || 1);
+        if (paymentForm.includeItem && paymentForm.itemId) {
           const selectedItem = inventoryItems.find(i => i.id === paymentForm.itemId);
-          if (selectedItem) bookName = `${selectedItem.name} (x${paymentForm.itemQuantity || 1})`;
+          const cfg = courseConfigs.find(c => c.bookName === selectedItem?.name);
+          const originalPrice = cfg?.bookPrice || 250000;
+          const isGift = paymentForm.itemDistributionType === 'TANG_KEM_KHOA';
+          const qty = parseInt(paymentForm.itemQuantity, 10) || 1;
+          const price = isGift ? 0 : (parsedItemPrice * qty);
+
+          bookCost = price;
+          bookName = selectedItem?.name ? `${selectedItem.name} (x${qty})` : 'Giáo trình';
+
+          receiptItems.push({
+            type: isGift ? 'MATERIAL_GIFT' : 'MATERIAL_SOLD',
+            name: bookName,
+            quantity: qty,
+            price,
+            originalPrice: isGift ? (originalPrice * qty) : null,
+            badge: isGift ? 'TẶNG KÈM THEO KHÓA HỌC' : 'GIÁO TRÌNH BÁN',
+            badgeColor: isGift ? '#059669' : '#0D88C4'
+          });
         }
-        
+
+        // 2. Quà tặng ghi danh
+        if (paymentForm.includeGift && paymentForm.giftId) {
+          const selectedGift = inventoryItems.find(i => i.id === paymentForm.giftId);
+          const qty = parseInt(paymentForm.giftQuantity, 10) || 1;
+          const giftName = selectedGift?.name ? `${selectedGift.name} (x${qty})` : 'Quà tặng ghi danh';
+
+          receiptItems.push({
+            type: 'GIFT',
+            name: giftName,
+            quantity: qty,
+            price: 0,
+            originalPrice: null,
+            badge: 'QUÀ TẶNG GHI DANH',
+            badgeColor: '#D97706'
+          });
+        }
+
         const tuitionPaid = Math.max(0, totalPaid - bookCost);
         const remainingDebt = Math.max(0, oldDebt - tuitionPaid);
+        const receiptCode = result.receiptCode || `PT-${new Date().toISOString().replace(/[-:T]/g, '').slice(2, 10)}`;
         
         setEReceiptData({
+          receiptCode,
           studentName,
           courseFee: totalCourseFee > 0 ? totalCourseFee : oldDebt,
           oldDebt,
           tuitionPaid,
           remainingDebt,
+          items: receiptItems,
           bookName,
           bookCost,
           totalPaid,
           date: new Date().toLocaleDateString('vi-VN'),
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          cashier: 'Admin',
+          cashier: 'Thu ngân / Kế toán',
           paymentMethod: paymentForm.paymentMethod,
         });
         
@@ -735,8 +811,12 @@ export default function StudentsPage() {
           notes: '',
           includeItem: false,
           itemId: '',
+          itemDistributionType: 'TANG_KEM_KHOA',
           itemPrice: '0',
           itemQuantity: 1,
+          includeGift: false,
+          giftId: '',
+          giftQuantity: 1,
         });
       } else {
         setMessage({ type: 'error', text: result.error || 'Có lỗi xảy ra khi thu tiền.' });
@@ -1865,69 +1945,184 @@ export default function StudentsPage() {
                                   </div>
                                 </div>
 
-                                {/* MỤC MUA GIÁO TRÌNH VẬT TƯ TÙY CHỌN ĐI KÈM */}
-                                <div style={{ marginTop: '1.25rem', padding: '1rem', border: '1px dashed var(--color-primary)', borderRadius: '8px', background: 'rgba(13, 136, 196, 0.03)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: paymentForm.includeItem ? '0.75rem' : 0 }}>
-                                    <input 
-                                      type="checkbox" 
-                                      id="includeItem" 
-                                      checked={paymentForm.includeItem} 
-                                      onChange={(e) => setPaymentForm(prev => ({ ...prev, includeItem: e.target.checked }))} 
-                                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                    />
-                                    <label htmlFor="includeItem" style={{ fontWeight: '700', color: 'var(--color-primary-dark)', cursor: 'pointer', margin: 0 }}>
-                                      <i className="fa-solid fa-book"></i> Đóng kèm tiền mua Giáo trình / Vật tư tùy chọn
-                                    </label>
-                                  </div>
+                                {/* MỤC GIÁO TRÌNH & QUÀ TẶNG KÈM THEO */}
+                                 <div style={{ marginTop: '1.25rem', padding: '1rem', border: '1px dashed var(--color-primary)', borderRadius: '10px', background: 'rgba(13, 136, 196, 0.03)' }}>
+                                   
+                                   {/* 1. Kèm Giáo trình / Sách học viên */}
+                                   <div style={{ marginBottom: paymentForm.includeItem ? '0.85rem' : '0.5rem' }}>
+                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                       <input 
+                                         type="checkbox" 
+                                         id="includeItem" 
+                                         checked={paymentForm.includeItem} 
+                                         onChange={(e) => setPaymentForm(prev => ({ ...prev, includeItem: e.target.checked }))} 
+                                         style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                       />
+                                       <label htmlFor="includeItem" style={{ fontWeight: '700', color: 'var(--color-primary-dark)', cursor: 'pointer', margin: 0 }}>
+                                         <i className="fa-solid fa-book"></i> Kèm Giáo trình / Sách học viên
+                                       </label>
+                                     </div>
 
-                                  {paymentForm.includeItem && (
-                                    <div className="animated-scale">
-                                      <div className="form-grid-2">
-                                        <div className="form-group">
-                                          <label>Chọn Giáo trình / Vật tư *</label>
-                                          <select 
-                                            value={paymentForm.itemId} 
-                                            onChange={(e) => {
-                                              const selectedId = e.target.value;
-                                              const item = inventoryItems.find(i => i.id === selectedId);
-                                              const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                              const defaultPrice = cfg?.bookPrice || 0;
-                                              setPaymentForm(prev => ({
-                                                ...prev,
-                                                itemId: selectedId,
-                                                itemPrice: formatNumber(defaultPrice),
-                                              }));
-                                            }}
-                                          >
-                                            <option value="">-- Chọn vật tư --</option>
-                                            {inventoryItems.map(item => (
-                                              <option key={item.id} value={item.id} disabled={item.currentStock <= 0}>
-                                                {item.name} ({item.category} - Tồn kho: {item.currentStock})
-                                              </option>
-                                            ))}
-                                          </select>
-                                        </div>
+                                     {paymentForm.includeItem && (
+                                       <div className="animated-scale" style={{ marginTop: '0.65rem', padding: '0.85rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                         {/* Chọn hình thức cấp phát */}
+                                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                           <button
+                                             type="button"
+                                             onClick={() => {
+                                               setPaymentForm(prev => ({ ...prev, itemDistributionType: 'TANG_KEM_KHOA', itemPrice: '0' }));
+                                             }}
+                                             style={{
+                                               flex: 1,
+                                               padding: '0.45rem 0.6rem',
+                                               borderRadius: '6px',
+                                               fontSize: '0.82rem',
+                                               fontWeight: '700',
+                                               border: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '2px solid #059669' : '1px solid #CBD5E1',
+                                               background: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '#ECFDF5' : '#F8FAFC',
+                                               color: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '#065F46' : '#64748B',
+                                               cursor: 'pointer',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'center',
+                                               gap: '0.35rem'
+                                             }}
+                                           >
+                                             <i className="fa-solid fa-gift"></i> Tặng kèm theo khóa (0đ)
+                                           </button>
+                                           <button
+                                             type="button"
+                                             onClick={() => {
+                                               setPaymentForm(prev => {
+                                                 const item = inventoryItems.find(i => i.id === prev.itemId);
+                                                 const cfg = courseConfigs.find(c => c.bookName === item?.name);
+                                                 const defaultPrice = cfg?.bookPrice || 200000;
+                                                 return { ...prev, itemDistributionType: 'BAN', itemPrice: formatNumber(defaultPrice) };
+                                               });
+                                             }}
+                                             style={{
+                                               flex: 1,
+                                               padding: '0.45rem 0.6rem',
+                                               borderRadius: '6px',
+                                               fontSize: '0.82rem',
+                                               fontWeight: '700',
+                                               border: paymentForm.itemDistributionType === 'BAN' ? '2px solid #0D88C4' : '1px solid #CBD5E1',
+                                               background: paymentForm.itemDistributionType === 'BAN' ? '#EFF6FF' : '#F8FAFC',
+                                               color: paymentForm.itemDistributionType === 'BAN' ? '#085E8A' : '#64748B',
+                                               cursor: 'pointer',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'center',
+                                               gap: '0.35rem'
+                                             }}
+                                           >
+                                             <i className="fa-solid fa-cart-shopping"></i> Bán giáo trình (Có thu)
+                                           </button>
+                                         </div>
 
-                                        <div className="form-group">
-                                          <label>Giá niêm yết / Đơn giá (VND)</label>
-                                          <input 
-                                            type="text" 
-                                            value={paymentForm.itemPrice} 
-                                            onChange={(e) => setPaymentForm(prev => ({ ...prev, itemPrice: formatNumber(e.target.value) }))} 
-                                          />
-                                        </div>
-                                      </div>
-                                      
-                                      {parseNumber(paymentForm.itemPrice) > 0 && (
-                                        <p className="field-note" style={{ color: 'var(--color-success)', fontWeight: '600', marginTop: '0.25rem' }}>
-                                          <i className="fa-solid fa-circle-check"></i> Tiền giáo trình sẽ tự động được ghi nhận hóa đơn tài chính và trừ 1 sản phẩm khỏi Kho.
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                         <div className="form-grid-2">
+                                           <div className="form-group">
+                                             <label style={{ fontSize: '0.82rem', fontWeight: '600' }}>Chọn Bộ Giáo trình *</label>
+                                             <select 
+                                               value={paymentForm.itemId} 
+                                               onChange={(e) => {
+                                                 const selectedId = e.target.value;
+                                                 const item = inventoryItems.find(i => i.id === selectedId);
+                                                 const cfg = courseConfigs.find(c => c.bookName === item?.name);
+                                                 const defaultPrice = cfg?.bookPrice || 0;
+                                                 setPaymentForm(prev => ({
+                                                   ...prev,
+                                                   itemId: selectedId,
+                                                   itemPrice: prev.itemDistributionType === 'TANG_KEM_KHOA' ? '0' : formatNumber(defaultPrice),
+                                                 }));
+                                               }}
+                                             >
+                                               <option value="">-- Chọn giáo trình trong kho --</option>
+                                               {inventoryItems.map(item => (
+                                                 <option key={item.id} value={item.id} disabled={item.currentStock <= 0}>
+                                                   {item.name} ({item.category} - Còn tồn: {item.currentStock})
+                                                 </option>
+                                               ))}
+                                             </select>
+                                           </div>
 
-                                <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                                           <div className="form-group">
+                                             <label style={{ fontSize: '0.82rem', fontWeight: '600' }}>
+                                               {paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? 'Giá trị thu (0đ Miễn phí)' : 'Đơn giá bán (VND)'}
+                                             </label>
+                                             <input 
+                                               type="text" 
+                                               value={paymentForm.itemPrice} 
+                                               disabled={paymentForm.itemDistributionType === 'TANG_KEM_KHOA'}
+                                               onChange={(e) => setPaymentForm(prev => ({ ...prev, itemPrice: formatNumber(e.target.value) }))} 
+                                               style={{ background: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '#F1F5F9' : '#FFFFFF' }}
+                                             />
+                                           </div>
+                                         </div>
+                                         
+                                         <p className="field-note" style={{ color: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '#059669' : '#0D88C4', fontWeight: '600', marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                                           {paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? (
+                                             <span><i className="fa-solid fa-circle-check"></i> Giáo trình sẽ hiển thị <strong>0đ [TẶNG KÈM THEO KHÓA HỌC]</strong> trên phiếu thu và tự động xuất kho 1 cuốn.</span>
+                                           ) : (
+                                             <span><i className="fa-solid fa-circle-check"></i> Tiền giáo trình sẽ tự động được cộng vào phiếu thu và trừ tồn kho 1 cuốn.</span>
+                                           )}
+                                         </p>
+                                       </div>
+                                     )}
+                                   </div>
+
+                                   {/* 2. Kèm Quà tặng ghi danh / Tri ân (Balo, Áo thun, Bình nước...) */}
+                                   <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '0.65rem' }}>
+                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                       <input 
+                                         type="checkbox" 
+                                         id="includeGift" 
+                                         checked={paymentForm.includeGift} 
+                                         onChange={(e) => setPaymentForm(prev => ({ ...prev, includeGift: e.target.checked }))} 
+                                         style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                       />
+                                       <label htmlFor="includeGift" style={{ fontWeight: '700', color: 'var(--color-primary-dark)', cursor: 'pointer', margin: 0 }}>
+                                         <i className="fa-solid fa-award"></i> Kèm Quà tặng ghi danh / Tri ân (Balo, Áo thun, Bình nước...)
+                                       </label>
+                                     </div>
+
+                                     {paymentForm.includeGift && (
+                                       <div className="animated-scale" style={{ marginTop: '0.65rem', padding: '0.85rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                         <div className="form-grid-2">
+                                           <div className="form-group">
+                                             <label style={{ fontSize: '0.82rem', fontWeight: '600' }}>Chọn Quà tặng từ Kho *</label>
+                                             <select 
+                                               value={paymentForm.giftId} 
+                                               onChange={(e) => setPaymentForm(prev => ({ ...prev, giftId: e.target.value }))}
+                                             >
+                                               <option value="">-- Chọn quà tặng / vật phẩm --</option>
+                                               {inventoryItems.map(item => (
+                                                 <option key={item.id} value={item.id} disabled={item.currentStock <= 0}>
+                                                   {item.name} ({item.category} - Còn tồn: {item.currentStock})
+                                                 </option>
+                                               ))}
+                                             </select>
+                                           </div>
+                                           <div className="form-group">
+                                             <label style={{ fontSize: '0.82rem', fontWeight: '600' }}>Số lượng quà tặng</label>
+                                             <input 
+                                               type="number" 
+                                               min="1" 
+                                               value={paymentForm.giftQuantity} 
+                                               onChange={(e) => setPaymentForm(prev => ({ ...prev, giftQuantity: parseInt(e.target.value) || 1 }))}
+                                             />
+                                           </div>
+                                         </div>
+                                         <p className="field-note" style={{ color: '#D97706', fontWeight: '600', marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                                           <i className="fa-solid fa-circle-check"></i> Quà tặng ghi danh sẽ hiển thị <strong>0đ [QUÀ TẶNG GHI DANH]</strong> trên phiếu thu và tự động xuất kho.
+                                         </p>
+                                       </div>
+                                     )}
+                                   </div>
+
+                                 </div>
+
+                                 <div className="form-group" style={{ marginTop: '0.75rem' }}>
                                   <label>Ghi chú thu tiền</label>
                                   <input 
                                     type="text" 
@@ -1939,7 +2134,7 @@ export default function StudentsPage() {
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', gap: '0.5rem' }}>
                                   <button type="button" className="btn btn-secondary" onClick={() => setIsEditModalOpen(false)}>Đóng</button>
-                                  <button type="submit" className="btn btn-primary" disabled={submitting || (totalDebt <= 0 && (!paymentForm.includeItem || parseNumber(paymentForm.itemPrice) <= 0))}>
+                                  <button type="submit" className="btn btn-primary" disabled={submitting || (totalDebt <= 0 && !paymentForm.includeItem && !paymentForm.includeGift && parseNumber(paymentForm.collectAmount) <= 0)}>
                                     <i className="fa-solid fa-file-invoice-dollar"></i> Xác nhận thu tiền
                                   </button>
                                 </div>
@@ -3026,7 +3221,7 @@ export default function StudentsPage() {
               {/* Dải line nhận diện thương hiệu Xanh & Vàng */}
               <div style={{ height: '6px', background: 'linear-gradient(90deg, #0D88C4 0%, #0D88C4 60%, #FFCA29 60%, #FFCA29 100%)' }}></div>
               
-              <div style={{ padding: '1.5rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              <div style={{ padding: '1.5rem 1.75rem 2.25rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif", position: 'relative' }}>
                 {/* Header: Logo bên trái, Tiêu đề ở giữa */}
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
                   <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
@@ -3035,6 +3230,11 @@ export default function StudentsPage() {
                     <div style={{ display: 'inline-block', background: '#FFCA29', color: '#085E8A', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
                       PHIẾU THU ĐIỆN TỬ
                     </div>
+                    {eReceiptData.receiptCode && (
+                      <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
+                        Số: {eReceiptData.receiptCode}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -3072,20 +3272,73 @@ export default function StudentsPage() {
                   </div>
                 </div>
 
-                {/* Khối Giáo trình / Vật tư (Tách riêng nếu có) */}
-                {Number(eReceiptData.bookCost || 0) > 0 && (
-                  <div style={{ margin: '0.75rem 0 0.5rem 0', borderTop: '1px dashed #CBD5E1', paddingTop: '0.65rem', fontSize: '0.95rem', lineHeight: '1.8' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#475569', paddingRight: '0.5rem' }}>
-                        Giáo trình:<br/><small style={{ color: '#64748B' }}>({eReceiptData.bookName})</small>
-                      </span>
-                      <span style={{ fontWeight: 'bold', color: '#0D88C4' }}>+ {Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ</span>
+                {/* Khối Giáo trình & Quà tặng đi kèm (Hiển thị đầy đủ cả khi 0đ hoặc có giá) */}
+                {((eReceiptData.items && eReceiptData.items.length > 0) || eReceiptData.bookName) && (
+                  <div style={{ margin: '0.85rem 0 0.5rem 0', borderTop: '1px dashed #CBD5E1', paddingTop: '0.75rem', fontSize: '0.92rem' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#085E8A', textTransform: 'uppercase', marginBottom: '0.45rem', letterSpacing: '0.5px' }}>
+                      Giáo trình & Tặng phẩm đi kèm
                     </div>
+                    {eReceiptData.items && eReceiptData.items.length > 0 ? (
+                      eReceiptData.items.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', borderBottom: idx < eReceiptData.items.length - 1 ? '1px dotted #E2E8F0' : 'none' }}>
+                          <div style={{ paddingRight: '0.5rem' }}>
+                            <div style={{ fontWeight: '600', color: '#1E293B', fontSize: '0.9rem' }}>{item.name}</div>
+                            <span style={{ 
+                              display: 'inline-block', 
+                              fontSize: '0.68rem', 
+                              fontWeight: '800', 
+                              padding: '0.15rem 0.5rem', 
+                              borderRadius: '4px', 
+                              background: item.badgeColor ? `${item.badgeColor}15` : '#ECFDF5', 
+                              color: item.badgeColor || '#059669',
+                              border: `1px solid ${item.badgeColor || '#059669'}40`,
+                              marginTop: '0.2rem'
+                            }}>
+                              {item.badge}
+                            </span>
+                          </div>
+                          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            {item.originalPrice != null && Number(item.originalPrice) > 0 && (
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textDecoration: 'line-through' }}>
+                                {Number(item.originalPrice).toLocaleString('vi-VN')}đ
+                              </div>
+                            )}
+                            <div style={{ fontWeight: '800', fontSize: '0.92rem', color: item.price === 0 ? '#059669' : '#0D88C4' }}>
+                              {item.price === 0 ? '0đ (Miễn phí)' : `+ ${Number(item.price).toLocaleString('vi-VN')}đ`}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
+                        <div style={{ paddingRight: '0.5rem' }}>
+                          <div style={{ fontWeight: '600', color: '#1E293B', fontSize: '0.9rem' }}>{eReceiptData.bookName}</div>
+                          <span style={{ 
+                            display: 'inline-block', 
+                            fontSize: '0.68rem', 
+                            fontWeight: '800', 
+                            padding: '0.15rem 0.5rem', 
+                            borderRadius: '4px', 
+                            background: Number(eReceiptData.bookCost || 0) > 0 ? '#EFF6FF' : '#ECFDF5', 
+                            color: Number(eReceiptData.bookCost || 0) > 0 ? '#0D88C4' : '#059669',
+                            border: `1px solid ${Number(eReceiptData.bookCost || 0) > 0 ? '#0D88C4' : '#059669'}40`,
+                            marginTop: '0.2rem'
+                          }}>
+                            {Number(eReceiptData.bookCost || 0) > 0 ? 'GIÁO TRÌNH BÁN' : 'TẶNG KÈM THEO KHÓA HỌC'}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: '800', fontSize: '0.92rem', color: Number(eReceiptData.bookCost || 0) === 0 ? '#059669' : '#0D88C4' }}>
+                            {Number(eReceiptData.bookCost || 0) === 0 ? '0đ (Miễn phí)' : `+ ${Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ`}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {/* Khung Tổng thu đợt này với điểm nhấn Vàng & Xanh */}
-                <div style={{ marginTop: '1rem', background: '#FFFBEB', border: '2px solid #FFCA29', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: '1rem', background: '#FFFBEB', border: '2px solid #FFCA29', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
                   <span style={{ fontWeight: '800', fontSize: '1rem', color: '#085E8A' }}>TỔNG THU ĐỢT NÀY:</span>
                   <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#0D88C4' }}>{Number(eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
                 </div>
@@ -3094,6 +3347,15 @@ export default function StudentsPage() {
                 <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
                   <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh & Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
                 </div>
+
+                {/* CON DẤU MỘC ĐỎ ĐIỆN TỬ "ĐÃ THU TIỀN / PAID" */}
+                <PaidStamp 
+                  date={eReceiptData.date}
+                  time={eReceiptData.time}
+                  receiptCode={eReceiptData.receiptCode}
+                  size={142}
+                  style={{ right: '12px', bottom: '22px' }}
+                />
               </div>
             </div>
             

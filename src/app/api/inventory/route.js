@@ -31,6 +31,7 @@ export async function GET(request) {
       totalItems: inventory.length,
       lowStock: inventory.filter(i => i.currentStock > 0 && i.currentStock <= i.threshold).length,
       outOfStock: inventory.filter(i => i.currentStock === 0).length,
+      totalInventoryValue: inventory.reduce((sum, i) => sum + (i.currentStock * (i.unitCost || 0)), 0),
     };
 
     return NextResponse.json({ success: true, data: inventory, stats });
@@ -43,7 +44,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id, name, category, threshold } = body;
+    const { id, name, category, threshold, unit, unitCost, unitPrice } = body;
 
     const userRole = request.headers.get('x-user-role');
     const branchId = request.headers.get('x-user-branch');
@@ -64,6 +65,9 @@ export async function POST(request) {
         id,
         name,
         category,
+        unit: unit || 'Cái',
+        unitCost: parseFloat(String(unitCost || 0).replace(/[^0-9.-]/g, '')) || 0,
+        unitPrice: parseFloat(String(unitPrice || 0).replace(/[^0-9.-]/g, '')) || 0,
         threshold: parseInt(threshold) || 5,
         currentStock: 0,
         branchId: branchFilter.branchId || process.env.DEFAULT_BRANCH_ID || "CN1_BinhDuong"
@@ -79,7 +83,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, name, category, threshold } = body;
+    const { id, name, category, threshold, unit, unitCost, unitPrice } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID vật tư là bắt buộc' }, { status: 400 });
@@ -90,7 +94,10 @@ export async function PUT(request) {
       data: {
         name,
         category,
-        threshold: parseInt(threshold) || 5,
+        unit: unit || undefined,
+        unitCost: unitCost !== undefined ? (parseFloat(String(unitCost).replace(/[^0-9.-]/g, '')) || 0) : undefined,
+        unitPrice: unitPrice !== undefined ? (parseFloat(String(unitPrice).replace(/[^0-9.-]/g, '')) || 0) : undefined,
+        threshold: threshold !== undefined ? parseInt(threshold) || 5 : undefined,
       },
     });
 
