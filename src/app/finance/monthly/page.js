@@ -751,7 +751,7 @@ export default function MonthlyBillingPage() {
     const canvas = await html2canvas(el, {
       scale: 2,
       useCORS: true,
-      allowTaint: false,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
     });
@@ -770,7 +770,7 @@ export default function MonthlyBillingPage() {
       await ensureQrReady();
       // Chờ DOM cập nhật ảnh QR Base64
       await new Promise((r) => setTimeout(r, 150));
-      const el = hiddenPrintRef.current || previewTemplateRef.current;
+      const el = previewTemplateRef.current || hiddenPrintRef.current;
       if (!el) throw new Error('Không tìm thấy nội dung thư báo');
 
       const blob = await captureElementToPngBlob(el);
@@ -797,7 +797,7 @@ export default function MonthlyBillingPage() {
       if (!blob) {
         await ensureQrReady();
         await new Promise((r) => setTimeout(r, 150));
-        const el = hiddenPrintRef.current || previewTemplateRef.current;
+        const el = previewTemplateRef.current || hiddenPrintRef.current;
         if (!el) return;
         blob = await captureElementToPngBlob(el);
       }
@@ -2550,7 +2550,8 @@ export default function MonthlyBillingPage() {
         <div
           style={{
             position: 'fixed',
-            left: '-99999px',
+            left: '0',
+            opacity: 0,
             top: '0',
             width: '850px',
             pointerEvents: 'none',
