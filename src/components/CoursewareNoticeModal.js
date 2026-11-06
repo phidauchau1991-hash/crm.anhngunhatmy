@@ -289,7 +289,7 @@ export default function CoursewareNoticeModal({
               <p style={styles.headerSubtitle}>
                 {studentList.length > 1
                   ? `Xuất thư hàng loạt cho ${studentList.length} học viên ${classInfo ? `• Lớp ${classInfo.code}` : ''}`
-                  : `Học viên: ${activeStudent?.name} (${activeStudent?.id}) • Lớp: ${activeStudent?.classCode || 'Chưa xếp lớp'}`}
+                  : `Học viên: ${activeStudent?.name || activeStudent?.fullName || "Học viên"} (${activeStudent?.id}) • Lớp: ${activeStudent?.classCode || 'Chưa xếp lớp'}`}
               </p>
             </div>
           </div>
@@ -338,7 +338,7 @@ export default function CoursewareNoticeModal({
                 <div style={styles.carouselIndicator}>
                   <strong>Học viên {currentIndex + 1} / {studentList.length}</strong>
                   <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block' }}>
-                    {activeStudent?.name} ({activeStudent?.id})
+                    {activeStudent?.name || activeStudent?.fullName || "Học viên"} ({activeStudent?.id})
                   </span>
                 </div>
                 <button
@@ -363,7 +363,7 @@ export default function CoursewareNoticeModal({
               ) : currentPreviewUrl ? (
                 <img
                   src={currentPreviewUrl}
-                  alt={`Thẻ học viên ${activeStudent?.name}`}
+                  alt={`Thẻ học viên ${activeStudent?.name || activeStudent?.fullName || "Học viên"}`}
                   style={styles.previewImage}
                 />
               ) : (
@@ -405,7 +405,7 @@ export default function CoursewareNoticeModal({
               <div style={styles.infoGrid}>
                 <div>
                   <span style={styles.infoLabel}>Họ và tên:</span>
-                  <strong style={styles.infoValue}>{activeStudent?.name}</strong>
+                  <strong style={styles.infoValue}>{activeStudent?.name || activeStudent?.fullName || "Học viên"}</strong>
                 </div>
                 <div>
                   <span style={styles.infoLabel}>Mã học viên:</span>
@@ -556,7 +556,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 9999,
+    zIndex: 99999,
     padding: '1rem',
   },
   container: {

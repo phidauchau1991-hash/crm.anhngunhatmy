@@ -1391,6 +1391,15 @@ export default function StudentsPage() {
                 <table className="custom-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '40px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={displayedStudents.length > 0 && selectedStudentIds.length === displayedStudents.length}
+                          onChange={() => toggleSelectAllDisplayed(displayedStudents)}
+                          title="Chọn tất cả để xuất thẻ hàng loạt"
+                          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                      </th>
                       <th>Mã HV</th>
                       <th>Họ & Tên</th>
                       <th>Trạng thái</th>
@@ -1408,6 +1417,14 @@ export default function StudentsPage() {
                   <tbody>
                     {displayedStudents.map((student) => (
                       <tr key={student.id} className="table-row">
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentIds.includes(student.id)}
+                            onChange={() => toggleSelectStudent(student.id)}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                          />
+                        </td>
                         <td className="std-id">{student.id}</td>
                         <td className="std-name">{student.name}</td>
                         <td>
@@ -1464,6 +1481,14 @@ export default function StudentsPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div className="action-buttons">
+                            <button 
+                              className="action-btn" 
+                              style={{ color: '#0B2A4A', background: 'rgba(11, 42, 74, 0.08)' }} 
+                              title="📱 Thư Học Liệu & Thẻ Học Viên" 
+                              onClick={() => handleOpenSingleCourseware(student)}
+                            >
+                              <i className="fa-solid fa-id-card"></i>
+                            </button>
                             <Link href={`/students/${student.id}`} className="action-btn view-btn" title="Xem chi tiết">
                               <i className="fa-regular fa-eye"></i>
                             </Link>
@@ -3435,6 +3460,16 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Xuất Thư Học Liệu & Thẻ Học Viên Điện Tử */}
+      <CoursewareNoticeModal
+        isOpen={isCoursewareModalOpen}
+        onClose={() => setIsCoursewareModalOpen(false)}
+        students={coursewareModalStudents}
+        onStudentUpdated={(stdId, codes, retain) => {
+          fetchStudents();
+        }}
+      />
     </div>
   );
 }

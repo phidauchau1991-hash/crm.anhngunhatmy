@@ -411,6 +411,16 @@ export default function ClassPortalPage() {
           .print-friendly { width: 100%; }
         }
       `}</style>
+      {/* Modal Xuất Thư Học Liệu & Thẻ Học Viên Cho Lớp */}
+      <CoursewareNoticeModal
+        isOpen={isCoursewareModalOpen}
+        onClose={() => {
+          setIsCoursewareModalOpen(false);
+          setCoursewareSingleStudent(null);
+        }}
+        students={coursewareSingleStudent ? [coursewareSingleStudent] : (students || [])}
+        classInfo={classInfo}
+      />
     </div>
   );
 }

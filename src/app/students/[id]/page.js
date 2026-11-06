@@ -5,6 +5,7 @@ import { encryptStudentId } from "@/lib/token";
 import CopyLinkButton from "./CopyLinkButton";
 import ReviewActionClient from "./ReviewActionClient";
 import TuitionNoticeAction from "./TuitionNoticeAction";
+import CoursewareStudentAction from "./CoursewareStudentAction";
 export const revalidate = 0;
 
 export default async function StudentDetailPage({ params }) {
@@ -288,6 +289,7 @@ export default async function StudentDetailPage({ params }) {
               <CopyLinkButton token={encryptedToken} />
               <ReviewActionClient studentId={student.id} studentName={student.name} classCode={student.enrollments?.[0]?.classCode || ''} />
               <TuitionNoticeAction student={student} />
+              <CoursewareStudentAction student={{ ...student, portalToken: encryptedToken }} classInfo={student.enrollments?.[0]?.class} />
             </div>
           </div>
 

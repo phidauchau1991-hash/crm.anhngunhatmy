@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { encryptStudentId } from '@/lib/token';
 
 export async function GET(request, { params }) {
   try {
@@ -100,7 +101,9 @@ export async function GET(request, { params }) {
     ];
 
     // Helper to calculate student stats
-    const processStudent = (id, name, isTrial) => {
+    const processStudent = (s, isTrial) => {
+      const id = s.id;
+      const name = s.name;
       let totalAbsent = 0;
       let totalWb = 0;
       let totalVideo = 0;
@@ -129,6 +132,13 @@ export async function GET(request, { params }) {
       studentsData.push({
         id,
         name,
+        phone: s.phone || '',
+        classCode: classCode,
+        level: classInfo?.level || '',
+        status: s.status || (isTrial ? 'Học thử' : 'Đang học'),
+        customBookCodes: s.customBookCodes || null,
+        retainCoursewareAccess: Boolean(s.retainCoursewareAccess),
+        portalToken: !isTrial && id ? encryptStudentId(id) : '',
         isTrial,
         totalAbsent,
         totalWb,
@@ -137,8 +147,8 @@ export async function GET(request, { params }) {
       });
     };
 
-    allStudents.forEach(s => processStudent(s.id, s.name, false));
-    trialLeads.forEach(l => processStudent(l.id, l.name, true));
+    allStudents.forEach(s => processStudent(s, false));
+    trialLeads.forEach(l => processStudent(l, true));
 
     const grades = allStudents.map(student => {
       const midTerm = examResults.find(r => r.studentId === student.id && r.config.examType === 'Giữa khóa');
