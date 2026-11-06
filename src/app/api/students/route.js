@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getDateRangeFromPreset } from '@/lib/dateHelpers';
 import { getBranchFilter } from '@/lib/rbac';
+import { encryptStudentId } from '@/lib/token';
 
 // Làm tròn xuống hàng 5.000đ, luôn có lợi cho khách hàng
 // VD: 1.103.000 → 1.100.000, 1.358.250 → 1.355.000
@@ -217,6 +218,9 @@ export async function GET(request) {
         reservationAmount: student.reservationAmount || 0,
         reservationDeadline: student.reservationDeadline,
         dropoutReason: student.dropoutReason,
+        customBookCodes: student.customBookCodes || null,
+        retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
+        portalToken: encryptStudentId(student.id),
         createdAt: student.createdAt,
       };
     });

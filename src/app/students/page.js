@@ -6,6 +6,8 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
 import PaidStamp from '@/components/PaidStamp';
+import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
+import { AVAILABLE_COURSEWARE_BOOKS, parseCustomBookCodes } from '@/lib/coursewareBooks';
 
 const getNormalizedStatus = (st) => {
   if (!st) return 'Đang học';
@@ -44,6 +46,11 @@ export default function StudentsPage() {
   const [editStudentData, setEditStudentData] = useState(null);
   const [loadingEditData, setLoadingEditData] = useState(false);
   const [transferPreview, setTransferPreview] = useState(null);
+
+  // Trạng thái xuất Thư học liệu & Thẻ học viên điện tử (Giai đoạn 1)
+  const [isCoursewareModalOpen, setIsCoursewareModalOpen] = useState(false);
+  const [coursewareModalStudents, setCoursewareModalStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
 
   // AI Birthday State
   const [showAiModal, setShowAiModal] = useState(false);
@@ -623,6 +630,37 @@ export default function StudentsPage() {
       setMessage({ type: 'error', text: 'Kết nối API thất bại.' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  
+  // Helper mở Thư học liệu & Thẻ học viên điện tử
+  const handleOpenSingleCourseware = (student) => {
+    setCoursewareModalStudents([student]);
+    setIsCoursewareModalOpen(true);
+  };
+
+  const handleOpenBatchCourseware = (studentListToExport = null) => {
+    const list = studentListToExport || students.filter(s => selectedStudentIds.includes(s.id));
+    if (!list || list.length === 0) {
+      alert('Vui lòng chọn ít nhất một học viên để xuất thư học liệu!');
+      return;
+    }
+    setCoursewareModalStudents(list);
+    setIsCoursewareModalOpen(true);
+  };
+
+  const toggleSelectStudent = (id) => {
+    setSelectedStudentIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllDisplayed = (displayedList) => {
+    if (selectedStudentIds.length === displayedList.length && displayedList.length > 0) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(displayedList.map(s => s.id));
     }
   };
 
@@ -1316,6 +1354,29 @@ export default function StudentsPage() {
 
             {/* Students Table */}
             <div className="table-container glass-panel">
+              {selectedStudentIds.length > 0 && (
+                <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #CBD5E1', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#0F172A', fontWeight: '700' }}>
+                    Đã chọn <strong style={{ color: '#0B2A4A', fontSize: '1.05rem' }}>{selectedStudentIds.length}</strong> / {displayedStudents.length} học viên
+                  </span>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ background: '#0B2A4A', color: '#FFFFFF', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: '700', padding: '0.45rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
+                    onClick={() => handleOpenBatchCourseware(displayedStudents.filter(s => selectedStudentIds.includes(s.id)))}
+                  >
+                    <i className="fa-solid fa-id-card"></i> 📱 Xuất Thư Học Liệu Đã Chọn ({selectedStudentIds.length})
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
+                    onClick={() => setSelectedStudentIds([])}
+                  >
+                    Bỏ chọn tất cả
+                  </button>
+                </div>
+              )}
               {loading ? (
                 <div className="loading-state">
                   <i className="fa-solid fa-spinner fa-spin"></i>
@@ -2148,6 +2209,7 @@ export default function StudentsPage() {
                     </div>
                   </div>
                     {/* TAB 1: Thông tin cơ bản */}
+                  {/* TAB 1: Thông tin cơ bản & Phân quyền học liệu */}
                   <form onSubmit={(e) => handleEditSubmit(e, 'basic')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
                       <div className="form-section">
                         <h3>Chỉnh sửa Hồ sơ Học viên</h3>

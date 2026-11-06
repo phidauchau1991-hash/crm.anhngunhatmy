@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getClassScheduleDetails } from '@/lib/classHelper';
+import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
 
 export default function ClassPortalPage() {
   const params = useParams();
@@ -10,6 +11,8 @@ export default function ClassPortalPage() {
   const [activeTab, setActiveTab] = useState('attendance'); 
   const [loading, setLoading] = useState(true);
   const [portalData, setPortalData] = useState(null);
+  const [isCoursewareModalOpen, setIsCoursewareModalOpen] = useState(false);
+  const [coursewareSingleStudent, setCoursewareSingleStudent] = useState(null);
 
   const fetchPortalData = async (code) => {
     try {
@@ -126,6 +129,16 @@ export default function ClassPortalPage() {
           <button className="btn-action btn-primary" onClick={() => router.push(`/attendance?classCode=${classCode}`)}>
             <i className="fa-solid fa-calendar-check"></i> Điểm danh hôm nay
           </button>
+          <button
+            className="btn-action"
+            style={{ background: '#0B2A4A', color: '#FFFFFF', border: '1px solid #C9A45C', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: '700', padding: '0.55rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
+            onClick={() => {
+              setCoursewareSingleStudent(null);
+              setIsCoursewareModalOpen(true);
+            }}
+          >
+            <i className="fa-solid fa-id-card"></i> 📱 Xuất Thư Học Liệu Cả Lớp ({students?.length || 0})
+          </button>
         </div>
       </div>
 
@@ -171,6 +184,17 @@ export default function ClassPortalPage() {
                       {student.name} 
                       {student.isTrial && <span className="badge" style={{fontSize:'0.7rem', background:'#fef08a', marginLeft: '5px'}}>Học thử</span>}
                       {student.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoursewareSingleStudent(student);
+                          setIsCoursewareModalOpen(true);
+                        }}
+                        title="📱 Thư Học Liệu & Thẻ Học Viên"
+                        style={{ border: 'none', background: 'rgba(11, 42, 74, 0.08)', color: '#0B2A4A', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', marginLeft: '6px' }}
+                      >
+                        <i className="fa-solid fa-id-card"></i>
+                      </button>
                     </td>
                     <td className="text-center" style={{ fontWeight: 'bold', color: student.totalAbsent > 0 ? '#ef4444' : 'inherit' }}>
                       {student.totalAbsent}
