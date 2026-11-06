@@ -118,6 +118,8 @@ export async function GET(request, { params }) {
           reservationAmount: student.reservationAmount,
           reservationDeadline: student.reservationDeadline ? student.reservationDeadline.toISOString().split('T')[0] : '',
           dropoutReason: student.dropoutReason,
+          customBookCodes: student.customBookCodes,
+          retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
           parentPortalToken: encryptStudentId(student.id),
         },
         currentClass: classDetails,
@@ -357,22 +359,41 @@ export async function PUT(request, { params }) {
       });
     }
 
-    // LUỒNG 1: Cập nhật thông tin cơ bản & chính sách
+    // LUỒNG 1: Cập nhật thông tin cơ bản & chính sách & Học liệu số
     if (action === 'basic') {
-      const { name, phone, dob, address, nationalId, specialPolicyType, specialPolicyValue } = body;
+      const { 
+        name, 
+        phone, 
+        dob, 
+        address, 
+        nationalId, 
+        specialPolicyType, 
+        specialPolicyValue,
+        customBookCodes,
+        retainCoursewareAccess 
+      } = body;
+
+      const updateData = {
+        name,
+        phone,
+        dob: dob ? new Date(dob) : null,
+        address,
+        nationalId,
+        specialPolicyType,
+        specialPolicyValue: parseFloat(specialPolicyValue) || 0,
+        specialPolicy: specialPolicyValue > 0 ? `${specialPolicyType} (-${parseFloat(specialPolicyValue).toLocaleString()}đ)` : 'Không',
+      };
+
+      if (customBookCodes !== undefined) {
+        updateData.customBookCodes = typeof customBookCodes === 'string' ? customBookCodes : JSON.stringify(customBookCodes);
+      }
+      if (retainCoursewareAccess !== undefined) {
+        updateData.retainCoursewareAccess = Boolean(retainCoursewareAccess);
+      }
 
       const updated = await prisma.student.update({
         where: { id },
-        data: {
-          name,
-          phone,
-          dob: dob ? new Date(dob) : null,
-          address,
-          nationalId,
-          specialPolicyType,
-          specialPolicyValue: parseFloat(specialPolicyValue) || 0,
-          specialPolicy: specialPolicyValue > 0 ? `${specialPolicyType} (-${parseFloat(specialPolicyValue).toLocaleString()}đ)` : 'Không',
-        },
+        data: updateData,
       });
 
       return NextResponse.json({ success: true, data: updated });
@@ -402,20 +423,26 @@ export async function PUT(request, { params }) {
 
     // LUỒNG 2: Đang học / Tạm nghỉ / Nghỉ luôn
     if (action === 'statusChange') {
-      const { status, callbackDate, dropoutReason, dropoutReasonType, dropoutReasonText } = body;
+      const { status, callbackDate, dropoutReason, dropoutReasonType, dropoutReasonText, retainCoursewareAccess } = body;
 
       const finalDropoutReason = status === 'Nghỉ luôn'
         ? (dropoutReasonText ? `${dropoutReasonType || 'Khác'}: ${dropoutReasonText}` : (dropoutReason || dropoutReasonType || 'Nghỉ luôn'))
         : null;
 
       await prisma.$transaction(async (tx) => {
+        const studentUpdate = {
+          status,
+          callbackDate: (status === 'Tạm nghỉ' && callbackDate) ? new Date(callbackDate) : null,
+          dropoutReason: finalDropoutReason,
+        };
+
+        if (retainCoursewareAccess !== undefined) {
+          studentUpdate.retainCoursewareAccess = Boolean(retainCoursewareAccess);
+        }
+
         await tx.student.update({
           where: { id },
-          data: {
-            status,
-            callbackDate: (status === 'Tạm nghỉ' && callbackDate) ? new Date(callbackDate) : null,
-            dropoutReason: finalDropoutReason,
-          },
+          data: studentUpdate,
         });
 
         // Nếu học viên Tạm nghỉ hoặc Nghỉ luôn, rút tên khỏi lớp học active để dọn sạch danh sách điểm danh

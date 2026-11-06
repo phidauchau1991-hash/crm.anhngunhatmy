@@ -85,7 +85,11 @@ model Student {
   reservationAmount   Float?    @default(0) // Sá»‘ tiá»n báº£o lÆ°u
   reservationDeadline DateTime? // Háº¡n chÃ³t báº£o lÆ°u
   dropoutReason       String? // LÃ½ do nghá»‰ luÃ´n
-  branchId            String    @default("CN1_BinhDuong") // Chi nhÃ¡nh quáº£n lÃ½ há»c viÃªn
+  branchId            String    @default("CN1_BinhDuong")
+
+  // Web App Courseware Integration
+  customBookCodes        String?   // JSON Array: vd ["beehive_1", "beehive_starter"]
+  retainCoursewareAccess Boolean   @default(false) // Giu quyen khi tam nghi / nghi luon // Chi nhÃ¡nh quáº£n lÃ½ há»c viÃªn
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
