@@ -246,25 +246,25 @@ export async function renderStudentCardCanvas({
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  // 1. Tên thương hiệu ANH NGỮ NHẬT MỸ - Chữ màu vàng hoàng gia sang trọng (theo yêu cầu Thầy Đấu)
+  // 1. Tên thương hiệu ANH NGỮ NHẬT MỸ - Màu Xanh Nhật Mỹ chuẩn nhận diện (theo yêu cầu Thầy Đấu)
   const headerBrandX = logoX + logoSize + 22;
   const headerBrandY = 52;
-  const goldGrad = ctx.createLinearGradient(headerBrandX, headerBrandY, headerBrandX, headerBrandY + 30);
-  goldGrad.addColorStop(0, '#D97706'); // Vàng hổ phách sáng
-  goldGrad.addColorStop(1, '#92400E'); // Vàng hoàng gia đậm sâu, tương phản hoàn hảo trên nền trắng
-  ctx.fillStyle = goldGrad;
+  const brandBlueGrad = ctx.createLinearGradient(headerBrandX, headerBrandY, headerBrandX, headerBrandY + 30);
+  brandBlueGrad.addColorStop(0, '#0D88C4'); // Xanh thương hiệu Nhật Mỹ
+  brandBlueGrad.addColorStop(1, '#086A9B'); // Xanh đậm Nhật Mỹ tạo độ sắc nét, tương phản hoàn hảo trên nền trắng
+  ctx.fillStyle = brandBlueGrad;
   ctx.font = `900 28px ${FONT_SERIF}`;
   ctx.letterSpacing = '0.5px';
   ctx.fillText('ANH NGỮ NHẬT MỸ', headerBrandX, headerBrandY);
 
-  // 2. Slogan chuẩn đặt ngay dưới tên, nhỏ hơn, mờ hơn một chút xíu (đúng bố cục logo gốc)
-  ctx.fillStyle = COLORS.textMuted;
+  // 2. Slogan chuẩn đặt ngay dưới tên - Điểm nhấn Vàng hoàng gia tinh tế
+  ctx.fillStyle = COLORS.goldDark;
   ctx.font = `italic 600 13px ${FONT_SERIF}`;
   ctx.letterSpacing = '0.5px';
   ctx.fillText('Dedicated to Excellence', logoX + logoSize + 24, 88);
 
   // 3. Hệ thống đào tạo chuẩn Cambridge
-  ctx.fillStyle = COLORS.goldDark;
+  ctx.fillStyle = COLORS.textMuted;
   ctx.font = `700 12.5px ${FONT_SERIF}`;
   ctx.letterSpacing = '0.3px';
   ctx.fillText('HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE', logoX + logoSize + 22, 114);

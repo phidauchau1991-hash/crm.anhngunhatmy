@@ -1,58 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { decryptStudentId, encryptStudentId } from '@/lib/token';
+import { getBookCodesFromClass, parseCustomBookCodes } from '@/lib/coursewareBooks';
 
 const COURSEWARE_SECRET_KEY = process.env.COURSEWARE_SECRET_KEY || 'nhatmy_cw_sec_8f92a4b8e19c4d379058fa16';
-
-// Helper đối soát cấp độ lớp sang mã sách Beehive tương ứng
-function getBookCodesFromClass(classInfo) {
-  if (!classInfo) return [];
-  const level = (classInfo.level || '').toUpperCase().trim();
-  const code = (classInfo.code || '').toUpperCase().trim();
-
-  const books = [];
-
-  // 1. Đối soát Beehive Starter
-  if (level.includes('STARTER') || level.includes('BEEHIVE_START') || code.includes('STARTER')) {
-    books.push('beehive_starter');
-  }
-  // 2. Đối soát Beehive 1 (hoặc lớp S1/M1 có giáo trình Beehive 1)
-  if (level.includes('BEEHIVE_1') || level === 'BH1' || level === 'S1' || level === 'M1') {
-    books.push('beehive_1');
-  }
-  // 3. Đối soát Beehive 2 (hoặc lớp S2/M2)
-  if (level.includes('BEEHIVE_2') || level === 'BH2' || level === 'S2' || level === 'M2') {
-    books.push('beehive_2');
-  }
-  // 4. Đối soát Beehive 3 (hoặc lớp S3/M3)
-  if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M3') {
-    books.push('beehive_3');
-  }
-  // 5. Đối soát Beehive 4 (hoặc lớp S4/F1/F2)
-  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'S4' || level === 'F1' || level === 'F2') {
-    books.push('beehive_4');
-  }
-
-  return books;
-}
-
-// Helper an toàn parse custom book codes (JSON array hoặc comma-separated)
-function parseCustomBookCodes(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map(b => String(b).trim().toLowerCase()).filter(Boolean);
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.map(b => String(b).trim().toLowerCase()).filter(Boolean);
-    }
-  } catch (e) {
-    // Không phải JSON, thử parse theo dấu phẩy
-  }
-  return String(raw)
-    .split(',')
-    .map(b => b.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 // Xử lý CORS Preflight
 export async function OPTIONS() {
@@ -132,15 +83,19 @@ export async function GET(request) {
       normalizedStatus = 'PENDING';
     }
 
-    // 5. Tính toán danh sách sách theo lớp & sách tick thêm (custom)
+    // 5. Tính toán danh sách giáo trình được cấp phát
     const activeEnrollment = student.enrollments?.[0] || null;
     const classInfo = activeEnrollment?.class || null;
     const classBookCodes = getBookCodesFromClass(classInfo);
     const customBookCodes = parseCustomBookCodes(student.customBookCodes);
 
-    // Hợp nhất danh sách sách hợp lệ (loại bỏ trùng lặp)
-    const combinedBookSet = new Set([...classBookCodes, ...customBookCodes]);
-    const effectiveBookCodes = Array.from(combinedBookSet);
+    // Quyết định danh sách sách hợp lệ:
+    // - Nếu học viên đã được phân quyền sách tùy chỉnh cụ thể (customBookCodes có phần tử),
+    //   lấy CHÍNH XÁC danh sách sách đó (đúng ý định admin/thầy giáo).
+    // - Nếu chưa cấu hình phân quyền riêng (customBookCodes rỗng/null), mặc định lấy theo lớp.
+    const effectiveBookCodes = (customBookCodes && customBookCodes.length > 0)
+      ? customBookCodes
+      : classBookCodes;
 
     // 6. Tính toán quyền truy cập (access_granted & access_reason)
     const retainGranted = Boolean(student.retainCoursewareAccess);

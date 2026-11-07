@@ -40,7 +40,16 @@ export default function CoursewareNoticeModal({
       const initialMap = {};
       const initialRetain = {};
       studentList.forEach(std => {
-        initialMap[std.id] = parseCustomBookCodes(std.customBookCodes);
+        const parsed = parseCustomBookCodes(std.customBookCodes);
+        if (parsed.length > 0) {
+          initialMap[std.id] = parsed;
+        } else {
+          const cls = classInfo || {
+            code: std.classCode || '',
+            level: std.level || std.classCode || '',
+          };
+          initialMap[std.id] = getBookCodesFromClass(cls);
+        }
         initialRetain[std.id] = Boolean(std.retainCoursewareAccess);
       });
       setCustomBooksMap(initialMap);
@@ -66,8 +75,10 @@ export default function CoursewareNoticeModal({
       level: activeStudent.level || activeStudent.classCode || '',
     };
     const classBooks = getBookCodesFromClass(cls);
-    const combinedSet = new Set([...classBooks, ...currentCustomCodes]);
-    return Array.from(combinedSet).map(code => {
+    const bookCodes = (currentCustomCodes && currentCustomCodes.length > 0)
+      ? currentCustomCodes
+      : classBooks;
+    return bookCodes.map(code => {
       const found = AVAILABLE_COURSEWARE_BOOKS.find(b => b.code.toLowerCase() === code.toLowerCase());
       return found || { code, title: code.toUpperCase(), color: '#0D88C4' };
     });

@@ -21,20 +21,33 @@ export function getBookCodesFromClass(classInfo) {
 
   const books = [];
 
+  // 1. Đối soát Beehive Starter (Mầm non / Pre-Starters)
   if (level.includes('STARTER') || level.includes('BEEHIVE_START') || code.includes('STARTER')) {
     books.push('beehive_starter');
   }
-  if (level.includes('BEEHIVE_1') || level === 'BH1' || level === 'S1' || level === 'M1' || code.includes('BH1') || code.includes('S1')) {
+  // 2. Đối soát Beehive 1 (Tiểu học / Starters 1: S1)
+  if (level.includes('BEEHIVE_1') || level === 'BH1' || level === 'S1' || code.includes('BH1') || code.includes('S1')) {
     books.push('beehive_1');
   }
-  if (level.includes('BEEHIVE_2') || level === 'BH2' || level === 'S2' || level === 'M2' || code.includes('BH2') || code.includes('S2')) {
+  // 3. Đối soát Beehive 2 (Tiểu học / Starters 2 / Movers 1: S2 / M1)
+  if (level.includes('BEEHIVE_2') || level === 'BH2' || level === 'S2' || level === 'M1' || code.includes('BH2') || code.includes('S2') || code.includes('M1')) {
     books.push('beehive_2');
   }
-  if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M3' || code.includes('BH3') || code.includes('S3')) {
+  // 4. Đối soát Beehive 3 (Tiểu học / Starters 3 / Movers 2-3: S3 / M2 / M3)
+  if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M2' || level === 'M3' || code.includes('BH3') || code.includes('S3') || code.includes('M2') || code.includes('M3')) {
     books.push('beehive_3');
   }
-  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'S4' || level === 'F1' || level === 'F2' || code.includes('BH4')) {
+  // 5. Đối soát Beehive 4 (Tiểu học / Starters 4 / Flyers: S4 / F1 / F2 / Flyers)
+  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'S4' || level === 'F1' || level === 'F2' || level.includes('FLYER') || code.includes('BH4') || code.includes('S4') || code.includes('F1') || code.includes('F2') || code.includes('FLYER')) {
     books.push('beehive_4');
+  }
+  // 6. Đối soát Think Starters (Trung học cơ sở)
+  if (level.includes('THINK') || code.includes('THINK')) {
+    books.push('think_starters');
+  }
+  // 7. Đối soát KET / B1 Preliminary (PET)
+  if (level.includes('KET') || level.includes('PET') || level.includes('B1') || code.includes('KET') || code.includes('PET')) {
+    books.push('ket_b1');
   }
 
   // Mặc định nếu chưa match được mà có chứa 'BEEHIVE'
@@ -66,7 +79,11 @@ export function parseCustomBookCodes(raw) {
 }
 
 /**
- * Tổng hợp toàn bộ giáo trình thực tế của học viên (Sách lớp + Sách cấp thêm)
+ * Tổng hợp toàn bộ giáo trình thực tế của học viên:
+ * - Nếu học viên đã được phân quyền danh sách sách cụ thể (customBookCodes có phần tử),
+ *   lấy CHÍNH XÁC danh sách sách đó.
+ * - Nếu chưa cấu hình phân quyền riêng (customBookCodes rỗng/null),
+ *   mặc định lấy theo sách của lớp học (classBooks).
  */
 export function getEffectiveBooksForStudent(student, classInfo = null) {
   const targetClass = classInfo || {
@@ -77,9 +94,10 @@ export function getEffectiveBooksForStudent(student, classInfo = null) {
   const classBooks = getBookCodesFromClass(targetClass);
   const customBooks = parseCustomBookCodes(student.customBookCodes);
 
-  // Gộp và loại trùng
-  const combinedSet = new Set([...classBooks, ...customBooks]);
-  const bookCodes = Array.from(combinedSet);
+  // Ưu tiên danh sách phân quyền cụ thể của học viên nếu đã được thiết lập
+  const bookCodes = (customBooks && customBooks.length > 0)
+    ? customBooks
+    : classBooks;
 
   // Map sang object có title & color
   return bookCodes.map(code => {
