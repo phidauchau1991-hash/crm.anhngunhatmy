@@ -15,20 +15,21 @@ function getCoursewareTargetBase() {
     }
   }
 
-  // Fallback an toàn sang Web App Vercel hoặc Subdomain học liệu
-  return 'https://beehive-oxford.vercel.app';
+  // Web App Giáo trình Tương tác Số chính thức của Nhật Mỹ trên Vercel
+  return 'https://nhatmy-learning-app.vercel.app';
 }
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token')?.trim();
+    const studentId = searchParams.get('student_id')?.trim();
 
-    if (!token) {
+    if (!token && !studentId) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Thiếu mã token truy cập học liệu số. Vui lòng quét lại mã QR trên Thư thông báo.',
+          error: 'Thiếu mã xác thực học liệu số. Vui lòng quét lại mã QR trên Thư thông báo.',
         },
         { status: 400 }
       );
@@ -36,7 +37,11 @@ export async function GET(request) {
 
     const base = getCoursewareTargetBase();
     const targetUrl = new URL(base);
-    targetUrl.searchParams.set('token', token);
+    
+    // Giữ nguyên và chuyển tiếp toàn bộ query params sang Web App (token, student_id, ...)
+    searchParams.forEach((val, key) => {
+      targetUrl.searchParams.set(key, val);
+    });
 
     // Chuyển hướng 307 an toàn tới Web App Học liệu
     const res = NextResponse.redirect(targetUrl.toString(), 307);
