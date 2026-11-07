@@ -69,7 +69,7 @@ export default function CoursewareNoticeModal({
     const combinedSet = new Set([...classBooks, ...currentCustomCodes]);
     return Array.from(combinedSet).map(code => {
       const found = AVAILABLE_COURSEWARE_BOOKS.find(b => b.code.toLowerCase() === code.toLowerCase());
-      return found || { code, title: code.toUpperCase(), color: '#0B2A4A' };
+      return found || { code, title: code.toUpperCase(), color: '#0D88C4' };
     });
   }, [activeStudent, classInfo, currentCustomCodes]);
 
@@ -140,6 +140,7 @@ export default function CoursewareNoticeModal({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'courseware',
           customBookCodes: codes,
           retainCoursewareAccess: retain,
         }),
@@ -284,7 +285,7 @@ export default function CoursewareNoticeModal({
             </div>
             <div>
               <h2 style={styles.headerTitle}>
-                THƯ THÔNG BÁO CẤP TÀI KHOẢN HỌC LIỆU SỐ & THẺ HỌC VIÊN
+                THƯ THÔNG BÁO CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ
               </h2>
               <p style={styles.headerSubtitle}>
                 {studentList.length > 1
@@ -355,7 +356,7 @@ export default function CoursewareNoticeModal({
             <div style={styles.previewBox}>
               {loadingPreview ? (
                 <div style={styles.loadingBox}>
-                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#0B2A4A' }}></i>
+                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#0D88C4' }}></i>
                   <p style={{ marginTop: '0.75rem', fontWeight: '600', color: '#475569' }}>
                     Đang dựng Thẻ học viên & Mã QR cá nhân...
                   </p>
@@ -400,7 +401,7 @@ export default function CoursewareNoticeModal({
             {/* THÔNG TIN HỌC VIÊN HIỆN TẠI */}
             <div style={styles.sectionCard}>
               <h3 style={styles.sectionTitle}>
-                <i className="fa-solid fa-user-graduate" style={{ color: '#0B2A4A' }}></i> Thông Tin Học Viên
+                <i className="fa-solid fa-user-graduate" style={{ color: '#0D88C4' }}></i> Thông Tin Học Viên
               </h3>
               <div style={styles.infoGrid}>
                 <div>
@@ -409,7 +410,7 @@ export default function CoursewareNoticeModal({
                 </div>
                 <div>
                   <span style={styles.infoLabel}>Mã học viên:</span>
-                  <span style={{ ...styles.infoValue, color: '#0B2A4A', fontFamily: 'monospace' }}>
+                  <span style={{ ...styles.infoValue, color: '#0D88C4', fontFamily: 'monospace' }}>
                     {activeStudent?.id}
                   </span>
                 </div>
@@ -428,7 +429,7 @@ export default function CoursewareNoticeModal({
             <div style={styles.sectionCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h3 style={styles.sectionTitle}>
-                  <i className="fa-solid fa-book-bookmark" style={{ color: '#C9A45C' }}></i> Phân Quyền Giáo Trình (1..N Bộ Sách)
+                  <i className="fa-solid fa-book-bookmark" style={{ color: '#FFCA29' }}></i> Phân Quyền Giáo Trình (1..N Bộ Sách)
                 </h3>
                 <button
                   type="button"
@@ -506,7 +507,7 @@ export default function CoursewareNoticeModal({
             {/* KHỐI XUẤT HÀNG LOẠT CHO TOÀN BỘ DANH SÁCH / LỚP HỌC */}
             {studentList.length > 1 && (
               <div style={styles.batchSectionCard}>
-                <h3 style={{ ...styles.sectionTitle, color: '#0B2A4A' }}>
+                <h3 style={{ ...styles.sectionTitle, color: '#0D88C4' }}>
                   <i className="fa-solid fa-file-zipper" style={{ color: '#059669' }}></i> Xuất File Hàng Loạt
                 </h3>
                 <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0.25rem 0 0.85rem 0' }}>
@@ -526,8 +527,8 @@ export default function CoursewareNoticeModal({
 
             {/* HƯỚNG DẪN DÀNH CHO THẦY CÔ / NHÂN SỰ CRM */}
             <div style={styles.guideCard}>
-              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', color: '#0B2A4A', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <i className="fa-solid fa-lightbulb" style={{ color: '#C9A45C' }}></i> Mẹo gửi Zalo cho Phụ huynh:
+              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', color: '#0D88C4', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="fa-solid fa-lightbulb" style={{ color: '#FFCA29' }}></i> Mẹo gửi Zalo cho Phụ huynh:
               </h4>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
                 <li>Nhấn nút <strong>📋 Copy Thư (Dán Zalo)</strong> để chép trực tiếp ảnh độ phân giải cao vào Clipboard.</li>
@@ -573,19 +574,19 @@ const styles = {
   },
   header: {
     padding: '1.1rem 1.5rem',
-    backgroundColor: '#0B2A4A',
+    backgroundColor: '#0D88C4',
     color: '#FFFFFF',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '3px solid #C9A45C',
+    borderBottom: '3px solid #FFCA29',
   },
   headerIcon: {
     width: '42px',
     height: '42px',
     borderRadius: '10px',
-    backgroundColor: 'rgba(201, 164, 92, 0.2)',
-    color: '#C9A45C',
+    backgroundColor: 'rgba(255, 202, 41, 0.25)',
+    color: '#FFCA29',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -774,17 +775,18 @@ const styles = {
     fontWeight: '700',
   },
   saveBtn: {
-    padding: '0.35rem 0.75rem',
-    backgroundColor: '#C9A45C',
-    color: '#0B2A4A',
+    padding: '0.4rem 0.85rem',
+    backgroundColor: '#FFCA29',
+    color: '#095B83',
     border: 'none',
     borderRadius: '6px',
-    fontSize: '0.8rem',
-    fontWeight: '700',
+    fontSize: '0.82rem',
+    fontWeight: '800',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     gap: '0.35rem',
+    boxShadow: '0 2px 4px rgba(255, 202, 41, 0.3)',
   },
   bookGrid: {
     display: 'grid',
@@ -818,7 +820,7 @@ const styles = {
   zipBtn: {
     width: '100%',
     padding: '0.75rem 1rem',
-    backgroundColor: '#0B2A4A',
+    backgroundColor: '#0D88C4',
     color: '#FFFFFF',
     border: 'none',
     borderRadius: '8px',
@@ -829,11 +831,11 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '0.5rem',
-    boxShadow: '0 2px 5px rgba(11, 42, 74, 0.25)',
+    boxShadow: '0 2px 5px rgba(13, 136, 196, 0.25)',
   },
   guideCard: {
-    backgroundColor: 'rgba(201, 164, 92, 0.08)',
-    border: '1px solid rgba(201, 164, 92, 0.3)',
+    backgroundColor: 'rgba(13, 136, 196, 0.08)',
+    border: '1px solid rgba(13, 136, 196, 0.25)',
     borderRadius: '10px',
     padding: '0.85rem',
   },

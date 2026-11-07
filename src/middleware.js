@@ -24,7 +24,8 @@ export async function middleware(request) {
     pathname.startsWith('/api/parent') ||
     pathname.startsWith('/cambridge/register') ||
     pathname.startsWith('/api/cambridge/public') ||
-    pathname.startsWith('/api/external')
+    pathname.startsWith('/api/external') ||
+    pathname.startsWith('/hoclieu')
   ) {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }

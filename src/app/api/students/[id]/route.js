@@ -165,6 +165,36 @@ export async function PUT(request, { params }) {
 
     const now = new Date();
 
+    // LUỒNG CẤP PHÁT HỌC LIỆU SỐ (Courseware Integration)
+    if (action === 'courseware' || (!action && body.customBookCodes !== undefined)) {
+      const { customBookCodes, retainCoursewareAccess } = body;
+      let formattedCodes = '[]';
+      if (Array.isArray(customBookCodes)) {
+        formattedCodes = JSON.stringify([...new Set(customBookCodes.map(c => String(c).trim()).filter(Boolean))]);
+      } else if (typeof customBookCodes === 'string') {
+        try {
+          const parsed = JSON.parse(customBookCodes);
+          formattedCodes = JSON.stringify(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          formattedCodes = JSON.stringify([customBookCodes.trim()]);
+        }
+      }
+
+      const updatedStudent = await prisma.student.update({
+        where: { id },
+        data: {
+          customBookCodes: formattedCodes,
+          retainCoursewareAccess: Boolean(retainCoursewareAccess),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Đã cập nhật phân quyền giáo trình học viên thành công.',
+        student: updatedStudent,
+      });
+    }
+
     // LUỒNG THANH TOÁN: Thu tiền học phí (Kết hợp bán/tặng giáo trình & tặng phẩm)
     if (action === 'collectTuition' || action === 'payment') {
       const { 

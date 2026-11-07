@@ -1483,11 +1483,11 @@ export default function StudentsPage() {
                           <div className="action-buttons">
                             <button 
                               className="action-btn" 
-                              style={{ color: '#0B2A4A', background: 'rgba(11, 42, 74, 0.08)' }} 
-                              title="📱 Thư Học Liệu & Thẻ Học Viên" 
+                              style={{ color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }} 
+                              title="📚 Thư Thông Báo Cấp Học Liệu Số" 
                               onClick={() => handleOpenSingleCourseware(student)}
                             >
-                              <i className="fa-solid fa-id-card"></i>
+                              <i className="fa-solid fa-book-open"></i>
                             </button>
                             <Link href={`/students/${student.id}`} className="action-btn view-btn" title="Xem chi tiết">
                               <i className="fa-regular fa-eye"></i>

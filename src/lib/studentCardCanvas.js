@@ -6,16 +6,16 @@ export const CARD_HEIGHT = 1000;
 export const CARD_SCALE = 2; // Output 1500 x 2000 px Retina
 
 const COLORS = {
-  navy: '#0B2A4A',
-  navyDark: '#06182B',
-  gold: '#C9A45C',
-  goldLight: '#E8D2A2',
-  cream: '#FDFBF7',
+  navy: '#0D88C4', // Màu Xanh Nhật Mỹ chuẩn (C85 M34 Y3 K0, R12 G131 B193)
+  navyDark: '#095B83', // Xanh đậm bổ trợ
+  gold: '#FFCA29', // Màu Vàng Nhật Mỹ chuẩn (C0 M20 Y100 K0, R255 G200 B42)
+  goldLight: '#FFE899', // Vàng sáng bổ trợ
+  cream: '#F4FAFD', // Nền xanh nhạt thanh lịch
   cardBg: '#FFFFFF',
-  textDark: '#0F172A',
-  textMuted: '#64748B',
-  redSeal: '#C41E3A',
-  borderLight: '#E2E8F0',
+  textDark: '#0B2A4A',
+  textMuted: '#50727B',
+  redSeal: '#D71920',
+  borderLight: '#CCE5F3',
   accentGreen: '#059669',
 };
 
@@ -80,13 +80,13 @@ function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Chữ trên: TRUNG TÂM ANH NGỮ
+  // Chữ trên: ANH NGỮ NHẬT MỸ
   ctx.font = `bold 10px ${FONT_FAMILY}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
   // Vẽ chữ cung tròn trên
-  const topText = 'TRUNG TÂM ANH NGỮ';
+  const topText = 'ANH NGỮ NHẬT MỸ';
   const topRadius = radius - 11;
   const topArc = Math.PI * 0.7;
   const startAngle = -Math.PI / 2 - topArc / 2;
@@ -113,10 +113,10 @@ function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
   ctx.font = `900 19px ${FONT_FAMILY}`;
   ctx.fillText('NHẬT MỸ', 0, -1);
 
-  // Chữ phụ: VERIFIED PASS
+  // Chữ phụ: CẤP QUYỀN HỌC LIỆU
   ctx.font = `bold 8px ${FONT_FAMILY}`;
-  ctx.letterSpacing = '1px';
-  ctx.fillText('★ CẤP QUYỀN HỌC LIỆU ★', 0, 10);
+  ctx.letterSpacing = '0.5px';
+  ctx.fillText('★ ĐÃ CẤP QUYỀN HỌC LIỆU ★', 0, 10);
 
   // Ngày cấp ở cung dưới
   ctx.font = `600 8.5px ${FONT_FAMILY}`;
@@ -157,7 +157,12 @@ export async function renderStudentCardCanvas({
   // 3. Chuẩn bị dữ liệu học viên & sách
   const effectiveBooks = customBooks || getEffectiveBooksForStudent(student, classInfo);
   const studentToken = portalToken || student.portalToken || student.parentPortalToken || '';
-  const webAppUrl = `https://hoclieu.anhngunhatmy.edu.vn/?token=${encodeURIComponent(studentToken)}`;
+  
+  // URL điều hướng an toàn qua CRM có chứng chỉ SSL Let's Encrypt chuẩn (tránh lỗi SSL subdomain)
+  const crmOrigin = (typeof window !== 'undefined' && window.location?.origin) 
+    ? window.location.origin 
+    : (process.env.NEXT_PUBLIC_CRM_URL || 'https://crm.anhngunhatmy.edu.vn');
+  const webAppUrl = `${crmOrigin.replace(/\/+$/, '')}/hoclieu?token=${encodeURIComponent(studentToken)}`;
 
   // 4. Sinh QR Code nội bộ bằng QRCode dataURL
   let qrImage = null;
@@ -242,59 +247,53 @@ export async function renderStudentCardCanvas({
   // Tên trung tâm & Tiêu đề thương hiệu
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+
+  ctx.fillStyle = COLORS.gold;
+  ctx.font = `900 27px ${FONT_FAMILY}`;
+  ctx.fillText('ANH NGỮ NHẬT MỸ', logoX + logoSize + 22, 60);
+
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `800 17px ${FONT_FAMILY}`;
-  ctx.fillText('TRUNG TÂM NGOẠI NGỮ NHẬT - MỸ', logoX + logoSize + 22, 54);
-
-  ctx.fillStyle = COLORS.goldLight;
-  ctx.font = `800 24px ${FONT_FAMILY}`;
-  ctx.fillText('ANH NGỮ NHẬT MỸ', logoX + logoSize + 22, 78);
-
-  ctx.fillStyle = '#E2E8F0';
-  ctx.font = `600 12.5px ${FONT_FAMILY}`;
-  ctx.fillText('HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE', logoX + logoSize + 22, 114);
+  ctx.font = `700 13px ${FONT_FAMILY}`;
+  ctx.letterSpacing = '0.3px';
+  ctx.fillText('HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE', logoX + logoSize + 22, 98);
 
   // Huy hiệu góc phải Header
   ctx.textAlign = 'right';
-  ctx.fillStyle = COLORS.goldLight;
-  ctx.font = `700 11px ${FONT_FAMILY}`;
+  ctx.fillStyle = COLORS.gold;
+  ctx.font = `800 11.5px ${FONT_FAMILY}`;
   ctx.fillText('CAMBRIDGE ENGLISH', CARD_WIDTH - 50, 68);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = `500 11px ${FONT_FAMILY}`;
-  ctx.fillText('Digital Learning Pass', CARD_WIDTH - 50, 88);
+  ctx.fillStyle = '#E0F2FE';
+  ctx.font = `600 11px ${FONT_FAMILY}`;
+  ctx.fillText('Digital Learning Pass', CARD_WIDTH - 50, 90);
 
   // --- LỚP 3: Tiêu đề Thư thông báo ---
-  const titleY = 208;
+  const titleY = 212;
   ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 12px ${FONT_FAMILY}`;
+  ctx.font = `800 13px ${FONT_FAMILY}`;
   ctx.letterSpacing = '2px';
   ctx.fillText('THƯ THÔNG BÁO CHÍNH THỨC', CARD_WIDTH / 2, titleY);
 
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `900 22px ${FONT_FAMILY}`;
+  ctx.font = `900 24px ${FONT_FAMILY}`;
   ctx.letterSpacing = '0.5px';
-  ctx.fillText('CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ', CARD_WIDTH / 2, titleY + 24);
-
-  ctx.fillStyle = COLORS.gold;
-  ctx.font = `800 18px ${FONT_FAMILY}`;
-  ctx.fillText('& THẺ HỌC VIÊN ĐIỆN TỬ', CARD_WIDTH / 2, titleY + 52);
+  ctx.fillText('CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ', CARD_WIDTH / 2, titleY + 28);
 
   // Đường trang trí kim loại dưới tiêu đề
   ctx.strokeStyle = COLORS.gold;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(CARD_WIDTH / 2 - 90, titleY + 70);
-  ctx.lineTo(CARD_WIDTH / 2 + 90, titleY + 70);
+  ctx.moveTo(CARD_WIDTH / 2 - 110, titleY + 68);
+  ctx.lineTo(CARD_WIDTH / 2 + 110, titleY + 68);
   ctx.stroke();
 
   // Hình thoi trang trí giữa đường
   ctx.fillStyle = COLORS.gold;
   ctx.beginPath();
-  ctx.moveTo(CARD_WIDTH / 2, titleY + 70 - 4);
-  ctx.lineTo(CARD_WIDTH / 2 + 4, titleY + 70);
-  ctx.lineTo(CARD_WIDTH / 2, titleY + 70 + 4);
-  ctx.lineTo(CARD_WIDTH / 2 - 4, titleY + 70);
+  ctx.moveTo(CARD_WIDTH / 2, titleY + 68 - 5);
+  ctx.lineTo(CARD_WIDTH / 2 + 5, titleY + 68);
+  ctx.lineTo(CARD_WIDTH / 2, titleY + 68 + 5);
+  ctx.lineTo(CARD_WIDTH / 2 - 5, titleY + 68);
   ctx.closePath();
   ctx.fill();
 
@@ -452,12 +451,12 @@ export async function renderStudentCardCanvas({
 
   // Chú thích dưới QR
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `600 10px ${FONT_FAMILY}`;
+  ctx.font = `600 10.5px ${FONT_FAMILY}`;
   ctx.textAlign = 'center';
   ctx.fillText('Không cần nhập tài khoản/mật khẩu', qrBoxX + qrBoxW / 2, qrSectionY + 248);
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `bold 10px ${FONT_FAMILY}`;
-  ctx.fillText('hoclieu.anhngunhatmy.edu.vn', qrBoxX + qrBoxW / 2, qrSectionY + 266);
+  ctx.font = `bold 11px ${FONT_FAMILY}`;
+  ctx.fillText('anhngunhatmy.edu.vn', qrBoxX + qrBoxW / 2, qrSectionY + 266);
 
   // Cột Hướng dẫn phụ huynh bên phải
   const guideX = qrBoxX + qrBoxW + 20;
@@ -540,17 +539,18 @@ export async function renderStudentCardCanvas({
 
   // Chỉ Gold trên footer
   ctx.fillStyle = COLORS.gold;
-  ctx.fillRect(24, footerY, CARD_WIDTH - 48, 2);
+  ctx.fillRect(24, footerY, CARD_WIDTH - 48, 2.5);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `700 13px ${FONT_FAMILY}`;
-  ctx.fillText('TRUNG TÂM ANH NGỮ NHẬT MỸ — TẬN TÂM TRÍ TUỆ, NÂNG TẦM TƯƠNG LAI', CARD_WIDTH / 2, footerY + 28);
+  ctx.font = `800 13px ${FONT_FAMILY}`;
+  ctx.letterSpacing = '1px';
+  ctx.fillText('ANH NGỮ NHẬT MỸ — DEDICATED TO EXCELLENCE', CARD_WIDTH / 2, footerY + 28);
 
-  ctx.fillStyle = COLORS.goldLight;
-  ctx.font = `600 11.5px ${FONT_FAMILY}`;
-  ctx.fillText('Hotline hỗ trợ phụ huynh: 0911 767 069  •  Website: crm.anhngunhatmy.edu.vn', CARD_WIDTH / 2, footerY + 52);
+  ctx.fillStyle = COLORS.gold;
+  ctx.font = `700 11.5px ${FONT_FAMILY}`;
+  ctx.fillText('Hotline hỗ trợ phụ huynh: 0911 767 069  •  Website: anhngunhatmy.edu.vn', CARD_WIDTH / 2, footerY + 52);
 
   return canvas;
 }

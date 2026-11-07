@@ -26,9 +26,9 @@ export default function CoursewareStudentAction({ student, classInfo = null }) {
           width: '100%',
           marginTop: '0.65rem',
           padding: '0.65rem 1rem',
-          backgroundColor: '#0B2A4A',
+          backgroundColor: '#0D88C4',
           color: '#FFFFFF',
-          border: '1px solid #C9A45C',
+          border: '1px solid #FFCA29',
           borderRadius: '8px',
           fontWeight: '700',
           fontSize: '0.9rem',
@@ -37,13 +37,13 @@ export default function CoursewareStudentAction({ student, classInfo = null }) {
           justifyContent: 'center',
           gap: '0.5rem',
           cursor: 'pointer',
-          boxShadow: '0 2px 4px rgba(11, 42, 74, 0.25)',
+          boxShadow: '0 2px 4px rgba(13, 136, 196, 0.25)',
           transition: 'all 0.2s ease',
         }}
-        title="Xuất thư cấp phát học liệu số & Thẻ học viên điện tử kèm mã QR cá nhân"
+        title="Xuất thư thông báo cấp phát tài khoản học liệu số kèm mã QR"
       >
-        <i className="fa-solid fa-id-card" style={{ color: '#C9A45C', fontSize: '1rem' }}></i>
-        <span>📱 Thư Học Liệu & Thẻ Học Viên</span>
+        <i className="fa-solid fa-book-open" style={{ color: '#FFCA29', fontSize: '1rem' }}></i>
+        <span>📚 Xuất Thư Cấp Học Liệu</span>
       </button>
 
       <CoursewareNoticeModal

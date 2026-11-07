@@ -131,13 +131,13 @@ export default function ClassPortalPage() {
           </button>
           <button
             className="btn-action"
-            style={{ background: '#0B2A4A', color: '#FFFFFF', border: '1px solid #C9A45C', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: '700', padding: '0.55rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
+            style={{ background: '#0D88C4', color: '#FFFFFF', border: '1px solid #FFCA29', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: '700', padding: '0.55rem 1rem', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(13, 136, 196, 0.25)' }}
             onClick={() => {
               setCoursewareSingleStudent(null);
               setIsCoursewareModalOpen(true);
             }}
           >
-            <i className="fa-solid fa-id-card"></i> 📱 Xuất Thư Học Liệu Cả Lớp ({students?.length || 0})
+            <i className="fa-solid fa-book-open" style={{ color: '#FFCA29' }}></i> Xuất Thư Học Liệu Cả Lớp ({students?.length || 0})
           </button>
         </div>
       </div>
@@ -190,10 +190,10 @@ export default function ClassPortalPage() {
                           setCoursewareSingleStudent(student);
                           setIsCoursewareModalOpen(true);
                         }}
-                        title="📱 Thư Học Liệu & Thẻ Học Viên"
-                        style={{ border: 'none', background: 'rgba(11, 42, 74, 0.08)', color: '#0B2A4A', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', marginLeft: '6px' }}
+                        title="📚 Xuất Thư Cấp Học Liệu"
+                        style={{ border: 'none', background: 'rgba(13, 136, 196, 0.12)', color: '#0D88C4', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', marginLeft: '6px' }}
                       >
-                        <i className="fa-solid fa-id-card"></i>
+                        <i className="fa-solid fa-book-open"></i>
                       </button>
                     </td>
                     <td className="text-center" style={{ fontWeight: 'bold', color: student.totalAbsent > 0 ? '#ef4444' : 'inherit' }}>
