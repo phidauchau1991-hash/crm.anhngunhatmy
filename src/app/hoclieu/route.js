@@ -36,7 +36,8 @@ export async function GET(request) {
     }
 
     const base = getCoursewareTargetBase();
-    const targetUrl = new URL(base);
+    // Chuyển hướng trực tiếp vào Tủ sách /lab/bookshelf.html để đảm bảo tải đúng tài nguyên
+    const targetUrl = new URL('/lab/bookshelf.html', base);
     
     // Giữ nguyên và chuyển tiếp toàn bộ query params sang Web App (token, student_id, ...)
     searchParams.forEach((val, key) => {
