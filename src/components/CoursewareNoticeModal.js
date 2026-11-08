@@ -439,7 +439,7 @@ export default function CoursewareNoticeModal({
         className="courseware-modal-container"
         style={{
           ...styles.container,
-          maxWidth: isBatchMode ? '1320px' : '980px',
+          maxWidth: isBatchMode ? '1480px' : '980px',
         }}
       >
         {/* HEADER MODAL */}
@@ -490,7 +490,7 @@ export default function CoursewareNoticeModal({
         <div
           style={{
             ...styles.bodyGrid,
-            gridTemplateColumns: isBatchMode ? '310px 380px 1fr' : '400px 1fr',
+            gridTemplateColumns: isBatchMode ? '390px 410px 1fr' : '420px 1fr',
           }}
         >
           {/* ======================================================== */}
@@ -559,7 +559,7 @@ export default function CoursewareNoticeModal({
                         if (e.target.checked) handleSelectAll();
                         else handleDeselectAll();
                       }}
-                      style={{ width: '15px', height: '15px', accentColor: '#0D88C4', cursor: 'pointer' }}
+                      style={{ width: '18px', height: '18px', accentColor: '#0D88C4', cursor: 'pointer' }}
                     />
                     <span>Chọn tất cả</span>
                   </label>
@@ -614,30 +614,44 @@ export default function CoursewareNoticeModal({
                             e.stopPropagation();
                             toggleSelectStudent(std.id);
                           }}
-                          style={{ padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                          style={{
+                            padding: '6px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                          title={isSelected ? "Bỏ chọn học viên này" : "Chọn xuất thư học viên này"}
                         >
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleSelectStudent(std.id)}
-                            style={{ width: '16px', height: '16px', accentColor: '#0D88C4', cursor: 'pointer' }}
+                            readOnly
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              accentColor: '#0D88C4',
+                              cursor: 'pointer',
+                              pointerEvents: 'none',
+                            }}
                           />
                         </div>
 
                         {/* Thông tin học viên */}
-                        <div style={{ flex: 1, minWidth: 0, paddingRight: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '600' }}>
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                            <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '700', marginTop: '1px' }}>
                               #{idx + 1}
                             </span>
                             <span
+                              title={std.name || std.fullName}
                               style={{
-                                fontSize: '0.86rem',
+                                fontSize: '0.88rem',
                                 fontWeight: isActive ? '800' : '700',
                                 color: isActive ? '#0D88C4' : '#0F172A',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.35,
                               }}
                             >
                               {std.name || std.fullName}
@@ -648,14 +662,14 @@ export default function CoursewareNoticeModal({
                             <span style={{ fontSize: '0.72rem', color: '#64748B', fontFamily: 'monospace' }}>
                               {std.id}
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: '#0369A1', background: '#E0F2FE', padding: '1px 5px', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#0369A1', background: '#E0F2FE', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
                               {bookCount} giáo trình
                             </span>
                           </div>
                         </div>
 
                         {/* Dấu hiệu ĐÃ XUẤT / CHƯA XUẤT */}
-                        <div style={{ textAlign: 'right' }}>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           {isExported ? (
                             <span
                               title={`Đã xuất thư: ${new Date(exportedMap[std.id]).toLocaleDateString('vi-VN')}`}
@@ -665,7 +679,7 @@ export default function CoursewareNoticeModal({
                             </span>
                           ) : (
                             <span style={styles.unexportedBadge}>
-                              ⏳ Chưa
+                              ⏳ Chưa xuất
                             </span>
                           )}
                         </div>
@@ -965,7 +979,7 @@ const styles = {
   container: {
     backgroundColor: '#F8FAFC',
     borderRadius: '16px',
-    width: '100%',
+    width: '96vw',
     maxHeight: '95vh',
     display: 'flex',
     flexDirection: 'column',
@@ -1221,7 +1235,7 @@ const styles = {
   },
   previewBox: {
     width: '100%',
-    maxWidth: '360px',
+    maxWidth: '380px',
     aspectRatio: '3 / 4',
     backgroundColor: '#E2E8F0',
     borderRadius: '12px',
@@ -1246,7 +1260,7 @@ const styles = {
     display: 'flex',
     gap: '0.6rem',
     width: '100%',
-    maxWidth: '360px',
+    maxWidth: '380px',
     marginTop: '0.75rem',
   },
   copyBtn: {
