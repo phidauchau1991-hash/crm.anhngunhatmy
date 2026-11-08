@@ -120,6 +120,7 @@ export async function GET(request, { params }) {
           dropoutReason: student.dropoutReason,
           customBookCodes: student.customBookCodes,
           retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
+          coursewareLetterExportedAt: student.coursewareLetterExportedAt ? student.coursewareLetterExportedAt.toISOString() : null,
           parentPortalToken: encryptStudentId(student.id),
         },
         currentClass: classDetails,
@@ -191,6 +192,22 @@ export async function PUT(request, { params }) {
       return NextResponse.json({
         success: true,
         message: 'Đã cập nhật phân quyền giáo trình học viên thành công.',
+        student: updatedStudent,
+      });
+    }
+
+    // LUỒNG ĐÁNH DẤU XUẤT THƯ HỌC LIỆU / THẺ HỌC VIÊN
+    if (action === 'markCoursewareExported') {
+      const updatedStudent = await prisma.student.update({
+        where: { id },
+        data: {
+          coursewareLetterExportedAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Đã cập nhật trạng thái xuất thư học liệu thành công.',
         student: updatedStudent,
       });
     }

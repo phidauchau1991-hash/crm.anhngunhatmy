@@ -220,6 +220,7 @@ export async function GET(request) {
         dropoutReason: student.dropoutReason,
         customBookCodes: student.customBookCodes || null,
         retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
+        coursewareLetterExportedAt: student.coursewareLetterExportedAt ? student.coursewareLetterExportedAt.toISOString() : null,
         portalToken: encryptStudentId(student.id),
         createdAt: student.createdAt,
       };

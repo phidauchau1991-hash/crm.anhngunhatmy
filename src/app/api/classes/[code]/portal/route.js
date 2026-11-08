@@ -138,6 +138,7 @@ export async function GET(request, { params }) {
         status: s.status || (isTrial ? 'Học thử' : 'Đang học'),
         customBookCodes: s.customBookCodes || null,
         retainCoursewareAccess: Boolean(s.retainCoursewareAccess),
+        coursewareLetterExportedAt: s.coursewareLetterExportedAt ? s.coursewareLetterExportedAt.toISOString() : null,
         portalToken: !isTrial && id ? encryptStudentId(id) : '',
         isTrial,
         totalAbsent,

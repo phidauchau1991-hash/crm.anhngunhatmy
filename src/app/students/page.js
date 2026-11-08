@@ -1483,11 +1483,11 @@ export default function StudentsPage() {
                           <div className="action-buttons">
                             <button 
                               className="action-btn" 
-                              style={{ color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }} 
-                              title="📚 Thư Thông Báo Cấp Học Liệu Số" 
+                              style={student.coursewareLetterExportedAt ? { color: '#059669', background: '#ecfdf5', border: '1px solid #10b981' } : { color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }} 
+                              title={student.coursewareLetterExportedAt ? `✓ Đã xuất thư học liệu (${new Date(student.coursewareLetterExportedAt).toLocaleDateString('vi-VN')})` : "📚 Thư Thông Báo Cấp Học Liệu Số (Chưa xuất)"} 
                               onClick={() => handleOpenSingleCourseware(student)}
                             >
-                              <i className="fa-solid fa-book-open"></i>
+                              <i className={student.coursewareLetterExportedAt ? "fa-solid fa-circle-check" : "fa-solid fa-book-open"}></i>
                             </button>
                             <Link href={`/students/${student.id}`} className="action-btn view-btn" title="Xem chi tiết">
                               <i className="fa-regular fa-eye"></i>

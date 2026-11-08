@@ -89,6 +89,7 @@ model Student {
 
   // Web App Courseware Integration
   customBookCodes        String?   // JSON Array: vd ["beehive_1", "beehive_starter"]
+  coursewareLetterExportedAt DateTime? // Thoi diem xuat thu hoc lieu gan nhat
   retainCoursewareAccess Boolean   @default(false) // Giu quyen khi tam nghi / nghi luon // Chi nhÃ¡nh quáº£n lÃ½ há»c viÃªn
 
   createdAt       DateTime         @default(now())

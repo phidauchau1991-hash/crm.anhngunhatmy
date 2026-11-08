@@ -18,5 +18,9 @@ if (!studentCols.includes('retainCoursewareAccess')) {
   console.log('Adding column "retainCoursewareAccess" to Student...');
   db.prepare("ALTER TABLE Student ADD COLUMN retainCoursewareAccess INTEGER NOT NULL DEFAULT 0").run();
 }
+if (!studentCols.includes('coursewareLetterExportedAt')) {
+  console.log('Adding column "coursewareLetterExportedAt" to Student...');
+  db.prepare("ALTER TABLE Student ADD COLUMN coursewareLetterExportedAt DATETIME").run();
+}
 
 console.log('Migration for courseware fields completed successfully!');

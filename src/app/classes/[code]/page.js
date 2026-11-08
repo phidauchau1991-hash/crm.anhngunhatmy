@@ -137,7 +137,7 @@ export default function ClassPortalPage() {
               setIsCoursewareModalOpen(true);
             }}
           >
-            <i className="fa-solid fa-book-open" style={{ color: '#FFCA29' }}></i> Xuất Thư Học Liệu Cả Lớp ({students?.length || 0})
+            <i className="fa-solid fa-book-open" style={{ color: '#FFCA29' }}></i> Xuất Thư Học Liệu ({students?.filter(s => s.coursewareLetterExportedAt)?.length || 0}/{students?.length || 0} đã cấp)
           </button>
         </div>
       </div>
@@ -184,17 +184,56 @@ export default function ClassPortalPage() {
                       {student.name} 
                       {student.isTrial && <span className="badge" style={{fontSize:'0.7rem', background:'#fef08a', marginLeft: '5px'}}>Học thử</span>}
                       {student.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCoursewareSingleStudent(student);
-                          setIsCoursewareModalOpen(true);
-                        }}
-                        title="📚 Xuất Thư Cấp Học Liệu"
-                        style={{ border: 'none', background: 'rgba(13, 136, 196, 0.12)', color: '#0D88C4', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', marginLeft: '6px' }}
-                      >
-                        <i className="fa-solid fa-book-open"></i>
-                      </button>
+                      {student.coursewareLetterExportedAt ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoursewareSingleStudent(student);
+                            setIsCoursewareModalOpen(true);
+                          }}
+                          title={`✓ Đã xuất thư học liệu (${new Date(student.coursewareLetterExportedAt).toLocaleDateString('vi-VN')}) - Bấm để xuất lại hoặc đổi sách`}
+                          style={{
+                            border: '1px solid #10b981',
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            borderRadius: '4px',
+                            padding: '2px 7px',
+                            cursor: 'pointer',
+                            marginLeft: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: '600',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <i className="fa-solid fa-circle-check"></i> Đã cấp
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoursewareSingleStudent(student);
+                            setIsCoursewareModalOpen(true);
+                          }}
+                          title="📚 Chưa xuất thư học liệu - Bấm để cấp phát"
+                          style={{
+                            border: '1px dashed #cbd5e1',
+                            background: '#f8fafc',
+                            color: '#64748b',
+                            borderRadius: '4px',
+                            padding: '2px 7px',
+                            cursor: 'pointer',
+                            marginLeft: '6px',
+                            fontSize: '0.72rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <i className="fa-solid fa-book-open" style={{ color: '#0D88C4' }}></i> Chưa cấp
+                        </button>
+                      )}
                     </td>
                     <td className="text-center" style={{ fontWeight: 'bold', color: student.totalAbsent > 0 ? '#ef4444' : 'inherit' }}>
                       {student.totalAbsent}
@@ -420,6 +459,7 @@ export default function ClassPortalPage() {
         }}
         students={coursewareSingleStudent ? [coursewareSingleStudent] : (students || [])}
         classInfo={classInfo}
+        onStudentUpdated={() => fetchPortalData(classCode)}
       />
     </div>
   );
