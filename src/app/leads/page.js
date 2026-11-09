@@ -5,6 +5,7 @@ import Link from 'next/link';
 import TrialInviteModal from './TrialInviteModal';
 import PlacementTestModal from './components/PlacementTestModal';
 import ReviewModal from '@/components/ReviewModal';
+import CourseWelcomeModal from '@/components/CourseWelcomeModal';
 import ClassSelect from '../components/ClassSelect';
 import { formatClassCode } from '@/lib/classHelper';
 
@@ -41,6 +42,10 @@ export default function LeadsPage() {
   // Placement Test Modal State
   const [showPlacementModal, setShowPlacementModal] = useState(false);
   const [placementLead, setPlacementLead] = useState(null);
+
+  // Course Welcome Modal State (Thư Thông Báo Khai Giảng & Chào Mừng Khóa Mới)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [welcomeLead, setWelcomeLead] = useState(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -462,15 +467,34 @@ export default function LeadsPage() {
                         >
                           🤖 Zalo AI
                         </button>
-                        {lead.status === 'Đã chốt' && (
-                          <Link 
-                            href={`/students?convertName=${encodeURIComponent(lead.name)}&convertPhone=${encodeURIComponent(lead.phone || '')}&convertDob=${encodeURIComponent(lead.dob ? lead.dob.substring(0,10) : '')}&convertAddress=${encodeURIComponent(lead.address || '')}&convertLeadId=${lead.id}&convertTrialClass=${encodeURIComponent(lead.trialClassCode || '')}`} 
-                            className="action-btn view-btn"
-                            style={{ display: 'inline-flex', padding: '0 0.5rem', width: 'auto', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold' }}
-                            title="Chuyển thành Học Viên"
+                        {lead.status === 'Đã chốt' ? (
+                          <>
+                            <button 
+                              className="action-btn" 
+                              style={{ color: '#0369a1', background: '#e0f2fe', border: '1px solid #38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                              title="Thư Thông Báo Khai Giảng & Chào Mừng Khóa Mới" 
+                              onClick={() => { setWelcomeLead(lead); setShowWelcomeModal(true); }}
+                            >
+                              📢 Thư Khai Giảng
+                            </button>
+                            <Link 
+                              href={`/students?convertName=${encodeURIComponent(lead.name)}&convertPhone=${encodeURIComponent(lead.phone || '')}&convertDob=${encodeURIComponent(lead.dob ? lead.dob.substring(0,10) : '')}&convertAddress=${encodeURIComponent(lead.address || '')}&convertLeadId=${lead.id}&convertTrialClass=${encodeURIComponent(lead.trialClassCode || '')}`} 
+                              className="action-btn view-btn"
+                              style={{ display: 'inline-flex', padding: '0 0.5rem', width: 'auto', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                              title="Chuyển thành Học Viên"
+                            >
+                              <i className="fa-solid fa-user-graduate"></i> Ghi danh
+                            </Link>
+                          </>
+                        ) : (
+                          <button 
+                            className="action-btn" 
+                            style={{ color: '#0284c7', background: '#f0f9ff', border: '1px dashed #7dd3fc', padding: '2px 7px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }} 
+                            title="Xuất Thư Khai Giảng gửi Phụ Huynh" 
+                            onClick={() => { setWelcomeLead(lead); setShowWelcomeModal(true); }}
                           >
-                            <i className="fa-solid fa-user-graduate"></i> Ghi danh
-                          </Link>
+                            📢 Khai giảng
+                          </button>
                         )}
                         <button className="action-btn edit-btn" title="Chăm sóc / Sửa" onClick={() => openLeadModal(lead)}>
                           <i className="fa-regular fa-pen-to-square"></i>
@@ -736,6 +760,13 @@ export default function LeadsPage() {
         isOpen={showPlacementModal} 
         onClose={() => { setShowPlacementModal(false); setPlacementLead(null); }} 
         lead={placementLead} 
+      />
+
+      <CourseWelcomeModal
+        isOpen={showWelcomeModal}
+        onClose={() => { setShowWelcomeModal(false); setWelcomeLead(null); }}
+        data={welcomeLead}
+        classList={classList}
       />
 
       <style>{`

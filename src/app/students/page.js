@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
 import PaidStamp from '@/components/PaidStamp';
 import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
+import CourseWelcomeModal from '@/components/CourseWelcomeModal';
 import { AVAILABLE_COURSEWARE_BOOKS, parseCustomBookCodes } from '@/lib/coursewareBooks';
 
 const getNormalizedStatus = (st) => {
@@ -51,6 +52,10 @@ export default function StudentsPage() {
   const [isCoursewareModalOpen, setIsCoursewareModalOpen] = useState(false);
   const [coursewareModalStudents, setCoursewareModalStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+  // Trạng thái xuất Thư Chào Mừng & Thông Báo Khai Giảng (Ghi danh / Lớp mới)
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [welcomeStudentData, setWelcomeStudentData] = useState(null);
 
   // AI Birthday State
   const [showAiModal, setShowAiModal] = useState(false);
@@ -975,6 +980,17 @@ export default function StudentsPage() {
             ? `Thêm học viên thành công! Mã số: ${result.data.id} (Đã đồng bộ sang mục Học phí tháng)`
             : `Thêm học viên thành công! Mã số: ${result.data.id}`
         });
+
+        // Tự động mở nhanh Thư Chào Mừng & Thông Báo Khai Giảng cho học viên mới ghi danh
+        const newStudentInfo = {
+          name: formData.name,
+          id: result.data?.id || formData.nationalId,
+          classCode: formData.classCode,
+          phone: formData.phone,
+        };
+        setWelcomeStudentData(newStudentInfo);
+        setIsWelcomeModalOpen(true);
+
         setFormData({
           name: '', phone: '', dob: '', address: '', nationalId: '', specialPolicyType: 'Không giảm',
           specialPolicyValue: '0', enrollmentMode: 'COURSE', billingType: 'MONTHLY_PREPAID',
@@ -1481,6 +1497,22 @@ export default function StudentsPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div className="action-buttons">
+                            <button 
+                              className="action-btn" 
+                              style={{ color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)', border: '1px solid #7dd3fc' }} 
+                              title="📢 Thư Thông Báo Khai Giảng & Lịch Học" 
+                              onClick={() => {
+                                setWelcomeStudentData({
+                                  name: student.name,
+                                  id: student.id,
+                                  classCode: student.classCode,
+                                  phone: student.phone,
+                                });
+                                setIsWelcomeModalOpen(true);
+                              }}
+                            >
+                              <i className="fa-solid fa-bullhorn"></i>
+                            </button>
                             <button 
                               className="action-btn" 
                               style={student.coursewareLetterExportedAt ? { color: '#059669', background: '#ecfdf5', border: '1px solid #10b981' } : { color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }} 
@@ -3469,6 +3501,17 @@ export default function StudentsPage() {
         onStudentUpdated={(stdId, codes, retain) => {
           fetchStudents();
         }}
+      />
+
+      {/* Modal Thư Chào Mừng & Thông Báo Khai Giảng (Ghi danh / Nhập học mới) */}
+      <CourseWelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={() => {
+          setIsWelcomeModalOpen(false);
+          setWelcomeStudentData(null);
+        }}
+        data={welcomeStudentData}
+        classList={classes}
       />
     </div>
   );
