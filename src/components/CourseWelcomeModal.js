@@ -2,25 +2,54 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import html2canvas from 'html2canvas';
-import CourseWelcomeTemplate from '@/app/components/CourseWelcomeTemplate';
+import CourseWelcomeTemplate, { FIXED_NOTE_1, FIXED_NOTE_2 } from '@/app/components/CourseWelcomeTemplate';
 import { getClassScheduleDetails, formatClassCode } from '@/lib/classHelper';
 
 /**
- * Helper chuyển ngày Date / ISO string thành "Thứ Bảy, ngày 14/11/2026"
+ * Helper parse chuỗi ngày (hỗ trợ cả ISO "2026-11-14", Date object, lẫn chuỗi vi-VN "14/11/2026")
  */
-function formatVietnameseDateWithDay(dateInput) {
-  if (!dateInput) return '';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return String(dateInput);
+function parseAnyDate(rawDate, isoDate) {
+  const candidate = isoDate || rawDate;
+  if (!candidate) return null;
+
+  const str = String(candidate).trim();
+  // Kiểm tra định dạng YYYY-MM-DD
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const y = Number(isoMatch[1]);
+    const m = Number(isoMatch[2]) - 1;
+    const d = Number(isoMatch[3]);
+    return new Date(y, m, d);
+  }
+
+  // Kiểm tra định dạng DD/MM/YYYY
+  const vnMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (vnMatch) {
+    const d = Number(vnMatch[1]);
+    const m = Number(vnMatch[2]) - 1;
+    const y = Number(vnMatch[3]);
+    return new Date(y, m, d);
+  }
+
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Chuyển ngày thành "Thứ 7, ngày 14/11/2026"
+ */
+function formatVietnameseDateWithDay(rawDate, isoDate) {
+  const d = parseAnyDate(rawDate, isoDate);
+  if (!d) return String(rawDate || '').trim() || '';
 
   const daysOfWeek = [
     'Chủ Nhật',
-    'Thứ Hai',
-    'Thứ Ba',
-    'Thứ Tư',
-    'Thứ Năm',
-    'Thứ Sáu',
-    'Thứ Bảy',
+    'Thứ 2',
+    'Thứ 3',
+    'Thứ 4',
+    'Thứ 5',
+    'Thứ 6',
+    'Thứ 7',
   ];
   const dayName = daysOfWeek[d.getDay()];
   const dd = String(d.getDate()).padStart(2, '0');
@@ -28,6 +57,26 @@ function formatVietnameseDateWithDay(dateInput) {
   const yyyy = d.getFullYear();
 
   return `${dayName}, ngày ${dd}/${mm}/${yyyy}`;
+}
+
+/**
+ * Chuyển ngày kết thúc từ lớp học thành "28/02/2027" hoặc "Học liên tục"
+ */
+function formatEndDateFromClass(rawEndDate, isoEndDate) {
+  const rawStr = String(rawEndDate || '').trim();
+  if (/học\s*liên\s*tục/i.test(rawStr)) return 'Học liên tục';
+
+  const d = parseAnyDate(rawEndDate, isoEndDate);
+  if (d) {
+    if (d.getFullYear() > 2090) return 'Học liên tục';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  if (rawStr) return rawStr;
+  return 'Theo lộ trình khóa';
 }
 
 export default function CourseWelcomeModal({
@@ -48,21 +97,11 @@ export default function CourseWelcomeModal({
   const [selectedClassCode, setSelectedClassCode] = useState('');
   const [className, setClassName] = useState('');
   const [teacherName, setTeacherName] = useState('');
-  const [room, setRoom] = useState('Phòng 01 (Lầu 1)');
-  const [branchName, setBranchName] = useState('Cơ sở 1 - Nhật Mỹ Bình Dương');
+  const [room, setRoom] = useState('Phòng 202 (Lầu 1)');
   const [startDateText, setStartDateText] = useState('');
   const [scheduleDays, setScheduleDays] = useState('');
   const [studyHours, setStudyHours] = useState('');
   const [endDateText, setEndDateText] = useState('');
-  const [notesUniform, setNotesUniform] = useState(
-    'Bé mặc trang phục gọn gàng/đồng phục, mang theo tập vở và bút. Giáo trình chính khóa và Thẻ học liệu số sẽ được thầy cô trao tận tay bé trong buổi học đầu tiên.'
-  );
-  const [notesArrival, setNotesArrival] = useState(
-    'Ba mẹ vui lòng đưa bé đến trước giờ học 10 - 15 phút trong ngày khai giảng để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học.'
-  );
-  const [notesPickup, setNotesPickup] = useState(
-    'Giờ tan học đúng giờ theo ca, thầy cô bàn giao bé tận tay tại sảnh đón. Hotline hỗ trợ phụ huynh: 0911 767 069.'
-  );
   const [suggestedMessage, setSuggestedMessage] = useState('');
 
   const showToast = (msg, type = 'success') => {
@@ -74,9 +113,11 @@ export default function CourseWelcomeModal({
   useEffect(() => {
     if (isOpen && data) {
       const name = data.name || data.fullName || '';
-      const code = data.id || (data.studentId ? data.studentId : `HV-${Date.now().toString().slice(-4)}`);
+      const rawId = String(data.id || data.studentId || '').trim();
+      // Chỉ hiển thị mã học viên nếu là mã chuẩn HV... (tránh hiển thị ID số của Lead)
+      const isOfficialStudentCode = /^HV/i.test(rawId);
       setStudentName(name);
-      setStudentCode(code);
+      setStudentCode(isOfficialStudentCode ? rawId : '');
 
       // Xác định lớp ban đầu
       const initialClassCode =
@@ -88,11 +129,10 @@ export default function CourseWelcomeModal({
     }
   }, [isOpen, data, classList]);
 
-  // Khi chọn hoặc đổi lớp: Tự động tra cứu lịch, giờ học, ngày khai giảng, giáo viên
+  // Khi chọn hoặc đổi lớp: Tự động tra cứu lịch, giờ học, ngày bắt đầu, ngày kết thúc dự kiến, giáo viên
   useEffect(() => {
     if (!selectedClassCode) return;
 
-    // Tìm lớp trong classList
     const targetClass = classList.find(c => c.code === selectedClassCode);
 
     // Format tên lớp hiển thị
@@ -102,33 +142,35 @@ export default function CourseWelcomeModal({
     // Tính toán lịch học & giờ học từ helper chuẩn
     const scheduleDetails = getClassScheduleDetails(
       selectedClassCode,
-      targetClass?.schedule
+      targetClass?.scheduleRaw || targetClass?.schedule
     );
-    setScheduleDays(scheduleDetails.daysDisplay || 'Thứ 7 & Chủ Nhật');
-    setStudyHours(scheduleDetails.hours ? `${scheduleDetails.hours} (${scheduleDetails.shiftName || 'Ca 1'})` : (scheduleDetails.shiftName || 'Ca 1'));
+    setScheduleDays(targetClass?.schedule || scheduleDetails.daysDisplay || 'Thứ 7, Chủ Nhật');
+    setStudyHours(
+      scheduleDetails.hours
+        ? `${scheduleDetails.hours} (${scheduleDetails.shiftName || 'Ca 1'})`
+        : scheduleDetails.shiftName || 'Ca 1'
+    );
 
     // Giáo viên
     if (targetClass?.teacherName) {
       setTeacherName(targetClass.teacherName);
     } else {
-      // Thử bóc tách từ tên lớp: e.g. CN1_M1_MsMy_7CN_Ca1 -> Ms My
       const parts = selectedClassCode.split('_');
-      setTeacherName(parts.length >= 3 ? parts[2] : 'Ms Trúc My');
+      setTeacherName(parts.length >= 3 ? parts[2] : 'Ms My');
     }
 
-    // Ngày khai giảng
-    if (targetClass?.startDateIso || targetClass?.startDate) {
-      setStartDateText(formatVietnameseDateWithDay(targetClass.startDateIso || targetClass.startDate));
+    // Ngày bắt đầu học (lấy từ lớp học)
+    if (targetClass?.startDate || targetClass?.startDateIso) {
+      setStartDateText(formatVietnameseDateWithDay(targetClass.startDate, targetClass.startDateIso));
     } else {
       setStartDateText(formatVietnameseDateWithDay(new Date()));
     }
 
-    // Ngày kết thúc
-    if (targetClass?.expectedEndDate) {
-      const d = new Date(targetClass.expectedEndDate);
-      setEndDateText(!isNaN(d.getTime()) ? `${d.toLocaleDateString('vi-VN')} (Dự kiến)` : 'Đang cập nhật');
+    // Ngày kết thúc dự kiến (tự động xuất chuẩn xác từ hệ thống)
+    if (targetClass?.expectedEndDate || targetClass?.expectedEndDateIso) {
+      setEndDateText(formatEndDateFromClass(targetClass.expectedEndDate, targetClass.expectedEndDateIso));
     } else {
-      setEndDateText('Khóa 32 buổi (Dự kiến)');
+      setEndDateText('Theo lộ trình khóa');
     }
 
     // Cấp độ / Chương trình
@@ -140,9 +182,9 @@ export default function CourseWelcomeModal({
     } else if (level.startsWith('F') || level.includes('Flyer')) {
       setProgramLevel(`Tiếng Anh Thiếu Nhi Flyers (${level})`);
     } else if (level.includes('KET')) {
-      setProgramLevel(`Tiếng Anh Thiếu Niên Cambridge KET (A2)`);
+      setProgramLevel(`Tiếng Anh Thiếu Niên Cambridge KET (${level})`);
     } else if (level.includes('PET')) {
-      setProgramLevel(`Tiếng Anh Thiếu Niên Cambridge PET (B1)`);
+      setProgramLevel(`Tiếng Anh Thiếu Niên Cambridge PET (${level})`);
     } else {
       setProgramLevel(`Tiếng Anh Chuẩn Cambridge Quốc Tế`);
     }
@@ -150,14 +192,16 @@ export default function CourseWelcomeModal({
 
   // Cập nhật lời nhắn Zalo soạn sẵn
   useEffect(() => {
-    const msg = `Dạ Trung tâm Anh ngữ Nhật Mỹ xin kính gửi Quý Phụ huynh Thư Chào Mừng & Thông Báo Khai Giảng chính thức của bé ${studentName}.\n\n` +
-      `📅 Ngày khai giảng: ${startDateText}\n` +
+    const msg =
+      `Dạ Trung tâm Anh ngữ Nhật Mỹ xin kính gửi Quý Phụ huynh Thư Chào Mừng & Thông Báo Lịch Học Chính Thức của bé ${studentName}.\n\n` +
+      `📅 Ngày bắt đầu học: ${startDateText}\n` +
       `⏰ Giờ học: ${studyHours} (${scheduleDays})\n` +
-      `🏫 Lớp: ${className} • GV: ${teacherName} • ${room}\n\n` +
-      `Ba mẹ lưu lại hình ảnh thư này để nhớ lịch đưa đón con nhé. Trung tâm và thầy cô đã chuẩn bị sẵn sàng chào đón bé trong buổi học đầu tiên rồi ạ! ❤️\n` +
+      `🎯 Dự kiến kết thúc khóa: ${endDateText}\n` +
+      `🏫 ${className} • GV: ${teacherName} • ${room}\n\n` +
+      `Ba mẹ lưu lại hình ảnh thư này để nhớ lịch đưa đón con nhé. Trung tâm và thầy cô đã chuẩn bị sẵn sàng chào đón bé rồi ạ! ❤️\n` +
       `Hotline hỗ trợ: 0911 767 069`;
     setSuggestedMessage(msg);
-  }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours]);
+  }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours, endDateText]);
 
   // Nhóm danh sách lớp theo cấp độ
   const groupedClasses = useMemo(() => {
@@ -186,14 +230,10 @@ export default function CourseWelcomeModal({
     rawClassCode: selectedClassCode,
     teacherName,
     room,
-    branchName,
     startDateText,
     scheduleDays,
     studyHours,
     endDateText,
-    notesUniform,
-    notesArrival,
-    notesPickup,
     issuedDate: new Date().toLocaleDateString('vi-VN'),
   };
 
@@ -222,12 +262,11 @@ export default function CourseWelcomeModal({
           await navigator.clipboard.write([
             new ClipboardItem({ 'image/png': blob }),
           ]);
-          showToast('✅ Đã copy Thư Khai Giảng! Nhấn Ctrl+V dán ngay vào Zalo.', 'success');
+          showToast('✅ Đã copy Thư Lịch Học! Nhấn Ctrl+V dán ngay vào Zalo.', 'success');
         } catch (clipErr) {
           console.warn('Clipboard write failed, falling back to download:', clipErr);
-          // Fallback tải xuống nếu trình duyệt chặn ClipboardItem
           const link = document.createElement('a');
-          link.download = `ThuKhaiGiang_${studentName.replace(/\s+/g, '_')}.png`;
+          link.download = `ThuLichHoc_${studentName.replace(/\s+/g, '_')}.png`;
           link.href = canvas.toDataURL('image/png');
           link.click();
           showToast('Đã tải ảnh thư xuống máy (Trình duyệt chưa bật quyền dán ảnh trực tiếp).', 'info');
@@ -258,10 +297,10 @@ export default function CourseWelcomeModal({
       });
 
       const link = document.createElement('a');
-      link.download = `ThuKhaiGiang_${studentName.replace(/\s+/g, '_')}.png`;
+      link.download = `ThuLichHoc_${studentName.replace(/\s+/g, '_')}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-      showToast('✅ Đã tải ảnh Thư Khai Giảng chất lượng cao (Retina 2x)!', 'success');
+      showToast('✅ Đã tải ảnh Thư Lịch Học chất lượng cao (Retina 2x)!', 'success');
     } catch (err) {
       console.error('Lỗi tải ảnh:', err);
       showToast('Không thể tải ảnh.', 'error');
@@ -335,10 +374,10 @@ export default function CourseWelcomeModal({
             <span style={{ fontSize: '24px' }}>📢</span>
             <div>
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', letterSpacing: '0.5px' }}>
-                THƯ CHÀO MỪNG & THÔNG BÁO KHAI GIẢNG KHÓA MỚI
+                CHÀO MỪNG HỌC VIÊN MỚI — THÔNG BÁO LỊCH HỌC CHÍNH THỨC
               </h2>
               <p style={{ margin: '2px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
-                Học viên: <strong>{studentName}</strong> • {className}
+                Học viên: <strong>{studentName}</strong> • {className} • Kết thúc dự kiến: <strong>{endDateText}</strong>
               </p>
             </div>
           </div>
@@ -379,7 +418,7 @@ export default function CourseWelcomeModal({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '460px 1fr',
+            gridTemplateColumns: '450px 1fr',
             flex: 1,
             overflow: 'hidden',
           }}
@@ -393,14 +432,14 @@ export default function CourseWelcomeModal({
               borderRight: '1px solid #E2E8F0',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '14px',
             }}
           >
             <div style={{ fontSize: '14px', fontWeight: '800', color: '#0D88C4', borderBottom: '2px solid #E2E8F0', paddingBottom: '6px' }}>
-              ⚙️ THÔNG TIN KHÓA HỌC & HỌC VIÊN
+              ⚙️ THÔNG TIN KHÓA HỌC &amp; HỌC VIÊN
             </div>
 
-            {/* Họ tên & Mã định danh */}
+            {/* Họ tên & Mã học viên */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
@@ -415,12 +454,13 @@ export default function CourseWelcomeModal({
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                  Mã định danh
+                  Mã học viên (Tùy chọn)
                 </label>
                 <input
                   type="text"
                   value={studentCode}
                   onChange={e => setStudentCode(e.target.value)}
+                  placeholder="VD: HV2611_001"
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
                 />
               </div>
@@ -429,12 +469,12 @@ export default function CourseWelcomeModal({
             {/* Chọn Lớp học */}
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                Lớp học tiếp nhận *
+                Lớp học tiếp nhận * (Tự động xuất Ngày Bắt đầu &amp; Kết thúc)
               </label>
               <select
                 value={selectedClassCode}
                 onChange={e => setSelectedClassCode(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #0D88C4', fontSize: '13px', fontWeight: '600', backgroundColor: '#FFFFFF' }}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1.5px solid #0D88C4', fontSize: '13px', fontWeight: '700', backgroundColor: '#FFFFFF' }}
               >
                 <option value="">-- Chọn lớp học --</option>
                 {Object.entries(groupedClasses).map(([groupTitle, clsList]) => (
@@ -475,18 +515,32 @@ export default function CourseWelcomeModal({
               </div>
             </div>
 
-            {/* Ngày khai giảng (to rõ) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0D88C4', marginBottom: '4px' }}>
-                🗓️ Ngày khai giảng chính thức (Hiển thị to rõ trên thiệp)
-              </label>
-              <input
-                type="text"
-                value={startDateText}
-                onChange={e => setStartDateText(e.target.value)}
-                placeholder="VD: Thứ Bảy, ngày 14/11/2026"
-                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '2px solid #FFCA29', fontSize: '13.5px', fontWeight: '800', backgroundColor: '#FFFDF5' }}
-              />
+            {/* Ngày bắt đầu học & Ngày kết thúc dự kiến */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0D88C4', marginBottom: '4px' }}>
+                  🗓️ Ngày bắt đầu học chính thức
+                </label>
+                <input
+                  type="text"
+                  value={startDateText}
+                  onChange={e => setStartDateText(e.target.value)}
+                  placeholder="VD: Thứ 7, ngày 14/11/2026"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '2px solid #FFCA29', fontSize: '13px', fontWeight: '800', backgroundColor: '#FFFDF5' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#D97706', marginBottom: '4px' }}>
+                  🎯 Dự kiến kết thúc
+                </label>
+                <input
+                  type="text"
+                  value={endDateText}
+                  onChange={e => setEndDateText(e.target.value)}
+                  placeholder="VD: 28/02/2027"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1.5px solid #FCD34D', fontSize: '13px', fontWeight: '800', backgroundColor: '#FFFDF5' }}
+                />
+              </div>
             </div>
 
             {/* Lịch học & Khung giờ học */}
@@ -515,29 +569,15 @@ export default function CourseWelcomeModal({
               </div>
             </div>
 
-            {/* Lời dặn dò */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                Lưu ý số 1 (Trang phục & Sách)
-              </label>
-              <textarea
-                rows={2}
-                value={notesUniform}
-                onChange={e => setNotesUniform(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                Lưu ý số 2 (Thời gian có mặt)
-              </label>
-              <textarea
-                rows={2}
-                value={notesArrival}
-                onChange={e => setNotesArrival(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
-              />
+            {/* Khung hiển thị 2 lưu ý cố định */}
+            <div style={{ backgroundColor: '#F0F9FF', padding: '10px 12px', borderRadius: '8px', border: '1px solid #BAE6FD', fontSize: '12px', color: '#0369A1' }}>
+              <div style={{ fontWeight: '800', marginBottom: '4px' }}>📌 2 Lưu ý cố định trên thư:</div>
+              <div style={{ marginBottom: '4px', lineHeight: 1.4 }}>
+                <strong>1. Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
+              </div>
+              <div style={{ lineHeight: 1.4 }}>
+                <strong>2. Thời gian có mặt:</strong> {FIXED_NOTE_2}
+              </div>
             </div>
 
             {/* Lời nhắn Zalo mẫu */}
@@ -593,15 +633,14 @@ export default function CourseWelcomeModal({
                 fontWeight: '600',
               }}
             >
-              👁️ BẢN XEM TRƯỚC THIỆP GỬI ZALO (Retina 2x Sắc Nét):
+              👁️ BẢN XEM TRƯỚC THIỆP GỬI ZALO (1 Font Đồng Nhất • Retina 2x):
             </div>
 
-            {/* Wrapper thu nhỏ 0.65 để vừa vặn khung preview máy tính */}
             <div
               style={{
-                transform: 'scale(0.66)',
+                transform: 'scale(0.68)',
                 transformOrigin: 'top center',
-                marginBottom: '-320px',
+                marginBottom: '-290px',
               }}
             >
               <CourseWelcomeTemplate data={templateData} />

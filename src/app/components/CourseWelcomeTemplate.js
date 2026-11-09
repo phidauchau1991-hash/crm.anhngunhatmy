@@ -3,23 +3,25 @@
 import React, { forwardRef } from 'react';
 import OfficialRedSeal from '@/components/OfficialRedSeal';
 
+// Cố định 2 lưu ý chuẩn mực của Trung tâm Anh ngữ Nhật Mỹ
+export const FIXED_NOTE_1 =
+  'Bé mặc trang phục gọn gàng/đồng phục, mang theo tập vở trắng, bút chì & màu tô. Giáo trình chính khóa và Thẻ học liệu số sẽ được thầy cô trao tận tay bé tại lớp.';
+export const FIXED_NOTE_2 =
+  'Ba mẹ vui lòng đưa bé đến trước giờ học 05 - 10 phút để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học giúp bé học tập hiệu quả hơn.';
+
 const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
   const {
     studentName = 'NGÔ LINH MẪN',
-    studentCode = 'HV2611_001',
-    programLevel = 'Tiếng Anh Thiếu Nhi Cambridge (Movers 1)',
-    className = 'Lớp Movers 1 (M1) - Ca 1',
+    studentCode = '',
+    programLevel = 'Tiếng Anh Thiếu Nhi Movers (M1)',
+    className = 'Lớp M1 - T7CN - Ca 1',
     rawClassCode = 'CN1_M1_MsMy_7CN_Ca1',
-    teacherName = 'Ms Trúc My',
-    room = 'Phòng 01 (Lầu 1)',
-    branchName = 'Cơ sở 1 - Nhật Mỹ Bình Dương',
+    teacherName = 'Ms My',
+    room = 'Phòng 202 (Lầu 1)',
     startDateText = 'Thứ Bảy, ngày 14/11/2026',
-    scheduleDays = 'Thứ 7 & Chủ Nhật',
+    scheduleDays = 'Thứ 7, Chủ Nhật',
     studyHours = '07:45 - 09:15 (Ca 1)',
-    endDateText = '28/02/2027 (Dự kiến)',
-    notesUniform = 'Bé mặc trang phục gọn gàng/đồng phục, mang theo tập vở và bút. Giáo trình chính khóa và Thẻ học liệu số sẽ được thầy cô trao tận tay bé trong buổi học đầu tiên.',
-    notesArrival = 'Ba mẹ vui lòng đưa bé đến trước giờ học 10 - 15 phút trong ngày khai giảng để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học.',
-    notesPickup = 'Giờ tan học đúng giờ theo ca, thầy cô bàn giao bé tận tay tại sảnh đón. Hotline hỗ trợ phụ huynh: 0911 767 069.',
+    endDateText = '28/02/2027',
     issuedDate = '',
   } = data || {};
 
@@ -31,25 +33,25 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
     gold: '#FFCA29', // Vàng Nhật Mỹ điểm nhấn
     goldDark: '#D97706', // Vàng hổ phách tương phản cao
     ink: '#0F172A', // Chữ đen than sắc nét
-    muted: '#64748B', // Chữ ghi phụ đề
-    border: '#CBD5E1',
+    muted: '#475569', // Chữ phụ rõ nét trên điện thoại
     white: '#FFFFFF',
     greenBadge: '#059669',
     greenBadgeBg: '#ECFDF5',
   };
 
-  const FONT_SERIF = `"Playfair Display", "Merriweather", "Times New Roman", Georgia, serif`;
-  const FONT_SANS = `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+  // Thống nhất DUY NHẤT 1 font chữ của dòng ANH NGỮ NHẬT MỸ cho toàn bộ thư
+  const FONT_UNIFIED = `"Playfair Display", "Merriweather", "Times New Roman", Georgia, serif`;
+
+  const cleanStudentCode = String(studentCode || '').trim();
 
   return (
     <div
       ref={ref}
       style={{
         width: '800px',
-        minHeight: '1060px',
         backgroundColor: BRAND.white,
         color: BRAND.ink,
-        fontFamily: FONT_SANS,
+        fontFamily: FONT_UNIFIED,
         lineHeight: 1.5,
         boxSizing: 'border-box',
         position: 'relative',
@@ -58,9 +60,10 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
         border: `3px solid ${BRAND.gold}`,
         borderRadius: '16px',
         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+        WebkitFontSmoothing: 'antialiased',
       }}
     >
-      {/* 1. HEADER NỀN TRẮNG TINH TẾ - LOGO NGUYÊN BẢN - CHỮ VÀNG/XANH */}
+      {/* 1. HEADER NỀN TRẮNG TINH TẾ - LOGO NGUYÊN BẢN - ĐỒNG BỘ MỘT FONT DUY NHẤT */}
       <div
         style={{
           backgroundColor: BRAND.white,
@@ -69,6 +72,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: `3px solid ${BRAND.gold}`,
+          fontFamily: FONT_UNIFIED,
         }}
       >
         {/* Khối Logo & Tên trung tâm */}
@@ -88,7 +92,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           <div>
             <div
               style={{
-                fontFamily: FONT_SERIF,
+                fontFamily: FONT_UNIFIED,
                 fontSize: '28px',
                 fontWeight: '900',
                 color: BRAND.blue,
@@ -101,8 +105,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             </div>
             <div
               style={{
-                fontFamily: FONT_SERIF,
-                fontSize: '13.5px',
+                fontFamily: FONT_UNIFIED,
+                fontSize: '14px',
                 fontStyle: 'italic',
                 fontWeight: '600',
                 color: BRAND.goldDark,
@@ -116,11 +120,11 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
         </div>
 
         {/* Khối Huy hiệu Cambridge English phía bên phải */}
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', fontFamily: FONT_UNIFIED }}>
           <div
             style={{
-              fontFamily: FONT_SERIF,
-              fontSize: '13px',
+              fontFamily: FONT_UNIFIED,
+              fontSize: '13.5px',
               fontWeight: '800',
               color: BRAND.goldDark,
               letterSpacing: '1.2px',
@@ -131,59 +135,61 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           </div>
           <div
             style={{
-              fontSize: '12px',
+              fontFamily: FONT_UNIFIED,
+              fontSize: '12.5px',
+              fontStyle: 'italic',
               fontWeight: '600',
               color: BRAND.muted,
-              letterSpacing: '0.5px',
-              marginTop: '2px',
+              letterSpacing: '0.4px',
+              marginTop: '3px',
             }}
           >
-            Official Course Welcome Pass
+            Official Welcome Pass
           </div>
         </div>
       </div>
 
       {/* 2. BODY VÙNG NỘI DUNG CHÍNH */}
-      <div style={{ padding: '28px 36px 20px 36px', backgroundColor: '#FAFDFE' }}>
+      <div style={{ padding: '26px 36px 22px 36px', backgroundColor: '#FAFDFE', fontFamily: FONT_UNIFIED }}>
         
-        {/* TIÊU ĐỀ THƯ */}
-        <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+        {/* TIÊU ĐỀ THƯ: NGẮN GỌN, KHÔNG LẶP CHỮ "THÔNG BÁO", DÙNG ĐƯỢC CHO MỌI LỚP */}
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div
             style={{
-              fontSize: '12.5px',
+              fontFamily: FONT_UNIFIED,
+              fontSize: '13px',
               fontWeight: '700',
               color: BRAND.blue,
-              letterSpacing: '2px',
+              letterSpacing: '2.2px',
               textTransform: 'uppercase',
               marginBottom: '4px',
             }}
           >
-            THƯ THÔNG BÁO CHÍNH THỨC
+            CHÀO MỪNG HỌC VIÊN MỚI
           </div>
           <h1
             style={{
-              fontFamily: FONT_SERIF,
-              fontSize: '27px',
+              fontFamily: FONT_UNIFIED,
+              fontSize: '28px',
               fontWeight: '900',
               color: BRAND.blueDark,
               margin: '0 0 4px 0',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.6px',
               textTransform: 'uppercase',
             }}
           >
-            CHÀO MỪNG & THÔNG BÁO KHAI GIẢNG
+            THÔNG BÁO LỊCH HỌC CHÍNH THỨC
           </h1>
           <div
             style={{
-              fontFamily: FONT_SERIF,
-              fontSize: '13px',
+              fontFamily: FONT_UNIFIED,
+              fontSize: '13.5px',
               fontStyle: 'italic',
               color: BRAND.muted,
             }}
           >
-            Course Commencement & Welcome Notice
+            Official Welcome &amp; Class Schedule Notice
           </div>
-          {/* Đường line trang trí */}
           <div
             style={{
               width: '80px',
@@ -203,17 +209,19 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             border: `1.5px solid #E2E8F0`,
             borderLeft: `6px solid ${BRAND.blue}`,
             padding: '16px 22px',
-            marginBottom: '20px',
+            marginBottom: '18px',
             boxShadow: '0 2px 6px rgba(13, 136, 196, 0.06)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            fontFamily: FONT_UNIFIED,
           }}
         >
           <div>
             <div
               style={{
-                fontSize: '11.5px',
+                fontFamily: FONT_UNIFIED,
+                fontSize: '12px',
                 fontWeight: '700',
                 color: BRAND.muted,
                 textTransform: 'uppercase',
@@ -225,8 +233,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             </div>
             <div
               style={{
-                fontFamily: FONT_SERIF,
-                fontSize: '23px',
+                fontFamily: FONT_UNIFIED,
+                fontSize: '24px',
                 fontWeight: '900',
                 color: BRAND.blueDark,
                 textTransform: 'uppercase',
@@ -237,28 +245,39 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             </div>
             <div
               style={{
-                fontSize: '13px',
-                color: '#475569',
+                fontFamily: FONT_UNIFIED,
+                fontSize: '14px',
+                color: '#334155',
                 marginTop: '4px',
                 display: 'flex',
-                gap: '14px',
+                gap: '12px',
                 flexWrap: 'wrap',
               }}
             >
-              <span><strong>Mã định danh:</strong> <span style={{ color: BRAND.blue, fontWeight: '700' }}>{studentCode}</span></span>
-              <span>•</span>
-              <span><strong>Chương trình:</strong> {programLevel}</span>
+              {cleanStudentCode && (
+                <>
+                  <span>
+                    <strong>Mã học viên:</strong>{' '}
+                    <span style={{ color: BRAND.blue, fontWeight: '800' }}>{cleanStudentCode}</span>
+                  </span>
+                  <span>•</span>
+                </>
+              )}
+              <span>
+                <strong>Chương trình:</strong> {programLevel}
+              </span>
             </div>
           </div>
 
           <div
             style={{
+              fontFamily: FONT_UNIFIED,
               backgroundColor: BRAND.greenBadgeBg,
               color: BRAND.greenBadge,
               border: `1.5px solid #A7F3D0`,
               borderRadius: '20px',
               padding: '6px 14px',
-              fontSize: '12px',
+              fontSize: '12.5px',
               fontWeight: '800',
               letterSpacing: '0.5px',
               display: 'flex',
@@ -271,15 +290,16 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           </div>
         </div>
 
-        {/* KHUNG THÔNG TIN LỚP HỌC & NGÀY KHAI GIẢNG (TRUNG TÂM NỔI BẬT NHẤT) */}
+        {/* KHUNG THÔNG TIN LỚP HỌC & NGÀY BẮT ĐẦU HỌC (TRUNG TÂM NỔI BẬT NHẤT) */}
         <div
           style={{
             backgroundColor: BRAND.white,
             borderRadius: '16px',
             border: `2px solid ${BRAND.blue}`,
-            padding: '22px',
-            marginBottom: '20px',
+            padding: '20px 22px',
+            marginBottom: '18px',
             boxShadow: '0 4px 12px rgba(13, 136, 196, 0.08)',
+            fontFamily: FONT_UNIFIED,
           }}
         >
           {/* Lưới 2 cột thông tin lớp */}
@@ -288,51 +308,53 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '14px',
-              marginBottom: '18px',
+              marginBottom: '16px',
             }}
           >
             <div style={{ backgroundColor: BRAND.blueLight, padding: '12px 16px', borderRadius: '10px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: BRAND.muted, textTransform: 'uppercase' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '700', color: BRAND.muted, textTransform: 'uppercase' }}>
                 Lớp Học Tiếp Nhận
               </div>
-              <div style={{ fontSize: '16px', fontWeight: '800', color: BRAND.blueDark, marginTop: '2px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '17px', fontWeight: '800', color: BRAND.blueDark, marginTop: '3px' }}>
                 {className}
               </div>
               {rawClassCode && (
-                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', color: BRAND.muted, marginTop: '2px' }}>
                   Mã lớp: {rawClassCode}
                 </div>
               )}
             </div>
 
             <div style={{ backgroundColor: BRAND.blueLight, padding: '12px 16px', borderRadius: '10px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: BRAND.muted, textTransform: 'uppercase' }}>
-                Giáo Viên & Phòng Học
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '700', color: BRAND.muted, textTransform: 'uppercase' }}>
+                Giáo Viên &amp; Phòng Học
               </div>
-              <div style={{ fontSize: '16px', fontWeight: '800', color: BRAND.blueDark, marginTop: '2px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '17px', fontWeight: '800', color: BRAND.blueDark, marginTop: '3px' }}>
                 {teacherName}
               </div>
-              <div style={{ fontSize: '12px', color: BRAND.goldDark, fontWeight: '700', marginTop: '2px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', color: BRAND.goldDark, fontWeight: '800', marginTop: '2px' }}>
                 📍 {room}
               </div>
             </div>
           </div>
 
-          {/* BLOCK NGÀY KHAI GIẢNG TO RÕ NHẤT (HIGHLIGHT TÂM ĐIỂM) */}
+          {/* BLOCK NGÀY BẮT ĐẦU HỌC TO RÕ NHẤT (PHÙ HỢP CẢ LỚP MỚI LẪN BÉ VÀO LỚP ĐANG HỌC) */}
           <div
             style={{
               background: `linear-gradient(135deg, ${BRAND.blue} 0%, ${BRAND.blueDark} 100%)`,
               borderRadius: '12px',
-              padding: '16px 20px',
+              padding: '15px 20px',
               color: BRAND.white,
               textAlign: 'center',
-              marginBottom: '16px',
+              marginBottom: '15px',
               boxShadow: '0 4px 10px rgba(13, 136, 196, 0.25)',
+              fontFamily: FONT_UNIFIED,
             }}
           >
             <div
               style={{
-                fontSize: '12px',
+                fontFamily: FONT_UNIFIED,
+                fontSize: '12.5px',
                 fontWeight: '800',
                 letterSpacing: '1.5px',
                 textTransform: 'uppercase',
@@ -340,11 +362,11 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 marginBottom: '4px',
               }}
             >
-              🗓️ NGÀY KHAI GIẢNG CHÍNH THỨC
+              🗓️ NGÀY BẮT ĐẦU HỌC CHÍNH THỨC
             </div>
             <div
               style={{
-                fontFamily: FONT_SERIF,
+                fontFamily: FONT_UNIFIED,
                 fontSize: '25px',
                 fontWeight: '900',
                 letterSpacing: '0.5px',
@@ -352,169 +374,147 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             >
               {startDateText}
             </div>
-            <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
+            <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', opacity: 0.92, marginTop: '3px', fontStyle: 'italic' }}>
               (Học viên có mặt tại sảnh trung tâm trước giờ học để thầy cô đón vào lớp)
             </div>
           </div>
 
-          {/* LỊCH HỌC TRONG TUẦN & KHUNG GIỜ HỌC */}
+          {/* LỊCH HỌC TRONG TUẦN, KHUNG GIỜ HỌC & DỰ KIẾN KẾT THÚC */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1.2fr 1.2fr 1fr',
+              gridTemplateColumns: '1.15fr 1.25fr 1fr',
               gap: '12px',
               backgroundColor: '#FFFBEB',
               border: `1.5px dashed ${BRAND.gold}`,
               borderRadius: '10px',
               padding: '12px 16px',
               textAlign: 'center',
+              fontFamily: FONT_UNIFIED,
             }}
           >
             <div>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 📅 Lịch Học Tuần
               </div>
-              <div style={{ fontSize: '14.5px', fontWeight: '800', color: BRAND.ink, marginTop: '3px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.ink, marginTop: '4px' }}>
                 {scheduleDays}
               </div>
             </div>
 
             <div style={{ borderLeft: '1px solid #FDE68A', borderRight: '1px solid #FDE68A', padding: '0 10px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 ⏰ Giờ Học Chi Tiết
               </div>
-              <div style={{ fontSize: '14.5px', fontWeight: '800', color: BRAND.blueDark, marginTop: '3px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.blueDark, marginTop: '4px' }}>
                 {studyHours}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 🎯 Dự Kiến Kết Thúc
               </div>
-              <div style={{ fontSize: '13.5px', fontWeight: '700', color: BRAND.ink, marginTop: '3px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.ink, marginTop: '4px' }}>
                 {endDateText}
               </div>
             </div>
           </div>
         </div>
 
-        {/* KHUNG DẶN DÒ CHUẨN BỊ CHO PHỤ HUYNH & BÉ (3 BƯỚC ĐỒNG HÀNH) */}
+        {/* KHUNG 2 LƯU Ý CỐ ĐỊNH ĐỒNG HÀNH CÙNG BÉ & CON DẤU ĐỎ BÊN PHẢI */}
         <div
           style={{
             backgroundColor: BRAND.white,
             borderRadius: '14px',
             border: `1.5px solid #E2E8F0`,
             padding: '18px 22px',
-            position: 'relative',
+            display: 'grid',
+            gridTemplateColumns: '1fr 140px',
+            gap: '16px',
+            alignItems: 'center',
+            fontFamily: FONT_UNIFIED,
           }}
         >
-          <div
-            style={{
-              fontSize: '13.5px',
-              fontWeight: '800',
-              color: BRAND.blueDark,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <span>📌</span> 3 LƯU Ý QUAN TRỌNG ĐỒNG HÀNH CÙNG BÉ:
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '130px' }}>
-            {/* Bước 1 */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <div
-                style={{
-                  backgroundColor: BRAND.blue,
-                  color: BRAND.white,
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: '800',
-                  flexShrink: 0,
-                  marginTop: '1px',
-                }}
-              >
-                1
-              </div>
-              <div style={{ fontSize: '13px', color: '#334155', lineHeight: 1.45 }}>
-                <strong>Trang phục & Đồ dùng:</strong> {notesUniform}
-              </div>
+          <div>
+            <div
+              style={{
+                fontFamily: FONT_UNIFIED,
+                fontSize: '14px',
+                fontWeight: '800',
+                color: BRAND.blueDark,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span>📌</span> LƯU Ý ĐỒNG HÀNH CÙNG BÉ:
             </div>
 
-            {/* Bước 2 */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <div
-                style={{
-                  backgroundColor: BRAND.blue,
-                  color: BRAND.white,
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: '800',
-                  flexShrink: 0,
-                  marginTop: '1px',
-                }}
-              >
-                2
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Lưu ý 1 cố định */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div
+                  style={{
+                    fontFamily: FONT_UNIFIED,
+                    backgroundColor: BRAND.blue,
+                    color: BRAND.white,
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    flexShrink: 0,
+                    marginTop: '2px',
+                  }}
+                >
+                  1
+                </div>
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14px', color: '#1E293B', lineHeight: 1.55 }}>
+                  <strong>Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
+                </div>
               </div>
-              <div style={{ fontSize: '13px', color: '#334155', lineHeight: 1.45 }}>
-                <strong>Thời gian có mặt:</strong> {notesArrival}
-              </div>
-            </div>
 
-            {/* Bước 3 */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <div
-                style={{
-                  backgroundColor: BRAND.goldDark,
-                  color: BRAND.white,
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: '800',
-                  flexShrink: 0,
-                  marginTop: '1px',
-                }}
-              >
-                3
-              </div>
-              <div style={{ fontSize: '13px', color: '#334155', lineHeight: 1.45 }}>
-                <strong>Giờ đón bé & Liên hệ:</strong> {notesPickup}
+              {/* Lưu ý 2 cố định */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div
+                  style={{
+                    fontFamily: FONT_UNIFIED,
+                    backgroundColor: BRAND.blue,
+                    color: BRAND.white,
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    flexShrink: 0,
+                    marginTop: '2px',
+                  }}
+                >
+                  2
+                </div>
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14px', color: '#1E293B', lineHeight: 1.55 }}>
+                  <strong>Thời gian có mặt:</strong> {FIXED_NOTE_2}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* CON DẤU MỘC ĐỎ NHẬT MỸ TRANG TRỌNG ĐẶT GÓC PHẢI DƯỚI */}
-          <div
-            style={{
-              position: 'absolute',
-              right: '18px',
-              bottom: '12px',
-              zIndex: 10,
-            }}
-          >
+          {/* CON DẤU MỘC ĐỎ NHẬT MỸ CÂN ĐỐI BÊN PHẢI */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <OfficialRedSeal
               title="ĐÃ GHI DANH"
               subtitle="BAN GIÁM ĐỐC"
-              size={130}
+              size={128}
               date={issuedDate || (typeof window !== 'undefined' ? new Date().toLocaleDateString('vi-VN') : '')}
             />
           </div>
@@ -522,7 +522,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
 
       </div>
 
-      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ - CHUẨN MỰC */}
+      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ - CHUẨN MỰC ĐỒNG BỘ MỘT FONT */}
       <div
         style={{
           backgroundColor: BRAND.blue,
@@ -530,12 +530,13 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           color: BRAND.white,
           textAlign: 'center',
           borderTop: `3px solid ${BRAND.gold}`,
+          fontFamily: FONT_UNIFIED,
         }}
       >
         <div
           style={{
-            fontFamily: FONT_SERIF,
-            fontSize: '14.5px',
+            fontFamily: FONT_UNIFIED,
+            fontSize: '15px',
             fontWeight: '900',
             letterSpacing: '1px',
             color: BRAND.gold,
@@ -545,10 +546,10 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
         >
           ANH NGỮ NHẬT MỸ — DEDICATED TO EXCELLENCE
         </div>
-        <div style={{ fontSize: '12px', opacity: 0.95 }}>
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', opacity: 0.96 }}>
           Hotline hỗ trợ phụ huynh: <strong>0911 767 069</strong> • Website: <strong>anhngunhatmy.edu.vn</strong>
         </div>
-        <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', opacity: 0.88, marginTop: '2px' }}>
           Địa chỉ: Đường D33, KDC Việt Sing, P. An Phú, TP. Thuận An, Tỉnh Bình Dương
         </div>
       </div>
