@@ -29,12 +29,12 @@ export async function GET(request) {
       };
     }
 
-    // Lấy lớp học kèm sỹ số học viên hiện tại (chỉ đếm học viên đang học)
+    // Lấy lớp học kèm sỹ số học viên (lấy cả học viên đang học và học viên đã chuyển/hoàn thành)
     const classes = await prisma.class.findMany({
       where: filter,
       include: {
         enrollments: {
-          where: { status: 'Đang học' }
+          where: { status: { in: ['Đang học', 'Đã chuyển', 'Đã chuyển lớp'] } }
         },
         teacher: {
           select: {
@@ -94,7 +94,13 @@ export async function GET(request) {
         careStaff: cls.careStaff || 'Chưa phân công',
         expectedEndDate: cls.expectedEndDate && new Date(cls.expectedEndDate).getFullYear() > 2090 ? 'Học liên tục' : new Date(cls.expectedEndDate).toLocaleDateString('vi-VN'),
         expectedEndDateIso: new Date(cls.expectedEndDate).toISOString().split('T')[0],
-        studentCount: cls.enrollments.length,
+        studentCount: (() => {
+          const activeCount = cls.enrollments.filter(e => e.status === 'Đang học').length;
+          if (sessionsRemaining > 0) {
+            return activeCount > 0 ? activeCount : cls.enrollments.length;
+          }
+          return cls.enrollments.length;
+        })(),
         totalSessions,
         sessionsTaught,
         sessionsRemaining,

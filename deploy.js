@@ -56,7 +56,7 @@ async function deploy() {
     if (backupResult.stderr) console.error(backupResult.stderr);
 
     console.log('4. Đang cài đặt dependencies và đồng bộ cấu trúc bảng CSDL an toàn...');
-    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npm install && node scripts/migrate-inventory-cost.js && node scripts/migrate-courseware-fields.js && npx prisma generate && npx prisma db push --accept-data-loss && rm -rf .next && npm run build');
+    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npm install && node scripts/migrate-inventory-cost.js && node scripts/migrate-courseware-fields.js && node scripts/fix-s4-enrollments.js && npx prisma generate && npx prisma db push --accept-data-loss && rm -rf .next && npm run build');
     console.log(dbPushResult.stdout);
     if (dbPushResult.stderr) console.error(dbPushResult.stderr);
 

@@ -22,9 +22,15 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
   const [suggestedMessage, setSuggestedMessage] = useState('');
 
   useEffect(() => {
+    if (isOpen && lead) {
+      const isTrial = lead.status === 'Học thử' || Boolean(lead.trialClassCode);
+      setInviteType(isTrial ? 'TRIAL' : 'ASSESSMENT');
+    }
+  }, [isOpen, lead?.id]);
+
+  useEffect(() => {
     if (lead) {
       setStudentName(lead.name || '');
-      setClassName(lead.trialClassCode || '');
       
       let formattedDate = '';
       if (lead.trialStartDate) {
@@ -32,10 +38,16 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
          if (!isNaN(dateObj.getTime())) {
              formattedDate = dateObj.toLocaleDateString('vi-VN');
          }
+      } else if (lead.followUpDate) {
+         const dateObj = new Date(lead.followUpDate);
+         if (!isNaN(dateObj.getTime())) {
+             formattedDate = dateObj.toLocaleDateString('vi-VN');
+         }
       }
-      setStartDate(formattedDate);
+      setStartDate(formattedDate || new Date().toLocaleDateString('vi-VN'));
       
       if (inviteType === 'TRIAL') {
+        setClassName(lead.trialClassCode || '');
         if (lead.trialClassCode) {
           const details = getClassScheduleDetails(lead.trialClassCode);
           setStudyDays(details.daysDisplay || '');
@@ -45,11 +57,18 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
           setStudyHours('');
         }
         setEndDate('');
+        setCenterPrep('Bộ tài liệu học thử độc quyền, vở bút viết, nước uống và không gian lớp học tương tác vui nhộn.');
+        setParentPrep('Trang phục thoải mái, nụ cười tự tin và có mặt trước giờ học 05-10 phút để con làm quen với lớp nhé!');
         setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời học thử của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch học của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
       } else {
-        // Đánh giá năng lực / Tư vấn: Cho phép nhập tự do thời gian hẹn
-        setEndDate('45 phút');
-        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ thư mời Đánh giá năng lực của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch đánh giá của bé nhé. Trung tâm đã chuẩn bị sẵn sàng để chào đón bé rồi ạ! ❤️`);
+        // Đánh giá năng lực: thiết lập mặc định thông minh
+        setClassName('Đánh giá 4 kỹ năng chuẩn Cambridge');
+        setStudyDays(formattedDate || new Date().toLocaleDateString('vi-VN'));
+        setStudyHours('45 - 60 phút');
+        setEndDate('Hoàn thành trong ngày');
+        setCenterPrep('Đề kiểm tra chuẩn Cambridge, phòng kiểm tra thân thiện, giáo viên phỏng vấn 1-1 và nước uống.');
+        setParentPrep('Ba mẹ đưa bé đến đúng giờ hẹn, tinh thần tự tin thoải mái, không cần ôn tập áp lực trước nhé!');
+        setSuggestedMessage(`Dạ Trung tâm Anh ngữ Nhật Mỹ xin gửi ba/mẹ Thư mời tham gia Đánh giá năng lực của bé ${lead.name || ''}. \n\nBa/mẹ lưu ảnh này lại để nhớ lịch hẹn kiểm tra của con nhé. Trung tâm đã chuẩn bị sẵn sàng để đón tiếp bé rồi ạ! ❤️`);
       }
     }
   }, [lead, inviteType]);

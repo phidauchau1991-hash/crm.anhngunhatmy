@@ -89,14 +89,28 @@ export async function POST(request) {
       // Recalculate ngày kết thúc
       await recalculateClassEndDate(newClassCode, tx);
 
+      // Kiểm tra xem lớp cũ đã học xong hết số buổi chưa
+      const oldConfig = await tx.courseConfig.findUnique({ where: { level: oldClass.level } });
+      const oldTotalSessions = oldConfig?.totalSessions || 32;
+      const oldUniqueDates = await tx.attendance.groupBy({
+        by: ['date'],
+        where: { classCode: oldClassCode }
+      });
+      const oldSessionsRemaining = Math.max(0, oldTotalSessions - oldUniqueDates.length);
+
       // 2. Chuyển sỹ số toàn bộ học viên từ lớp cũ sang lớp mới và tạo hóa đơn khóa mới
       let movedCount = 0;
       for (const en of activeStudents) {
-        // Đổi trạng thái enrollment lớp cũ thay vì xóa để bảo toàn lịch sử
-        await tx.enrollment.updateMany({
-          where: { studentId: en.studentId, classCode: oldClassCode },
-          data: { status: 'Đã chuyển' }
-        });
+        // NẾU LỚP CŨ ĐÃ HỌC HẾT SỐ BUỔI (oldSessionsRemaining <= 0):
+        // -> Đổi trạng thái enrollment lớp cũ sang 'Đã chuyển'
+        // NẾU LỚP CŨ VẪN CÒN BUỔI HỌC (oldSessionsRemaining > 0):
+        // -> Giữ nguyên trạng thái 'Đang học' ở lớp cũ để học nốt các buổi còn lại và bảo toàn sĩ số sổ đầu bài!
+        if (oldSessionsRemaining <= 0) {
+          await tx.enrollment.updateMany({
+            where: { studentId: en.studentId, classCode: oldClassCode },
+            data: { status: 'Đã chuyển' }
+          });
+        }
 
         // Tạo enrollment lớp mới
         await tx.enrollment.create({

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import TrialInviteModal from './TrialInviteModal';
 import PlacementTestModal from './components/PlacementTestModal';
 import ReviewModal from '@/components/ReviewModal';
+import ClassSelect from '../components/ClassSelect';
+import { formatClassCode } from '@/lib/classHelper';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
@@ -384,7 +386,7 @@ export default function LeadsPage() {
                       </span>
                       {lead.status === 'Học thử' && lead.trialClassCode && (
                         <div style={{ fontSize: '0.75rem', color: 'var(--color-primary-dark)', marginTop: '0.25rem', fontWeight: '600' }}>
-                          <i className="fa-solid fa-graduation-cap"></i> {lead.trialClassCode}
+                          <i className="fa-solid fa-graduation-cap"></i> {formatClassCode(lead.trialClassCode)}
                           {lead.trialStartDate && <><br /><span>từ {new Date(lead.trialStartDate).toLocaleDateString('vi-VN')}</span></>}
                         </div>
                       )}
@@ -428,16 +430,14 @@ export default function LeadsPage() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-buttons">
-                        {lead.status === 'Học thử' && (
-                          <button 
-                            className="action-btn" 
-                            style={{ color: '#0f766e', background: '#ccfbf1', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
-                            title="Thư mời học thử" 
-                            onClick={() => { setTrialLead(lead); setShowTrialModal(true); }}
-                          >
-                            🎫 Thư mời
-                          </button>
-                        )}
+                        <button 
+                          className="action-btn" 
+                          style={{ color: '#0f766e', background: '#ccfbf1', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                          title="Thư mời (Đánh giá năng lực hoặc Học thử)" 
+                          onClick={() => { setTrialLead(lead); setShowTrialModal(true); }}
+                        >
+                          🎫 Thư mời
+                        </button>
                         <button 
                             className="action-btn" 
                             style={{ color: '#4c1d95', background: '#ede9fe', border: '1px solid #ddd6fe', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
@@ -551,12 +551,14 @@ export default function LeadsPage() {
                       <div className="form-grid-2">
                         <div className="form-group">
                           <label>Chọn Lớp học thử *</label>
-                          <select name="trialClassCode" value={form.trialClassCode} onChange={handleInputChange} required={form.status === 'Học thử'}>
-                            <option value="">-- Chọn lớp cho học thử --</option>
-                            {classList.map(cls => (
-                              <option key={cls.code} value={cls.code}>{cls.code} ({cls.teacherName || 'Chưa phân công'} - {cls.schedule})</option>
-                            ))}
-                          </select>
+                          <ClassSelect
+                            name="trialClassCode"
+                            value={form.trialClassCode}
+                            onChange={handleInputChange}
+                            classes={classList}
+                            placeholder="-- Chọn lớp cho học thử --"
+                            required={form.status === 'Học thử'}
+                          />
                         </div>
                         <div className="form-group">
                           <label>Bắt đầu học từ ngày *</label>
