@@ -17,15 +17,64 @@ const COLORS = {
   cream: '#F8FBFC', // Nền thẻ xanh nhạt thanh lịch quý phái
   cardBg: '#FFFFFF',
   textDark: '#0F172A',
-  textMuted: '#64748B',
+  textMuted: '#475569',
   redSeal: '#D71920',
   borderLight: '#E2E8F0',
   borderGold: '#FFCA29',
   accentGreen: '#059669',
 };
 
-// Hệ thống Typography học thuật sang trọng chuẩn Cambridge (thống nhất toàn bộ thẻ)
-const FONT_SERIF = `"Playfair Display", "Merriweather", "Times New Roman", "Georgia", serif`;
+// Đồng bộ DUY NHẤT 1 hệ thống Typography Geometric Sans-Serif nét dày chắc chắn (giống Thư Thông Báo Lịch Học)
+export const FONT_SANS_BRAND = `"Be Vietnam Pro", "Segoe UI", Arial, sans-serif`;
+
+const BRAND_FONT_SPECS = [
+  '400 16px "Be Vietnam Pro"',
+  '500 16px "Be Vietnam Pro"',
+  '600 16px "Be Vietnam Pro"',
+  '700 16px "Be Vietnam Pro"',
+  '800 16px "Be Vietnam Pro"',
+  '900 16px "Be Vietnam Pro"',
+  'italic 500 16px "Be Vietnam Pro"',
+  'italic 600 16px "Be Vietnam Pro"',
+];
+
+const VIETNAMESE_FONT_SAMPLE =
+  'THƯ THÔNG BÁO CHÍNH THỨC CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ ' +
+  'ANH NGỮ NHẬT MỸ HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE ' +
+  'ĐÃ CẤP QUYỀN HỌC LIỆU Ữ Ậ Ỹ Ễ Ỗ ★ → ⋮ 0123456789 SĐT Zalo Ba/Mẹ';
+
+let studentCardFontPromise = null;
+
+/**
+ * Ép tải đầy đủ các weight tiếng Việt của Be Vietnam Pro trước khi vẽ lên HTML5 Canvas
+ */
+export function preloadStudentCardFonts() {
+  if (typeof document === 'undefined' || !document.fonts) return Promise.resolve();
+  if (studentCardFontPromise) return studentCardFontPromise;
+
+  studentCardFontPromise = (async () => {
+    await Promise.allSettled(
+      BRAND_FONT_SPECS.map((spec) =>
+        document.fonts.load(spec, VIETNAMESE_FONT_SAMPLE)
+      )
+    );
+    await document.fonts.ready;
+  })().catch((err) => {
+    console.warn('[studentCardCanvas] Font preload warning:', err);
+  });
+
+  return studentCardFontPromise;
+}
+
+/**
+ * Helper thiết lập font và letterSpacing nhất quán trên Canvas
+ */
+function setBrandFont(ctx, { weight = 500, size = 12, italic = false, spacing = 0 } = {}) {
+  ctx.font = `${italic ? 'italic ' : ''}${weight} ${size}px ${FONT_SANS_BRAND}`;
+  if ('letterSpacing' in ctx) {
+    ctx.letterSpacing = `${spacing}px`;
+  }
+}
 
 /**
  * Helper tải ảnh từ URL / Data URI
@@ -57,7 +106,7 @@ function drawRoundedRect(ctx, x, y, width, height, radius, fill = true, stroke =
 }
 
 /**
- * Helper vẽ con dấu đỏ Nhật Mỹ chuẩn mực
+ * Helper vẽ con dấu đỏ Nhật Mỹ chuẩn mực (Font Be Vietnam Pro đồng nhất)
  */
 function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
   ctx.save();
@@ -87,14 +136,13 @@ function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
   ctx.setLineDash([]);
 
   // Chữ trên: ANH NGỮ NHẬT MỸ
-  ctx.font = `bold 10.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 9.5, spacing: 0 });
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  
-  // Vẽ chữ cung tròn trên
+
   const topText = 'ANH NGỮ NHẬT MỸ';
   const topRadius = radius - 11;
-  const topArc = Math.PI * 0.72;
+  const topArc = Math.PI * 0.74;
   const startAngle = -Math.PI / 2 - topArc / 2;
   const step = topArc / (topText.length - 1);
 
@@ -116,16 +164,15 @@ function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
   ctx.stroke();
 
   // Chữ chính giữa: NHẬT MỸ
-  ctx.font = `900 19px ${FONT_SERIF}`;
-  ctx.fillText('NHẬT MỸ', 0, -1);
+  setBrandFont(ctx, { weight: 900, size: 17.5, spacing: 0 });
+  ctx.fillText('NHẬT MỸ', 0, -2, 82);
 
-  // Chữ phụ: CẤP QUYỀN HỌC LIỆU
-  ctx.font = `bold 8px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.5px';
-  ctx.fillText('★ ĐÃ CẤP QUYỀN HỌC LIỆU ★', 0, 10);
+  // Chữ phụ: ĐÃ CẤP QUYỀN HỌC LIỆU
+  setBrandFont(ctx, { weight: 700, size: 7.2, spacing: 0 });
+  ctx.fillText('★ ĐÃ CẤP QUYỀN HỌC LIỆU ★', 0, 10, 86);
 
   // Ngày cấp ở cung dưới
-  ctx.font = `600 8.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 8, spacing: 0 });
   ctx.fillText(dateStr || 'ĐÃ XÁC THỰC', 0, radius - 11);
 
   ctx.restore();
@@ -133,7 +180,7 @@ function drawOfficialStamp(ctx, cx, cy, radius, dateStr) {
 
 /**
  * Render thẻ học viên & thư cấp phát học liệu số trên Canvas
- * Trả về canvas đã vẽ với kích thước 1500 x 2000 (Retina 2x)
+ * Trả về canvas đã vẽ với kích thước 1500 x 2400 (Retina 2x)
  */
 export async function renderStudentCardCanvas({
   student,
@@ -142,14 +189,8 @@ export async function renderStudentCardCanvas({
   portalToken = '',
   issuedDate = new Date(),
 }) {
-  // 1. Chờ phông chữ trình duyệt sẵn sàng
-  if (typeof document !== 'undefined' && document.fonts?.ready) {
-    try {
-      await document.fonts.ready;
-    } catch (e) {
-      // Bỏ qua nếu môi trường không hỗ trợ font API
-    }
-  }
+  // 1. Đảm bảo toàn bộ weight tiếng Việt của Be Vietnam Pro đã nạp xong trước khi vẽ Canvas
+  await preloadStudentCardFonts();
 
   // 2. Tạo canvas với tỉ lệ Retina 2x
   const canvas = document.createElement('canvas');
@@ -163,11 +204,12 @@ export async function renderStudentCardCanvas({
   // 3. Chuẩn bị dữ liệu học viên & sách
   const effectiveBooks = customBooks || getEffectiveBooksForStudent(student, classInfo);
   const studentToken = portalToken || student.portalToken || student.parentPortalToken || '';
-  
-  // URL điều hướng an toàn qua CRM có chứng chỉ SSL Let's Encrypt chuẩn (tránh lỗi SSL subdomain)
-  const crmOrigin = (typeof window !== 'undefined' && window.location?.origin) 
-    ? window.location.origin 
-    : (process.env.NEXT_PUBLIC_CRM_URL || 'https://crm.anhngunhatmy.edu.vn');
+
+  // URL điều hướng an toàn qua CRM có chứng chỉ SSL Let's Encrypt chuẩn
+  const crmOrigin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_CRM_URL || 'https://crm.anhngunhatmy.edu.vn';
   const webAppUrl = `${crmOrigin.replace(/\/+$/, '')}/hoclieu?token=${encodeURIComponent(studentToken)}`;
 
   // 4. Sinh QR Code nội bộ bằng QRCode dataURL
@@ -184,7 +226,7 @@ export async function renderStudentCardCanvas({
     console.error('Lỗi sinh mã QR:', err);
   }
 
-  // 5. Thử nạp logo Nhật Mỹ (nếu có trong public)
+  // 5. Thử nạp logo Nhật Mỹ (tỷ lệ gốc 1:1)
   let logoImg = null;
   try {
     logoImg = await loadImage('/logo.png');
@@ -193,7 +235,7 @@ export async function renderStudentCardCanvas({
   }
 
   // ==========================================
-  // BẮT ĐẦU VẼ CÁC LỚP ĐỒ HỌA
+  // BẮT ĐẦU VẼ CÁC LỚP ĐỒ HỌA (CHỮ DÀY CHẮC CHẮN)
   // ==========================================
 
   // --- LỚP 1: Nền thẻ sang trọng (Thư chính 0..990) & Nền trắng Cuống phiếu (990..1200) ---
@@ -227,7 +269,7 @@ export async function renderStudentCardCanvas({
   ctx.fillStyle = COLORS.goldLight;
   ctx.fillRect(24, 24 + headerHeight + 3.5, CARD_WIDTH - 48, 1);
 
-  // Vẽ Logo Nhật Mỹ nguyên bản (giữ nguyên hình dạng nhận diện gốc, không viền vàng, không cắt xén)
+  // Vẽ Logo Nhật Mỹ nguyên bản (tỷ lệ vuông 1:1 chuẩn xác 105x105)
   const logoX = 50;
   const logoY = 48;
   const logoSize = 105;
@@ -235,11 +277,10 @@ export async function renderStudentCardCanvas({
   if (logoImg) {
     ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
   } else {
-    // Fallback Monogram
     ctx.fillStyle = COLORS.navy;
     drawRoundedRect(ctx, logoX, logoY, logoSize, logoSize, 14, true, false);
     ctx.fillStyle = COLORS.gold;
-    ctx.font = `900 44px ${FONT_SERIF}`;
+    setBrandFont(ctx, { weight: 900, size: 42, spacing: 0 });
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('NM', logoX + logoSize / 2, logoY + logoSize / 2);
@@ -249,51 +290,50 @@ export async function renderStudentCardCanvas({
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  // 1. Tên thương hiệu ANH NGỮ NHẬT MỸ - Màu Xanh Nhật Mỹ chuẩn nhận diện (theo yêu cầu Thầy Đấu)
   const headerBrandX = logoX + logoSize + 22;
-  const headerBrandY = 52;
+  const headerBrandY = 50;
   const brandBlueGrad = ctx.createLinearGradient(headerBrandX, headerBrandY, headerBrandX, headerBrandY + 30);
-  brandBlueGrad.addColorStop(0, '#0D88C4'); // Xanh thương hiệu Nhật Mỹ
-  brandBlueGrad.addColorStop(1, '#086A9B'); // Xanh đậm Nhật Mỹ tạo độ sắc nét, tương phản hoàn hảo trên nền trắng
+  brandBlueGrad.addColorStop(0, '#0D88C4');
+  brandBlueGrad.addColorStop(1, '#086A9B');
   ctx.fillStyle = brandBlueGrad;
-  ctx.font = `900 28px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.5px';
-  ctx.fillText('ANH NGỮ NHẬT MỸ', headerBrandX, headerBrandY);
+  setBrandFont(ctx, { weight: 900, size: 26, spacing: 0.25 });
+  ctx.fillText('ANH NGỮ NHẬT MỸ', headerBrandX, headerBrandY, 360);
 
-  // 2. Slogan chuẩn đặt ngay dưới tên - Điểm nhấn Vàng hoàng gia tinh tế
+  // Slogan ngay dưới tên
   ctx.fillStyle = COLORS.goldDark;
-  ctx.font = `italic 600 13px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.5px';
-  ctx.fillText('Dedicated to Excellence', logoX + logoSize + 24, 88);
+  setBrandFont(ctx, { weight: 600, size: 13, italic: true, spacing: 0.15 });
+  ctx.fillText('Dedicated to Excellence', headerBrandX + 1, 86, 360);
 
-  // 3. Hệ thống đào tạo chuẩn Cambridge
-  ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `700 12.5px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.3px';
-  ctx.fillText('HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE', logoX + logoSize + 22, 114);
-
-  // Huy hiệu góc phải Header trên nền trắng
+  // Huy hiệu góc phải Header
+  const rightHeaderText = 'CAMBRIDGE ENGLISH';
+  setBrandFont(ctx, { weight: 800, size: 11.5, spacing: 0.3 });
+  const rightHeaderW = ctx.measureText(rightHeaderText).width;
   ctx.textAlign = 'right';
   ctx.fillStyle = COLORS.goldDark;
-  ctx.font = `800 12px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.5px';
-  ctx.fillText('CAMBRIDGE ENGLISH', CARD_WIDTH - 50, 68);
+  ctx.fillText(rightHeaderText, CARD_WIDTH - 48, 66);
+
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `italic 500 11.5px ${FONT_SERIF}`;
-  ctx.fillText('Digital Learning Pass', CARD_WIDTH - 50, 90);
+  setBrandFont(ctx, { weight: 600, size: 11.5, italic: true, spacing: 0.1 });
+  ctx.fillText('Digital Learning Pass', CARD_WIDTH - 48, 88);
+
+  // Dòng Hệ thống đào tạo chuẩn Cambridge (tự tính khoảng hở để không đụng cột phải)
+  const leftSystemMaxW = Math.max(300, CARD_WIDTH - 48 - rightHeaderW - 18 - headerBrandX);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = COLORS.textMuted;
+  setBrandFont(ctx, { weight: 700, size: 11, spacing: 0.15 });
+  ctx.fillText('HỆ THỐNG ĐÀO TẠO TIẾNG ANH CHUẨN CAMBRIDGE', headerBrandX, 114, leftSystemMaxW);
 
   // --- LỚP 3: Tiêu đề Thư thông báo ---
   const titleY = 212;
   ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `800 12.5px ${FONT_SERIF}`;
-  ctx.letterSpacing = '2.5px';
-  ctx.fillText('THƯ THÔNG BÁO CHÍNH THỨC', CARD_WIDTH / 2, titleY);
+  setBrandFont(ctx, { weight: 800, size: 12, spacing: 2.2 });
+  ctx.fillText('THƯ THÔNG BÁO CHÍNH THỨC', CARD_WIDTH / 2, titleY, 560);
 
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `900 24px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.8px';
-  ctx.fillText('CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ', CARD_WIDTH / 2, titleY + 28);
+  setBrandFont(ctx, { weight: 900, size: 23.5, spacing: 0.5 });
+  ctx.fillText('CẤP PHÁT TÀI KHOẢN HỌC LIỆU SỐ', CARD_WIDTH / 2, titleY + 27, 650);
+  setBrandFont(ctx, { weight: 500, size: 12, spacing: 0 });
 
   // Đường trang trí kim loại dưới tiêu đề
   ctx.strokeStyle = COLORS.gold;
@@ -335,62 +375,61 @@ export async function renderStudentCardCanvas({
   ctx.closePath();
   ctx.fill();
 
-  // Thông tin học viên bên trong
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  // Hàng 1: Họ tên học viên (font Serif sang trọng quý phái)
+  // Hàng 1: Họ tên học viên (dày, vuông vức, uy tín)
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `700 11px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 11, spacing: 0.4 });
   ctx.fillText('HỌ VÀ TÊN HỌC VIÊN', infoBoxX + 24, infoBoxY + 18);
 
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `900 24px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 900, size: 22.5, spacing: 0.2 });
   const studentName = (student.name || student.fullName || 'HỌC VIÊN').toUpperCase();
-  ctx.fillText(studentName, infoBoxX + 24, infoBoxY + 34);
+  ctx.fillText(studentName, infoBoxX + 24, infoBoxY + 35, infoBoxW - 190);
 
   // Badge trạng thái học viên góc phải
   const isEnrolled = student.status === 'Đang học';
   ctx.fillStyle = isEnrolled ? 'rgba(5, 150, 105, 0.12)' : 'rgba(217, 119, 6, 0.12)';
-  drawRoundedRect(ctx, infoBoxX + infoBoxW - 145, infoBoxY + 18, 125, 28, 6, true, false);
+  drawRoundedRect(ctx, infoBoxX + infoBoxW - 150, infoBoxY + 18, 130, 28, 6, true, false);
   ctx.fillStyle = isEnrolled ? COLORS.accentGreen : '#D97706';
-  ctx.font = `800 12px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 11.5, spacing: 0.2 });
   ctx.textAlign = 'center';
-  ctx.fillText(isEnrolled ? '● CHÍNH THỨC' : `● ${student.status || 'BẢO LƯU'}`, infoBoxX + infoBoxW - 82, infoBoxY + 25);
+  ctx.fillText(isEnrolled ? '● CHÍNH THỨC' : `● ${student.status || 'BẢO LƯU'}`, infoBoxX + infoBoxW - 85, infoBoxY + 25);
 
-  // Hàng 2: Grid 3 cột (Mã HV - Lớp học - Giáo viên)
+  // Hàng 2: Grid 3 cột (Mã HV - Lớp học - Ngày kích hoạt)
   ctx.textAlign = 'left';
   const colY = infoBoxY + 80;
 
   // Cột 1: Mã HV
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `600 11px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 10.5, spacing: 0.2 });
   ctx.fillText('MÃ ĐỊNH DANH (ID):', infoBoxX + 24, colY);
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 15px ${FONT_SERIF}`;
-  ctx.fillText(student.id || 'N/A', infoBoxX + 24, colY + 18);
+  setBrandFont(ctx, { weight: 800, size: 14.5, spacing: 0 });
+  ctx.fillText(student.id || 'N/A', infoBoxX + 24, colY + 18, 180);
 
   // Cột 2: Lớp học
-  const col2X = infoBoxX + 220;
+  const col2X = infoBoxX + 215;
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `600 11px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 10.5, spacing: 0.2 });
   ctx.fillText('LỚP HỌC HIỆN TẠI:', col2X, colY);
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 15px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 14.5, spacing: 0 });
   const className = student.classCode || (classInfo ? classInfo.code : 'Chưa xếp lớp');
-  ctx.fillText(className, col2X, colY + 18);
+  ctx.fillText(className, col2X, colY + 18, 215);
 
   // Cột 3: Ngày cấp thẻ
-  const col3X = infoBoxX + 440;
+  const col3X = infoBoxX + 445;
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `600 11px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 10.5, spacing: 0.2 });
   ctx.fillText('NGÀY KÍCH HOẠT:', col3X, colY);
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 15px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 14.5, spacing: 0 });
   const dateFormatted = issuedDate instanceof Date ? issuedDate.toLocaleDateString('vi-VN') : String(issuedDate);
-  ctx.fillText(dateFormatted, col3X, colY + 18);
+  ctx.fillText(dateFormatted, col3X, colY + 18, 185);
 
-  // --- LỚP 5: Box Giáo trình & VỊ TRÍ CON DẤU ĐỎ MỚI (CẠNH SÁCH, KHÔNG CHE CHỮ) ---
+  // --- LỚP 5: Box Giáo trình & Con Dấu Đỏ bên phải ---
   const bookBoxY = 455;
   const bookBoxH = 120;
   ctx.fillStyle = COLORS.cardBg;
@@ -400,27 +439,26 @@ export async function renderStudentCardCanvas({
   drawRoundedRect(ctx, infoBoxX, bookBoxY, infoBoxW, bookBoxH, 12, false, true);
 
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 12.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 12, spacing: 0.2 });
   ctx.textAlign = 'left';
   ctx.fillText('GIÁO TRÌNH TƯƠNG TÁC ĐƯỢC PHÂN QUYỀN TRUY CẬP:', infoBoxX + 20, bookBoxY + 16);
 
-  // Vẽ các huy hiệu giáo trình (Pill badges) ở bên trái
+  // Vẽ các huy hiệu giáo trình (Pill badges)
   let badgeX = infoBoxX + 20;
   let badgeY = bookBoxY + 44;
-  const maxBadgeRight = infoBoxX + infoBoxW - 175; // Dành khoảng trống 175px bên phải cho Con Dấu Đỏ
+  const maxBadgeRight = infoBoxX + infoBoxW - 175;
 
   if (effectiveBooks.length === 0) {
     ctx.fillStyle = COLORS.textMuted;
-    ctx.font = `italic 13px ${FONT_SERIF}`;
+    setBrandFont(ctx, { weight: 500, size: 12.5, italic: true, spacing: 0 });
     ctx.fillText('Đang cập nhật danh mục sách theo tiến độ lớp...', badgeX, badgeY + 10);
   } else {
     for (const book of effectiveBooks) {
       const badgeText = `📖 ${book.title}`;
-      ctx.font = `bold 12.5px ${FONT_SERIF}`;
+      setBrandFont(ctx, { weight: 700, size: 12, spacing: 0 });
       const textW = ctx.measureText(badgeText).width;
-      const badgeW = textW + 28;
+      const badgeW = textW + 26;
 
-      // Nếu chạm vào khu vực con dấu đỏ bên phải thì xuống hàng
       if (badgeX + badgeW > maxBadgeRight) {
         badgeX = infoBoxX + 20;
         badgeY += 34;
@@ -434,14 +472,13 @@ export async function renderStudentCardCanvas({
 
       ctx.fillStyle = book.color || COLORS.navy;
       ctx.textAlign = 'left';
-      ctx.fillText(badgeText, badgeX + 14, badgeY + 7);
+      ctx.fillText(badgeText, badgeX + 13, badgeY + 7);
 
       badgeX += badgeW + 10;
     }
   }
 
-  // --- VỊ TRÍ CON DẤU ĐỎ MỚI: ĐẶT TẠI KHOẢNG TRỐNG BÊN PHẢI Ô GIÁO TRÌNH ---
-  // Vừa chứng thực danh mục sách được cấp, vừa không đè lên chữ hướng dẫn 3 bước phía dưới!
+  // Con dấu đỏ bên phải ô giáo trình
   const stampCx = infoBoxX + infoBoxW - 88;
   const stampCy = bookBoxY + 60;
   drawOfficialStamp(ctx, stampCx, stampCy, 48, dateFormatted);
@@ -452,20 +489,17 @@ export async function renderStudentCardCanvas({
   const qrBoxH = 290;
   const qrBoxX = infoBoxX;
 
-  // Khung QR Code bên trái
   ctx.fillStyle = '#FFFFFF';
   drawRoundedRect(ctx, qrBoxX, qrSectionY, qrBoxW, qrBoxH, 12, true, false);
   ctx.strokeStyle = COLORS.gold;
   ctx.lineWidth = 1.8;
   drawRoundedRect(ctx, qrBoxX, qrSectionY, qrBoxW, qrBoxH, 12, false, true);
 
-  // Tiêu đề nhỏ trên QR
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 12px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 11.5, spacing: 0.2 });
   ctx.textAlign = 'center';
   ctx.fillText('QUÉT MÃ ĐĂNG NHẬP NHANH', qrBoxX + qrBoxW / 2, qrSectionY + 20);
 
-  // Vẽ hình ảnh QR
   if (qrImage) {
     const qrRenderSize = 188;
     const qrPosX = qrBoxX + (qrBoxW - qrRenderSize) / 2;
@@ -473,16 +507,15 @@ export async function renderStudentCardCanvas({
     ctx.drawImage(qrImage, qrPosX, qrPosY, qrRenderSize, qrRenderSize);
   }
 
-  // Chú thích dưới QR (bỏ hoàn toàn website)
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `600 10.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 600, size: 10.5, spacing: 0 });
   ctx.textAlign = 'center';
-  ctx.fillText('Không cần nhập tài khoản / mật khẩu', qrBoxX + qrBoxW / 2, qrSectionY + 244);
+  ctx.fillText('Không cần nhập tài khoản / mật khẩu', qrBoxX + qrBoxW / 2, qrSectionY + 244, qrBoxW - 20);
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `bold 11px ${FONT_SERIF}`;
-  ctx.fillText('Quét bằng Zalo hoặc Camera điện thoại', qrBoxX + qrBoxW / 2, qrSectionY + 263);
+  setBrandFont(ctx, { weight: 800, size: 10.5, spacing: 0 });
+  ctx.fillText('Quét bằng Zalo hoặc Camera điện thoại', qrBoxX + qrBoxW / 2, qrSectionY + 263, qrBoxW - 20);
 
-  // Cột Hướng dẫn phụ huynh bên phải (ngôn ngữ bình dân, rõ ràng, có mốc thời gian 10-15p)
+  // Cột Hướng dẫn phụ huynh bên phải
   const guideX = qrBoxX + qrBoxW + 20;
   const guideW = infoBoxW - qrBoxW - 20;
   const guideH = qrBoxH;
@@ -493,10 +526,9 @@ export async function renderStudentCardCanvas({
   ctx.lineWidth = 1.2;
   drawRoundedRect(ctx, guideX, qrSectionY, guideW, guideH, 12, false, true);
 
-  // Tiêu đề hướng dẫn
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `800 13.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 800, size: 13, spacing: 0.2 });
   ctx.fillText('3 BƯỚC ĐỒNG HÀNH CÙNG BÉ:', guideX + 20, qrSectionY + 20);
 
   const steps = [
@@ -508,7 +540,7 @@ export async function renderStudentCardCanvas({
     {
       num: '2',
       title: 'Đưa App ra màn hình điện thoại',
-      desc: 'Bấm dấu 3 chấm (⋮) góc phải trên màn hình → Chọn "Thêm vào màn hình chính" để biểu tượng Nhật Mỹ hiện ngoài máy.',
+      desc: 'Bấm dấu 3 chấm (⋮) góc phải màn hình → Chọn "Thêm vào màn hình chính" để biểu tượng Nhật Mỹ hiện ngoài máy.',
     },
     {
       num: '3',
@@ -518,6 +550,8 @@ export async function renderStudentCardCanvas({
   ];
 
   let stepY = qrSectionY + 52;
+  const descMaxWidth = guideW - 74;
+
   for (const step of steps) {
     // Vòng tròn số thứ tự
     ctx.fillStyle = COLORS.navy;
@@ -526,7 +560,7 @@ export async function renderStudentCardCanvas({
     ctx.fill();
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `800 11px ${FONT_SERIF}`;
+    setBrandFont(ctx, { weight: 800, size: 11.5, spacing: 0 });
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(step.num, guideX + 32, stepY + 12);
@@ -535,18 +569,27 @@ export async function renderStudentCardCanvas({
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = COLORS.navy;
-    ctx.font = `800 12.5px ${FONT_SERIF}`;
-    ctx.fillText(step.title, guideX + 54, stepY + 1);
+    setBrandFont(ctx, { weight: 800, size: 12, spacing: 0 });
+    ctx.fillText(step.title, guideX + 54, stepY + 1, descMaxWidth);
 
-    // Nội dung bước (thoáng đãng, sắc nét)
+    // Nội dung bước (tự điều chỉnh fontSize nhẹ nếu cần để không quá 3 dòng)
     ctx.fillStyle = COLORS.textMuted;
-    ctx.font = `500 10.5px ${FONT_SERIF}`;
-    wrapText(ctx, step.desc, guideX + 54, stepY + 20, guideW - 74, 15);
+    let descSize = 10.5;
+    setBrandFont(ctx, { weight: 500, size: descSize, spacing: 0 });
+    let lines = computeWrapLines(ctx, step.desc, descMaxWidth);
+    while (lines.length > 3 && descSize > 9.5) {
+      descSize -= 0.25;
+      setBrandFont(ctx, { weight: 500, size: descSize, spacing: 0 });
+      lines = computeWrapLines(ctx, step.desc, descMaxWidth);
+    }
+    lines.slice(0, 3).forEach((line, idx) => {
+      ctx.fillText(line, guideX + 54, stepY + 20 + idx * 14.5, descMaxWidth);
+    });
 
     stepY += 76;
   }
 
-  // --- LỚP 8: Footer & Hotline hỗ trợ (Bỏ Website, chỉ giữ Hotline) ---
+  // --- LỚP 8: Footer & Hotline hỗ trợ ---
   const footerY = 890;
   const footerBottom = MAIN_CARD_HEIGHT - 18;
   ctx.fillStyle = COLORS.navy;
@@ -567,27 +610,23 @@ export async function renderStudentCardCanvas({
 
   // Hàng 1: ANH NGỮ NHẬT MỸ
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `900 15.5px ${FONT_SERIF}`;
-  ctx.letterSpacing = '1px';
+  setBrandFont(ctx, { weight: 900, size: 15.5, spacing: 0.6 });
   ctx.fillText('ANH NGỮ NHẬT MỸ', CARD_WIDTH / 2, footerY + 22);
 
-  // Hàng 2: Slogan Dedicated to Excellence
+  // Hàng 2: Slogan Dedicated to Excellence (nằm dưới, nhỏ hơn, in nghiêng)
   ctx.fillStyle = COLORS.goldLight;
-  ctx.font = `italic 600 13px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.6px';
+  setBrandFont(ctx, { weight: 600, size: 12.5, italic: true, spacing: 0.3 });
   ctx.fillText('Dedicated to Excellence', CARD_WIDTH / 2, footerY + 42);
 
-  // Hàng 3: Duy nhất Hotline hỗ trợ phụ huynh
+  // Hàng 3: Hotline hỗ trợ phụ huynh
   ctx.fillStyle = COLORS.gold;
-  ctx.font = `700 11.5px ${FONT_SERIF}`;
-  ctx.letterSpacing = '0.3px';
+  setBrandFont(ctx, { weight: 700, size: 11.5, spacing: 0.2 });
   ctx.fillText('Hotline hỗ trợ phụ huynh: 0911 767 069', CARD_WIDTH / 2, footerY + 63);
 
   // --- LỚP 9: CUỐNG PHIẾU XÁC NHẬN CẮT RỜI (NỀN TRẮNG DỄ VIẾT BÚT BI) ---
-  ctx.letterSpacing = '0px';
+  setBrandFont(ctx, { weight: 500, size: 12, spacing: 0 });
   const cutY = MAIN_CARD_HEIGHT + 10; // y = 1000
 
-  // Đường cắt nét đứt
   ctx.save();
   ctx.strokeStyle = '#64748B';
   ctx.lineWidth = 1.4;
@@ -598,19 +637,18 @@ export async function renderStudentCardCanvas({
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Nhãn cắt nhỏ bên trái & phải đường cắt
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(26, cutY - 9, 24, 18);
   ctx.fillStyle = '#475569';
-  ctx.font = `700 13px sans-serif`;
+  setBrandFont(ctx, { weight: 700, size: 13, spacing: 0 });
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('✂', 30, cutY + 1);
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(CARD_WIDTH - 220, cutY - 8, 192, 16);
+  ctx.fillRect(CARD_WIDTH - 230, cutY - 8, 202, 16);
   ctx.fillStyle = '#64748B';
-  ctx.font = `700 9.5px ${FONT_SERIF}`;
+  setBrandFont(ctx, { weight: 700, size: 9.5, spacing: 0.2 });
   ctx.textAlign = 'right';
   ctx.fillText('PHẦN CẮT GỬI LẠI TRUNG TÂM', CARD_WIDTH - 34, cutY);
   ctx.restore();
@@ -619,7 +657,7 @@ export async function renderStudentCardCanvas({
   const slipX = 34;
   const slipY = cutY + 15; // y = 1015
   const slipW = CARD_WIDTH - 68;
-  const slipH = CARD_HEIGHT - slipY - 14; // 1200 - 1015 - 14 = 171
+  const slipH = CARD_HEIGHT - slipY - 14; // 171
 
   ctx.fillStyle = '#FAFCFF';
   drawRoundedRect(ctx, slipX, slipY, slipW, slipH, 10, true, false);
@@ -631,13 +669,18 @@ export async function renderStudentCardCanvas({
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `900 13.5px ${FONT_SERIF}`;
-  ctx.fillText('PHIẾU XÁC NHẬN ĐÃ CÀI HỌC LIỆU SỐ LÊN ĐIỆN THOẠI', CARD_WIDTH / 2, slipY + 11);
+  setBrandFont(ctx, { weight: 900, size: 13, spacing: 0.2 });
+  ctx.fillText('PHIẾU XÁC NHẬN ĐÃ CÀI HỌC LIỆU SỐ LÊN ĐIỆN THOẠI', CARD_WIDTH / 2, slipY + 11, slipW - 24);
 
   // Ghi chú nhỏ khích lệ học viên
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = `italic 600 10.5px ${FONT_SERIF}`;
-  ctx.fillText('(Ba Mẹ quét mã cài App xong, vui lòng điền phiếu này gửi lại Thầy Cô để bé nhận sao thưởng nhé ạ!)', CARD_WIDTH / 2, slipY + 30);
+  setBrandFont(ctx, { weight: 600, size: 10.5, italic: true, spacing: 0 });
+  ctx.fillText(
+    '(Ba Mẹ quét mã cài App xong, vui lòng điền phiếu này gửi lại Thầy Cô để bé nhận sao thưởng nhé ạ!)',
+    CARD_WIDTH / 2,
+    slipY + 30,
+    slipW - 24
+  );
 
   // Đường kẻ phân cách nhẹ
   ctx.strokeStyle = '#E2E8F0';
@@ -651,13 +694,13 @@ export async function renderStudentCardCanvas({
   const row1Y = slipY + 58;
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.textDark;
-  ctx.font = `700 12px ${FONT_SERIF}`;
-  ctx.fillText(`Họ tên học viên: ${studentName} (${student.id || 'N/A'})`, slipX + 18, row1Y, slipW - 175);
+  setBrandFont(ctx, { weight: 700, size: 11.5, spacing: 0 });
+  ctx.fillText(`Họ tên học viên: ${studentName} (${student.id || 'N/A'})`, slipX + 18, row1Y, slipW - 185);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = COLORS.navy;
-  ctx.font = `700 12px ${FONT_SERIF}`;
-  ctx.fillText(`Lớp: ${className}`, slipX + slipW - 18, row1Y, 150);
+  setBrandFont(ctx, { weight: 700, size: 11.5, spacing: 0 });
+  ctx.fillText(`Lớp: ${className}`, slipX + slipW - 18, row1Y, 155);
 
   // Dòng 2: Checkbox Xác nhận cài App
   const row2Y = slipY + 86;
@@ -669,14 +712,14 @@ export async function renderStudentCardCanvas({
 
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.textDark;
-  ctx.font = `700 12px ${FONT_SERIF}`;
-  ctx.fillText('Đã cài biểu tượng Anh Ngữ Nhật Mỹ ra màn hình điện thoại', slipX + 42, row2Y + 1);
+  setBrandFont(ctx, { weight: 700, size: 11.5, spacing: 0 });
+  ctx.fillText('Đã cài biểu tượng Anh Ngữ Nhật Mỹ ra màn hình điện thoại', slipX + 42, row2Y + 1, slipW - 60);
 
-  // Helper vẽ dòng điền tay chấm đứt chuẩn xác không bị tràn
+  // Helper vẽ dòng điền tay chấm đứt chuẩn xác
   const drawDottedFieldLine = (label, yPos) => {
     ctx.textAlign = 'left';
     ctx.fillStyle = COLORS.textDark;
-    ctx.font = `600 12px ${FONT_SERIF}`;
+    setBrandFont(ctx, { weight: 700, size: 11, spacing: 0 });
     ctx.fillText(label, slipX + 18, yPos);
     const labelWidth = ctx.measureText(label).width;
     ctx.save();
@@ -690,35 +733,32 @@ export async function renderStudentCardCanvas({
     ctx.restore();
   };
 
-  // Dòng 3: SĐT Zalo Ba/Mẹ
   drawDottedFieldLine('SĐT Zalo Ba/Mẹ (để nhận báo cáo 14 ngày):', slipY + 115);
-
-  // Dòng 4: Chữ ký
   drawDottedFieldLine('Họ tên & Chữ ký của Ba/Mẹ:', slipY + 143);
 
   return canvas;
 }
 
 /**
- * Helper ngắt dòng chữ dài trên canvas
+ * Helper tính toán các dòng ngắt chữ theo maxWidth trên Canvas
  */
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+function computeWrapLines(ctx, text, maxWidth) {
   const words = text.split(' ');
+  const lines = [];
   let line = '';
 
   for (let n = 0; n < words.length; n++) {
     const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
+    const testWidth = ctx.measureText(testLine).width;
     if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line, x, y);
+      lines.push(line.trimEnd());
       line = words[n] + ' ';
-      y += lineHeight;
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line, x, y);
+  if (line.trim()) lines.push(line.trimEnd());
+  return lines;
 }
 
 /**
