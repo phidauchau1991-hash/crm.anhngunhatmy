@@ -237,20 +237,45 @@ export default function CourseWelcomeModal({
     issuedDate: new Date().toLocaleDateString('vi-VN'),
   };
 
+  // Helper chung đảm bảo load đầy đủ font tiếng Việt Be Vietnam Pro trước khi chụp Retina 2x
+  const captureTemplateCanvas = async () => {
+    if (typeof document !== 'undefined' && document.fonts) {
+      try {
+        await document.fonts.ready;
+        const criticalFonts = [
+          '400 16px "Be Vietnam Pro"',
+          '500 16px "Be Vietnam Pro"',
+          '600 16px "Be Vietnam Pro"',
+          '700 16px "Be Vietnam Pro"',
+          '800 16px "Be Vietnam Pro"',
+          '900 16px "Be Vietnam Pro"',
+          'italic 500 16px "Be Vietnam Pro"',
+        ];
+        await Promise.allSettled(
+          criticalFonts.map((f) => document.fonts.load(f, 'ANH NGỮ NHẬT MỸ Ữ Ậ Ỹ Ễ Ỗ'))
+        );
+        await new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        );
+      } catch (e) {
+        // Bỏ qua nếu font API bị giới hạn
+      }
+    }
+
+    return html2canvas(templateRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#FFFFFF',
+      logging: false,
+    });
+  };
+
   // Sao chép thư trực tiếp vào Clipboard (PNG Retina 2x)
   const handleCopyImage = async () => {
     if (!templateRef.current) return;
     setIsCopying(true);
     try {
-      if (typeof document !== 'undefined' && document.fonts?.ready) {
-        await document.fonts.ready;
-      }
-      const canvas = await html2canvas(templateRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
+      const canvas = await captureTemplateCanvas();
 
       canvas.toBlob(async (blob) => {
         if (!blob) {
@@ -286,15 +311,7 @@ export default function CourseWelcomeModal({
     if (!templateRef.current) return;
     setIsDownloading(true);
     try {
-      if (typeof document !== 'undefined' && document.fonts?.ready) {
-        await document.fonts.ready;
-      }
-      const canvas = await html2canvas(templateRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
+      const canvas = await captureTemplateCanvas();
 
       const link = document.createElement('a');
       link.download = `ThuLichHoc_${studentName.replace(/\s+/g, '_')}.png`;

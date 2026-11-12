@@ -1235,8 +1235,8 @@ const styles = {
   },
   previewBox: {
     width: '100%',
-    maxWidth: '380px',
-    aspectRatio: '3 / 4',
+    maxWidth: '355px',
+    aspectRatio: '750 / 1200',
     backgroundColor: '#E2E8F0',
     borderRadius: '12px',
     overflow: 'hidden',

@@ -2,8 +2,9 @@ import QRCode from 'qrcode';
 import { getEffectiveBooksForStudent } from './coursewareBooks';
 
 export const CARD_WIDTH = 750;
-export const CARD_HEIGHT = 1000;
-export const CARD_SCALE = 2; // Output 1500 x 2000 px Retina
+export const MAIN_CARD_HEIGHT = 990;
+export const CARD_HEIGHT = 1200;
+export const CARD_SCALE = 2; // Output 1500 x 2400 px Retina
 
 const COLORS = {
   navy: '#0D88C4', // Màu Xanh Nhật Mỹ chuẩn (C85 M34 Y3 K0, R12 G131 B193)
@@ -195,17 +196,19 @@ export async function renderStudentCardCanvas({
   // BẮT ĐẦU VẼ CÁC LỚP ĐỒ HỌA
   // ==========================================
 
-  // --- LỚP 1: Nền thẻ sang trọng ---
+  // --- LỚP 1: Nền thẻ sang trọng (Thư chính 0..990) & Nền trắng Cuống phiếu (990..1200) ---
   ctx.fillStyle = COLORS.cream;
-  ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+  ctx.fillRect(0, 0, CARD_WIDTH, MAIN_CARD_HEIGHT);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, MAIN_CARD_HEIGHT, CARD_WIDTH, CARD_HEIGHT - MAIN_CARD_HEIGHT);
 
-  // Viền khung hoàng gia đôi viền Gold ngoài
+  // Viền khung hoàng gia đôi viền Gold ngoài ôm trọn Thư chính
   ctx.strokeStyle = COLORS.gold;
   ctx.lineWidth = 2.5;
-  drawRoundedRect(ctx, 16, 16, CARD_WIDTH - 32, CARD_HEIGHT - 32, 16, false, true);
+  drawRoundedRect(ctx, 16, 16, CARD_WIDTH - 32, MAIN_CARD_HEIGHT - 28, 16, false, true);
   ctx.strokeStyle = COLORS.goldLight;
   ctx.lineWidth = 1;
-  drawRoundedRect(ctx, 22, 22, CARD_WIDTH - 44, CARD_HEIGHT - 44, 12, false, true);
+  drawRoundedRect(ctx, 22, 22, CARD_WIDTH - 44, MAIN_CARD_HEIGHT - 40, 12, false, true);
 
   // --- LỚP 2: Header NỀN TRẮNG (#FFFFFF) Nổi Bật Logo Nhật Mỹ ---
   const headerHeight = 158;
@@ -444,9 +447,9 @@ export async function renderStudentCardCanvas({
   drawOfficialStamp(ctx, stampCx, stampCy, 48, dateFormatted);
 
   // --- LỚP 6: Khu vực Mã QR & Hướng dẫn sử dụng (Chia 2 cột) ---
-  const qrSectionY = 590;
+  const qrSectionY = 588;
   const qrBoxW = 270;
-  const qrBoxH = 295;
+  const qrBoxH = 290;
   const qrBoxX = infoBoxX;
 
   // Khung QR Code bên trái
@@ -464,22 +467,22 @@ export async function renderStudentCardCanvas({
 
   // Vẽ hình ảnh QR
   if (qrImage) {
-    const qrRenderSize = 190;
+    const qrRenderSize = 188;
     const qrPosX = qrBoxX + (qrBoxW - qrRenderSize) / 2;
     const qrPosY = qrSectionY + 42;
     ctx.drawImage(qrImage, qrPosX, qrPosY, qrRenderSize, qrRenderSize);
   }
 
-  // Chú thích dưới QR
+  // Chú thích dưới QR (bỏ hoàn toàn website)
   ctx.fillStyle = COLORS.textMuted;
   ctx.font = `600 10.5px ${FONT_SERIF}`;
   ctx.textAlign = 'center';
-  ctx.fillText('Không cần nhập tài khoản/mật khẩu', qrBoxX + qrBoxW / 2, qrSectionY + 248);
+  ctx.fillText('Không cần nhập tài khoản / mật khẩu', qrBoxX + qrBoxW / 2, qrSectionY + 244);
   ctx.fillStyle = COLORS.navy;
   ctx.font = `bold 11px ${FONT_SERIF}`;
-  ctx.fillText('anhngunhatmy.edu.vn', qrBoxX + qrBoxW / 2, qrSectionY + 266);
+  ctx.fillText('Quét bằng Zalo hoặc Camera điện thoại', qrBoxX + qrBoxW / 2, qrSectionY + 263);
 
-  // Cột Hướng dẫn phụ huynh bên phải (HOÀN TOÀN THOÁNG ĐÃNG, KHÔNG CÒN BỊ CON DẤU CHE)
+  // Cột Hướng dẫn phụ huynh bên phải (ngôn ngữ bình dân, rõ ràng, có mốc thời gian 10-15p)
   const guideX = qrBoxX + qrBoxW + 20;
   const guideW = infoBoxW - qrBoxW - 20;
   const guideH = qrBoxH;
@@ -494,27 +497,27 @@ export async function renderStudentCardCanvas({
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.navy;
   ctx.font = `800 13.5px ${FONT_SERIF}`;
-  ctx.fillText('3 BƯỚC ĐỒNG HÀNH CÙNG BÉ:', guideX + 20, qrSectionY + 22);
+  ctx.fillText('3 BƯỚC ĐỒNG HÀNH CÙNG BÉ:', guideX + 20, qrSectionY + 20);
 
   const steps = [
     {
       num: '1',
       title: 'Quét mã QR bằng Camera / Zalo',
-      desc: 'Mở ứng dụng Zalo hoặc Camera điện thoại, hướng máy quét mã QR bên cạnh để vào thẳng ứng dụng học liệu.',
+      desc: 'Mở ứng dụng Zalo hoặc Camera điện thoại, hướng máy vào mã QR bên cạnh để vào thẳng ứng dụng học liệu.',
     },
     {
       num: '2',
-      title: 'Thêm vào Màn hình chính (App)',
-      desc: 'Nhấn biểu tượng Chia sẻ (Safari) hoặc Ba chấm (Chrome) -> chọn "Thêm vào MH chính" để tạo lối tắt như một ứng dụng độc lập.',
+      title: 'Đưa App ra màn hình điện thoại',
+      desc: 'Bấm dấu 3 chấm (⋮) góc phải trên màn hình → Chọn "Thêm vào màn hình chính" để biểu tượng Nhật Mỹ hiện ngoài máy.',
     },
     {
       num: '3',
-      title: 'Học tập tương tác hàng ngày',
-      desc: 'Bé dễ dàng xem bài giảng video, nghe audio chuẩn giọng bản xứ và làm bài tập củng cố sau mỗi buổi học tại trung tâm.',
+      title: 'Chỉ 10 - 15 phút mỗi tối cùng con',
+      desc: 'Bé nghe audio chuẩn giọng bản ngữ và làm bài tập ôn luyện đều đặn sau mỗi buổi học tại trung tâm.',
     },
   ];
 
-  let stepY = qrSectionY + 56;
+  let stepY = qrSectionY + 52;
   for (const step of steps) {
     // Vòng tròn số thứ tự
     ctx.fillStyle = COLORS.navy;
@@ -533,24 +536,25 @@ export async function renderStudentCardCanvas({
     ctx.textBaseline = 'top';
     ctx.fillStyle = COLORS.navy;
     ctx.font = `800 12.5px ${FONT_SERIF}`;
-    ctx.fillText(step.title, guideX + 54, stepY + 2);
+    ctx.fillText(step.title, guideX + 54, stepY + 1);
 
-    // Nội dung bước (thoáng đãng, sắc nét, không bị che khuất)
+    // Nội dung bước (thoáng đãng, sắc nét)
     ctx.fillStyle = COLORS.textMuted;
     ctx.font = `500 10.5px ${FONT_SERIF}`;
-    wrapText(ctx, step.desc, guideX + 54, stepY + 22, guideW - 74, 16);
+    wrapText(ctx, step.desc, guideX + 54, stepY + 20, guideW - 74, 15);
 
-    stepY += 72;
+    stepY += 76;
   }
 
-  // --- LỚP 8: Footer & Hotline hỗ trợ (Theo chuẩn mới Thầy Đấu yêu cầu) ---
-  const footerY = 896;
+  // --- LỚP 8: Footer & Hotline hỗ trợ (Bỏ Website, chỉ giữ Hotline) ---
+  const footerY = 890;
+  const footerBottom = MAIN_CARD_HEIGHT - 18;
   ctx.fillStyle = COLORS.navy;
   ctx.beginPath();
   ctx.moveTo(24, footerY);
   ctx.lineTo(CARD_WIDTH - 24, footerY);
-  ctx.lineTo(CARD_WIDTH - 24, CARD_HEIGHT - 24);
-  ctx.lineTo(24, CARD_HEIGHT - 24);
+  ctx.lineTo(CARD_WIDTH - 24, footerBottom);
+  ctx.lineTo(24, footerBottom);
   ctx.closePath();
   ctx.fill();
 
@@ -561,23 +565,136 @@ export async function renderStudentCardCanvas({
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Hàng 1: ANH NGỮ NHẬT MỸ (canh giữa)
+  // Hàng 1: ANH NGỮ NHẬT MỸ
   ctx.fillStyle = '#FFFFFF';
   ctx.font = `900 15.5px ${FONT_SERIF}`;
   ctx.letterSpacing = '1px';
-  ctx.fillText('ANH NGỮ NHẬT MỸ', CARD_WIDTH / 2, footerY + 23);
+  ctx.fillText('ANH NGỮ NHẬT MỸ', CARD_WIDTH / 2, footerY + 22);
 
-  // Hàng 2: Slogan Dedicated to Excellence (canh giữa, font italic tương tự khung trên)
+  // Hàng 2: Slogan Dedicated to Excellence
   ctx.fillStyle = COLORS.goldLight;
   ctx.font = `italic 600 13px ${FONT_SERIF}`;
   ctx.letterSpacing = '0.6px';
-  ctx.fillText('Dedicated to Excellence', CARD_WIDTH / 2, footerY + 43);
+  ctx.fillText('Dedicated to Excellence', CARD_WIDTH / 2, footerY + 42);
 
-  // Hàng 3: Hotline & Website (canh giữa)
+  // Hàng 3: Duy nhất Hotline hỗ trợ phụ huynh
   ctx.fillStyle = COLORS.gold;
-  ctx.font = `600 11px ${FONT_SERIF}`;
+  ctx.font = `700 11.5px ${FONT_SERIF}`;
   ctx.letterSpacing = '0.3px';
-  ctx.fillText('Hotline hỗ trợ phụ huynh: 0911 767 069  •  Website: anhngunhatmy.edu.vn', CARD_WIDTH / 2, footerY + 63);
+  ctx.fillText('Hotline hỗ trợ phụ huynh: 0911 767 069', CARD_WIDTH / 2, footerY + 63);
+
+  // --- LỚP 9: CUỐNG PHIẾU XÁC NHẬN CẮT RỜI (NỀN TRẮNG DỄ VIẾT BÚT BI) ---
+  ctx.letterSpacing = '0px';
+  const cutY = MAIN_CARD_HEIGHT + 10; // y = 1000
+
+  // Đường cắt nét đứt
+  ctx.save();
+  ctx.strokeStyle = '#64748B';
+  ctx.lineWidth = 1.4;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.moveTo(24, cutY);
+  ctx.lineTo(CARD_WIDTH - 24, cutY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Nhãn cắt nhỏ bên trái & phải đường cắt
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(26, cutY - 9, 24, 18);
+  ctx.fillStyle = '#475569';
+  ctx.font = `700 13px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✂', 30, cutY + 1);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(CARD_WIDTH - 220, cutY - 8, 192, 16);
+  ctx.fillStyle = '#64748B';
+  ctx.font = `700 9.5px ${FONT_SERIF}`;
+  ctx.textAlign = 'right';
+  ctx.fillText('PHẦN CẮT GỬI LẠI TRUNG TÂM', CARD_WIDTH - 34, cutY);
+  ctx.restore();
+
+  // Khung cuống phiếu bên dưới
+  const slipX = 34;
+  const slipY = cutY + 15; // y = 1015
+  const slipW = CARD_WIDTH - 68;
+  const slipH = CARD_HEIGHT - slipY - 14; // 1200 - 1015 - 14 = 171
+
+  ctx.fillStyle = '#FAFCFF';
+  drawRoundedRect(ctx, slipX, slipY, slipW, slipH, 10, true, false);
+  ctx.strokeStyle = '#CBD5E1';
+  ctx.lineWidth = 1.2;
+  drawRoundedRect(ctx, slipX, slipY, slipW, slipH, 10, false, true);
+
+  // Tiêu đề cuống phiếu
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = COLORS.navy;
+  ctx.font = `900 13.5px ${FONT_SERIF}`;
+  ctx.fillText('PHIẾU XÁC NHẬN ĐÃ CÀI HỌC LIỆU SỐ LÊN ĐIỆN THOẠI', CARD_WIDTH / 2, slipY + 11);
+
+  // Ghi chú nhỏ khích lệ học viên
+  ctx.fillStyle = COLORS.textMuted;
+  ctx.font = `italic 600 10.5px ${FONT_SERIF}`;
+  ctx.fillText('(Ba Mẹ quét mã cài App xong, vui lòng điền phiếu này gửi lại Thầy Cô để bé nhận sao thưởng nhé ạ!)', CARD_WIDTH / 2, slipY + 30);
+
+  // Đường kẻ phân cách nhẹ
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(slipX + 16, slipY + 49);
+  ctx.lineTo(slipX + slipW - 16, slipY + 49);
+  ctx.stroke();
+
+  // Dòng 1: Thông tin in sẵn để không nhầm lẫn
+  const row1Y = slipY + 58;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = COLORS.textDark;
+  ctx.font = `700 12px ${FONT_SERIF}`;
+  ctx.fillText(`Họ tên học viên: ${studentName} (${student.id || 'N/A'})`, slipX + 18, row1Y, slipW - 175);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = COLORS.navy;
+  ctx.font = `700 12px ${FONT_SERIF}`;
+  ctx.fillText(`Lớp: ${className}`, slipX + slipW - 18, row1Y, 150);
+
+  // Dòng 2: Checkbox Xác nhận cài App
+  const row2Y = slipY + 86;
+  ctx.fillStyle = '#FFFFFF';
+  drawRoundedRect(ctx, slipX + 18, row2Y, 15, 15, 3, true, false);
+  ctx.strokeStyle = COLORS.navy;
+  ctx.lineWidth = 1.8;
+  drawRoundedRect(ctx, slipX + 18, row2Y, 15, 15, 3, false, true);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = COLORS.textDark;
+  ctx.font = `700 12px ${FONT_SERIF}`;
+  ctx.fillText('Đã cài biểu tượng Anh Ngữ Nhật Mỹ ra màn hình điện thoại', slipX + 42, row2Y + 1);
+
+  // Helper vẽ dòng điền tay chấm đứt chuẩn xác không bị tràn
+  const drawDottedFieldLine = (label, yPos) => {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.textDark;
+    ctx.font = `600 12px ${FONT_SERIF}`;
+    ctx.fillText(label, slipX + 18, yPos);
+    const labelWidth = ctx.measureText(label).width;
+    ctx.save();
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(slipX + 24 + labelWidth, yPos + 12);
+    ctx.lineTo(slipX + slipW - 18, yPos + 12);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // Dòng 3: SĐT Zalo Ba/Mẹ
+  drawDottedFieldLine('SĐT Zalo Ba/Mẹ (để nhận báo cáo 14 ngày):', slipY + 115);
+
+  // Dòng 4: Chữ ký
+  drawDottedFieldLine('Họ tên & Chữ ký của Ba/Mẹ:', slipY + 143);
 
   return canvas;
 }

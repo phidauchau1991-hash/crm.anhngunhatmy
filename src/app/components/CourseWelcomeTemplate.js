@@ -9,6 +9,10 @@ export const FIXED_NOTE_1 =
 export const FIXED_NOTE_2 =
   'Ba mẹ vui lòng đưa bé đến trước giờ học 05 - 10 phút để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học giúp bé học tập hiệu quả hơn.';
 
+// Địa chỉ chính thức duy nhất của Trung tâm Anh ngữ Nhật Mỹ
+export const CENTER_ADDRESS =
+  'Số 15, Đường D9, KDC Phú Tân, Phường Bình Dương, Thành phố Hồ Chí Minh';
+
 const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
   const {
     studentName = 'NGÔ LINH MẪN',
@@ -18,7 +22,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
     rawClassCode = 'CN1_M1_MsMy_7CN_Ca1',
     teacherName = 'Ms My',
     room = 'Phòng 202 (Lầu 1)',
-    startDateText = 'Thứ Bảy, ngày 14/11/2026',
+    startDateText = 'Thứ 7, ngày 14/11/2026',
     scheduleDays = 'Thứ 7, Chủ Nhật',
     studyHours = '07:45 - 09:15 (Ca 1)',
     endDateText = '28/02/2027',
@@ -39,8 +43,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
     greenBadgeBg: '#ECFDF5',
   };
 
-  // Thống nhất DUY NHẤT 1 font chữ của dòng ANH NGỮ NHẬT MỸ cho toàn bộ thư
-  const FONT_UNIFIED = `"Playfair Display", "Merriweather", "Times New Roman", Georgia, serif`;
+  // Thống nhất DUY NHẤT 1 font Geometric Sans-Serif nét dày chắc chắn khớp với logo thực tế
+  const FONT_UNIFIED = `"Be Vietnam Pro", "Segoe UI", Arial, sans-serif`;
 
   const cleanStudentCode = String(studentCode || '').trim();
 
@@ -63,11 +67,11 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
         WebkitFontSmoothing: 'antialiased',
       }}
     >
-      {/* 1. HEADER NỀN TRẮNG TINH TẾ - LOGO NGUYÊN BẢN - ĐỒNG BỘ MỘT FONT DUY NHẤT */}
+      {/* 1. HEADER NỀN TRẮNG - LOGO TỶ LỆ VUÔNG 1:1 NGUYÊN BẢN - FONT DÀY CHẮC CHẮN */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          padding: '24px 36px 18px 36px',
+          padding: '22px 36px 18px 36px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -75,17 +79,18 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           fontFamily: FONT_UNIFIED,
         }}
       >
-        {/* Khối Logo & Tên trung tâm */}
+        {/* Khối Logo 1:1 chuẩn (1143x1143 -> 84x84) & Tên trung tâm */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <img
             src="/logo.png"
             alt="Logo Nhật Mỹ"
+            width={84}
+            height={84}
             style={{
-              width: '88px',
-              height: 'auto',
-              maxHeight: '76px',
-              objectFit: 'contain',
+              width: '84px',
+              height: '84px',
               display: 'block',
+              flexShrink: 0,
             }}
             crossOrigin="anonymous"
           />
@@ -96,8 +101,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontSize: '28px',
                 fontWeight: '900',
                 color: BRAND.blue,
-                letterSpacing: '1px',
-                lineHeight: '1.2',
+                letterSpacing: '0.6px',
+                lineHeight: '1.15',
                 textTransform: 'uppercase',
               }}
             >
@@ -110,7 +115,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontStyle: 'italic',
                 fontWeight: '600',
                 color: BRAND.goldDark,
-                letterSpacing: '0.8px',
+                letterSpacing: '0.4px',
                 marginTop: '3px',
               }}
             >
@@ -127,7 +132,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               fontSize: '13.5px',
               fontWeight: '800',
               color: BRAND.goldDark,
-              letterSpacing: '1.2px',
+              letterSpacing: '1px',
               textTransform: 'uppercase',
             }}
           >
@@ -140,7 +145,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               fontStyle: 'italic',
               fontWeight: '600',
               color: BRAND.muted,
-              letterSpacing: '0.4px',
+              letterSpacing: '0.3px',
               marginTop: '3px',
             }}
           >
@@ -152,15 +157,15 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
       {/* 2. BODY VÙNG NỘI DUNG CHÍNH */}
       <div style={{ padding: '26px 36px 22px 36px', backgroundColor: '#FAFDFE', fontFamily: FONT_UNIFIED }}>
         
-        {/* TIÊU ĐỀ THƯ: NGẮN GỌN, KHÔNG LẶP CHỮ "THÔNG BÁO", DÙNG ĐƯỢC CHO MỌI LỚP */}
+        {/* TIÊU ĐỀ THƯ */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div
             style={{
               fontFamily: FONT_UNIFIED,
               fontSize: '13px',
-              fontWeight: '700',
+              fontWeight: '800',
               color: BRAND.blue,
-              letterSpacing: '2.2px',
+              letterSpacing: '2px',
               textTransform: 'uppercase',
               marginBottom: '4px',
             }}
@@ -170,11 +175,11 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           <h1
             style={{
               fontFamily: FONT_UNIFIED,
-              fontSize: '28px',
+              fontSize: '27px',
               fontWeight: '900',
               color: BRAND.blueDark,
               margin: '0 0 4px 0',
-              letterSpacing: '0.6px',
+              letterSpacing: '0.4px',
               textTransform: 'uppercase',
             }}
           >
@@ -185,6 +190,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               fontFamily: FONT_UNIFIED,
               fontSize: '13.5px',
               fontStyle: 'italic',
+              fontWeight: '500',
               color: BRAND.muted,
             }}
           >
@@ -193,7 +199,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           <div
             style={{
               width: '80px',
-              height: '3px',
+              height: '3.5px',
               backgroundColor: BRAND.gold,
               margin: '10px auto 0 auto',
               borderRadius: '2px',
@@ -225,7 +231,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontWeight: '700',
                 color: BRAND.muted,
                 textTransform: 'uppercase',
-                letterSpacing: '0.8px',
+                letterSpacing: '0.6px',
                 marginBottom: '2px',
               }}
             >
@@ -238,7 +244,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontWeight: '900',
                 color: BRAND.blueDark,
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.4px',
               }}
             >
               {studentName}
@@ -247,24 +253,25 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               style={{
                 fontFamily: FONT_UNIFIED,
                 fontSize: '14px',
+                fontWeight: '500',
                 color: '#334155',
                 marginTop: '4px',
                 display: 'flex',
-                gap: '12px',
+                gap: '10px',
                 flexWrap: 'wrap',
               }}
             >
               {cleanStudentCode && (
                 <>
                   <span>
-                    <strong>Mã học viên:</strong>{' '}
+                    <strong style={{ fontWeight: '700' }}>Mã học viên:</strong>{' '}
                     <span style={{ color: BRAND.blue, fontWeight: '800' }}>{cleanStudentCode}</span>
                   </span>
                   <span>•</span>
                 </>
               )}
               <span>
-                <strong>Chương trình:</strong> {programLevel}
+                <strong style={{ fontWeight: '700' }}>Chương trình:</strong> {programLevel}
               </span>
             </div>
           </div>
@@ -277,9 +284,9 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               border: `1.5px solid #A7F3D0`,
               borderRadius: '20px',
               padding: '6px 14px',
-              fontSize: '12.5px',
+              fontSize: '12px',
               fontWeight: '800',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.4px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -290,7 +297,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           </div>
         </div>
 
-        {/* KHUNG THÔNG TIN LỚP HỌC & NGÀY BẮT ĐẦU HỌC (TRUNG TÂM NỔI BẬT NHẤT) */}
+        {/* KHUNG THÔNG TIN LỚP HỌC & NGÀY BẮT ĐẦU HỌC */}
         <div
           style={{
             backgroundColor: BRAND.white,
@@ -319,7 +326,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 {className}
               </div>
               {rawClassCode && (
-                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', color: BRAND.muted, marginTop: '2px' }}>
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', color: BRAND.muted, marginTop: '2px' }}>
                   Mã lớp: {rawClassCode}
                 </div>
               )}
@@ -338,7 +345,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             </div>
           </div>
 
-          {/* BLOCK NGÀY BẮT ĐẦU HỌC TO RÕ NHẤT (PHÙ HỢP CẢ LỚP MỚI LẪN BÉ VÀO LỚP ĐANG HỌC) */}
+          {/* BLOCK NGÀY BẮT ĐẦU HỌC TO RÕ NHẤT */}
           <div
             style={{
               background: `linear-gradient(135deg, ${BRAND.blue} 0%, ${BRAND.blueDark} 100%)`,
@@ -356,7 +363,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontFamily: FONT_UNIFIED,
                 fontSize: '12.5px',
                 fontWeight: '800',
-                letterSpacing: '1.5px',
+                letterSpacing: '1.2px',
                 textTransform: 'uppercase',
                 color: BRAND.gold,
                 marginBottom: '4px',
@@ -369,12 +376,12 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontFamily: FONT_UNIFIED,
                 fontSize: '25px',
                 fontWeight: '900',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.4px',
               }}
             >
               {startDateText}
             </div>
-            <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', opacity: 0.92, marginTop: '3px', fontStyle: 'italic' }}>
+            <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontWeight: '500', opacity: 0.94, marginTop: '3px', fontStyle: 'italic' }}>
               (Học viên có mặt tại sảnh trung tâm trước giờ học để thầy cô đón vào lớp)
             </div>
           </div>
@@ -444,7 +451,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 fontWeight: '800',
                 color: BRAND.blueDark,
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.4px',
                 marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -476,8 +483,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 >
                   1
                 </div>
-                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14px', color: '#1E293B', lineHeight: 1.55 }}>
-                  <strong>Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55 }}>
+                  <strong style={{ fontWeight: '800' }}>Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
                 </div>
               </div>
 
@@ -502,8 +509,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 >
                   2
                 </div>
-                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14px', color: '#1E293B', lineHeight: 1.55 }}>
-                  <strong>Thời gian có mặt:</strong> {FIXED_NOTE_2}
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55 }}>
+                  <strong style={{ fontWeight: '800' }}>Thời gian có mặt:</strong> {FIXED_NOTE_2}
                 </div>
               </div>
             </div>
@@ -522,7 +529,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
 
       </div>
 
-      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ - CHUẨN MỰC ĐỒNG BỘ MỘT FONT */}
+      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ — SLOGAN NẰM DƯỚI CHỮ ANH NGỮ NHẬT MỸ, NHỎ HƠN VÀ IN NGHIÊNG */}
       <div
         style={{
           backgroundColor: BRAND.blue,
@@ -536,21 +543,35 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
         <div
           style={{
             fontFamily: FONT_UNIFIED,
-            fontSize: '15px',
+            fontSize: '16.5px',
             fontWeight: '900',
             letterSpacing: '1px',
             color: BRAND.gold,
             textTransform: 'uppercase',
-            marginBottom: '4px',
+            lineHeight: 1.2,
           }}
         >
-          ANH NGỮ NHẬT MỸ — DEDICATED TO EXCELLENCE
+          ANH NGỮ NHẬT MỸ
         </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', opacity: 0.96 }}>
-          Hotline hỗ trợ phụ huynh: <strong>0911 767 069</strong> • Website: <strong>anhngunhatmy.edu.vn</strong>
+        <div
+          style={{
+            fontFamily: FONT_UNIFIED,
+            fontSize: '12.5px',
+            fontStyle: 'italic',
+            fontWeight: '500',
+            color: '#FEF08A',
+            letterSpacing: '0.4px',
+            marginTop: '2px',
+            marginBottom: '8px',
+          }}
+        >
+          Dedicated to Excellence
         </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', opacity: 0.88, marginTop: '2px' }}>
-          Địa chỉ: Đường D33, KDC Việt Sing, P. An Phú, TP. Thuận An, Tỉnh Bình Dương
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', fontWeight: '500', opacity: 0.96 }}>
+          Hotline hỗ trợ phụ huynh: <strong style={{ fontWeight: '800' }}>0911 767 069</strong> • Website: <strong style={{ fontWeight: '800' }}>anhngunhatmy.edu.vn</strong>
+        </div>
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.9, marginTop: '3px' }}>
+          Địa chỉ: {CENTER_ADDRESS}
         </div>
       </div>
     </div>
