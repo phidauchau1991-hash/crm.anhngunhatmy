@@ -581,6 +581,7 @@ export default function LeadsPage() {
                             onChange={handleInputChange}
                             classes={classList}
                             placeholder="-- Chọn lớp cho học thử --"
+                            hideEnded={true}
                             required={form.status === 'Học thử'}
                           />
                         </div>

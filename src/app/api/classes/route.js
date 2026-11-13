@@ -2,6 +2,26 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getHolidayForDate } from '@/lib/holidayHelpers';
 
+// Helper chuyển đổi Date sang chuẩn ngày Việt Nam (GMT+7 Asia/Ho_Chi_Minh) tránh lệch ngày do Timezone UTC
+const formatToVnDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+};
+
+const formatToVnIso = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+};
+
 // GET: Lấy danh sách lớp học kèm theo sĩ số và số buổi động
 export async function GET(request) {
   try {
@@ -73,8 +93,8 @@ export async function GET(request) {
         capDo: config ? config.capDo : 'Khác',
         teacherName: finalTeacherName || 'Chưa phân công',
         teacherId: cls.teacherId,
-        startDate: new Date(cls.startDate).toLocaleDateString('vi-VN'),
-        startDateIso: new Date(cls.startDate).toISOString().split('T')[0],
+        startDate: formatToVnDate(cls.startDate),
+        startDateIso: formatToVnIso(cls.startDate),
         schedule: (() => {
           if (cls.schedule.includes('|')) {
             const parts = cls.schedule.split('|');
@@ -92,8 +112,8 @@ export async function GET(request) {
         })(),
         scheduleRaw: cls.schedule,
         careStaff: cls.careStaff || 'Chưa phân công',
-        expectedEndDate: cls.expectedEndDate && new Date(cls.expectedEndDate).getFullYear() > 2090 ? 'Học liên tục' : new Date(cls.expectedEndDate).toLocaleDateString('vi-VN'),
-        expectedEndDateIso: new Date(cls.expectedEndDate).toISOString().split('T')[0],
+        expectedEndDate: cls.expectedEndDate && new Date(cls.expectedEndDate).getFullYear() > 2090 ? 'Học liên tục' : formatToVnDate(cls.expectedEndDate),
+        expectedEndDateIso: formatToVnIso(cls.expectedEndDate),
         studentCount: (() => {
           const activeCount = cls.enrollments.filter(e => e.status === 'Đang học').length;
           if (sessionsRemaining > 0) {

@@ -7,6 +7,7 @@ export const AVAILABLE_COURSEWARE_BOOKS = [
   { code: 'beehive_2', title: 'Beehive 2', level: 'Tiểu học / Movers 1', color: '#D97706' },
   { code: 'beehive_3', title: 'Beehive 3', level: 'Tiểu học / Movers 2', color: '#059669' },
   { code: 'beehive_4', title: 'Beehive 4', level: 'Tiểu học / Flyers', color: '#0284C7' },
+  { code: 's4_starters', title: 'S4 · Tổng Hợp & Luyện Thi Starters', level: 'Ôn tổng hợp S1–S3 & Pre A1 Starters', color: '#EAB308' },
   { code: 'think_starters', title: 'Think Starters', level: 'Trung học cơ sở', color: '#7C3AED' },
   { code: 'ket_b1', title: 'B1 Preliminary (PET)', level: 'Luyện thi Cambridge', color: '#4F46E5' },
 ];
@@ -20,6 +21,11 @@ export function getBookCodesFromClass(classInfo) {
   const code = (classInfo.code || classInfo.classCode || '').toUpperCase().trim();
 
   const books = [];
+
+  // 0. Lớp S4: Ôn tổng hợp S1+S2+S3 và Luyện thi Cambridge Pre A1 Starters
+  if (level === 'S4' || code.includes('_S4_') || code === 'S4' || code.startsWith('S4 ')) {
+    return ['s4_starters', 'beehive_1', 'beehive_2', 'beehive_3'];
+  }
 
   // 1. Đối soát Beehive Starter (Mầm non / Pre-Starters)
   if (level.includes('STARTER') || level.includes('BEEHIVE_START') || code.includes('STARTER')) {
@@ -37,8 +43,8 @@ export function getBookCodesFromClass(classInfo) {
   if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M2' || level === 'M3' || code.includes('BH3') || code.includes('S3') || code.includes('M2') || code.includes('M3')) {
     books.push('beehive_3');
   }
-  // 5. Đối soát Beehive 4 (Tiểu học / Starters 4 / Flyers: S4 / F1 / F2 / Flyers)
-  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'S4' || level === 'F1' || level === 'F2' || level.includes('FLYER') || code.includes('BH4') || code.includes('S4') || code.includes('F1') || code.includes('F2') || code.includes('FLYER')) {
+  // 5. Đối soát Beehive 4 (Tiểu học / Flyers: F1 / F2 / Flyers)
+  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'F1' || level === 'F2' || level.includes('FLYER') || code.includes('BH4') || code.includes('F1') || code.includes('F2') || code.includes('FLYER')) {
     books.push('beehive_4');
   }
   // 6. Đối soát Think Starters (Trung học cơ sở)

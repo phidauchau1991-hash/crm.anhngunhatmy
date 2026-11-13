@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import {
@@ -23,6 +23,7 @@ export default function CoursewareNoticeModal({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [copying, setCopying] = useState(false);
   const [savingBooks, setSavingBooks] = useState(false);
+  const [savingAllBooks, setSavingAllBooks] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState({ current: 0, total: 0 });
   const [toastMessage, setToastMessage] = useState(null);
@@ -37,41 +38,83 @@ export default function CoursewareNoticeModal({
   const [retainAccessMap, setRetainAccessMap] = useState({});
   const [exportedMap, setExportedMap] = useState({});
 
+  // Ghi nhớ ID học viên đang xem để KHÔNG bị nhảy về học viên đầu tiên khi re-render
+  const activeStudentIdRef = useRef(null);
+
   const studentList = useMemo(() => {
     return Array.isArray(students) ? students : [students].filter(Boolean);
   }, [students]);
 
   const isBatchMode = studentList.length > 1;
 
-  // Khởi tạo state sách và trạng thái xuất thư khi danh sách học viên thay đổi
+  // Học viên đang được xem trước & chỉnh sửa
+  const activeStudent = studentList[currentIndex] || null;
+
+  // Cập nhật ref mỗi khi activeStudent thay đổi
+  useEffect(() => {
+    if (activeStudent?.id) {
+      activeStudentIdRef.current = activeStudent.id;
+    }
+  }, [activeStudent]);
+
+  // Khởi tạo và đồng bộ state sách khi danh sách học viên hoặc lớp học thay đổi
   useEffect(() => {
     if (studentList.length > 0) {
-      const initialMap = {};
-      const initialRetain = {};
-      const initialExported = {};
-
-      studentList.forEach(std => {
-        const parsed = parseCustomBookCodes(std.customBookCodes);
-        if (parsed.length > 0) {
-          initialMap[std.id] = parsed;
-        } else {
-          const cls = classInfo || {
-            code: std.classCode || '',
-            level: std.level || std.classCode || '',
-          };
-          initialMap[std.id] = getBookCodesFromClass(cls);
-        }
-        initialRetain[std.id] = Boolean(std.retainCoursewareAccess);
-        initialExported[std.id] = std.coursewareLetterExportedAt || null;
+      setCustomBooksMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          // Chỉ khởi tạo nếu học viên này chưa có trong map (tránh đè mất các bộ sách người dùng đã tick)
+          if (!next[std.id]) {
+            const parsed = parseCustomBookCodes(std.customBookCodes);
+            if (parsed.length > 0) {
+              next[std.id] = parsed;
+            } else {
+              const cls = classInfo || {
+                code: std.classCode || '',
+                level: std.level || std.classCode || '',
+              };
+              next[std.id] = getBookCodesFromClass(cls);
+            }
+          }
+        });
+        return next;
       });
 
-      setCustomBooksMap(initialMap);
-      setRetainAccessMap(initialRetain);
-      setExportedMap(initialExported);
-      setSelectedStudentIds(studentList.map(s => s.id)); // Mặc định chọn tất cả
-      setCurrentIndex(0);
-      setSearchKeyword('');
-      setFilterMode('all');
+      setRetainAccessMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          if (next[std.id] === undefined) {
+            next[std.id] = Boolean(std.retainCoursewareAccess);
+          }
+        });
+        return next;
+      });
+
+      setExportedMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          if (next[std.id] === undefined || std.coursewareLetterExportedAt) {
+            next[std.id] = std.coursewareLetterExportedAt || null;
+          }
+        });
+        return next;
+      });
+
+      setSelectedStudentIds(prev => {
+        if (prev.length === 0) return studentList.map(s => s.id);
+        const validIds = prev.filter(id => studentList.some(s => s.id === id));
+        return validIds.length > 0 ? validIds : studentList.map(s => s.id);
+      });
+
+      // GIỮ NGUYÊN VỊ TRÍ HỌC VIÊN ĐANG CHỌN, TUYỆT ĐỐI KHÔNG RESET VỀ 0!
+      if (activeStudentIdRef.current) {
+        const foundIdx = studentList.findIndex(s => s.id === activeStudentIdRef.current);
+        if (foundIdx !== -1) {
+          setCurrentIndex(foundIdx);
+        } else {
+          setCurrentIndex(0);
+        }
+      }
     }
   }, [studentList, classInfo]);
 
@@ -80,9 +123,6 @@ export default function CoursewareNoticeModal({
     setToastMessage({ text: msg, type });
     setTimeout(() => setToastMessage(null), 3800);
   };
-
-  // Học viên đang được xem trước & chỉnh sửa
-  const activeStudent = studentList[currentIndex] || null;
 
   // Danh sách học viên được lọc theo tìm kiếm và trạng thái
   const filteredStudents = useMemo(() => {
@@ -294,6 +334,40 @@ export default function CoursewareNoticeModal({
     }
   };
 
+  // Lưu cấu hình giáo trình cho TẤT CẢ học viên vào CSDL CRM
+  const handleSaveAllStudentsBooks = async () => {
+    if (studentList.length === 0) return;
+    setSavingAllBooks(true);
+    try {
+      const allIds = studentList.map(s => s.id);
+      const res = await fetch('/api/students/courseware-batch-exported', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentIds: allIds,
+          customBooksMap,
+          retainAccessMap,
+          markExported: false, // Chỉ lưu cấu hình sách, không đổi trạng thái xuất thư
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ Đã lưu cấu hình phân quyền sách cho toàn bộ ${studentList.length} học viên vào CRM!`);
+        if (onStudentUpdated) {
+          onStudentUpdated(allIds, customBooksMap, retainAccessMap);
+        }
+      } else {
+        showToast('❌ Lỗi khi lưu: ' + (data.error || 'Thất bại'), 'error');
+      }
+    } catch (err) {
+      console.error('Lỗi khi lưu toàn bộ sách học viên:', err);
+      showToast('❌ Lỗi kết nối server', 'error');
+    } finally {
+      setSavingAllBooks(false);
+    }
+  };
+
   // Copy ảnh thư báo hiện tại vào Clipboard để dán thẳng vào Zalo
   const handleCopyCurrentImage = async () => {
     if (!activeStudent) return;
@@ -358,7 +432,7 @@ export default function CoursewareNoticeModal({
     }
   };
 
-  // Xuất các học viên ĐƯỢC TÍCH CHỌN thành tệp nén ZIP
+  // Xuất các học viên ĐƯỢC TÍCH CHỌN thành tệp nén ZIP (TỰ ĐỘNG LƯU TOÀN BỘ SÁCH VÀO CRM)
   const handleExportSelectedZip = async () => {
     const studentsToExport = studentList.filter(s => selectedStudentIds.includes(s.id));
     if (studentsToExport.length === 0) {
@@ -370,6 +444,37 @@ export default function CoursewareNoticeModal({
     setZipProgress({ current: 0, total: studentsToExport.length });
 
     try {
+      const exportIds = studentsToExport.map(s => s.id);
+
+      // BƯỚC 1: TỰ ĐỘNG LƯU TOÀN BỘ CẤU HÌNH SÁCH ĐÃ TÙY CHỈNH VÀO CSDL CRM
+      showToast('💾 Đang tự động lưu cấu hình sách vào CRM...');
+      const exportCustomBooks = {};
+      const exportRetain = {};
+      exportIds.forEach(id => {
+        if (customBooksMap[id]) exportCustomBooks[id] = customBooksMap[id];
+        if (retainAccessMap[id] !== undefined) exportRetain[id] = retainAccessMap[id];
+      });
+
+      await fetch('/api/students/courseware-batch-exported', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentIds: exportIds,
+          customBooksMap: exportCustomBooks,
+          retainAccessMap: exportRetain,
+          markExported: true, // Lưu sách đồng thời đánh dấu thời điểm xuất thư vào DB
+        }),
+      });
+
+      // Cập nhật trạng thái xuất thư ở state local
+      const nowIso = new Date().toISOString();
+      setExportedMap(prev => {
+        const updated = { ...prev };
+        exportIds.forEach(id => { updated[id] = nowIso; });
+        return updated;
+      });
+
+      // BƯỚC 2: KẾT XUẤT ẢNH CANVAS VÀ ĐÓNG GÓI TỆP ZIP
       const zip = new JSZip();
       const folderName = classInfo?.code ? `Thu_Hoc_Lieu_Lop_${classInfo.code}` : 'Thu_Hoc_Lieu_Nhat_My';
       const imgFolder = zip.folder(folderName);
@@ -400,14 +505,15 @@ export default function CoursewareNoticeModal({
         imgFolder.file(fileName, blob);
       }
 
-      showToast('📦 Đang đóng gói tệp ZIP...');
+      showToast('📦 Đang nén tệp ZIP...');
       const zipContent = await zip.generateAsync({ type: 'blob' });
       saveAs(zipContent, `${folderName}_${studentsToExport.length}HV.zip`);
 
-      // Đánh dấu hàng loạt các học sinh được xuất thư vào DB
-      await markBatchExported(studentsToExport.map(s => s.id));
+      if (onStudentUpdated) {
+        onStudentUpdated(exportIds, exportCustomBooks, exportRetain);
+      }
 
-      showToast(`🎉 Đã xuất thành công ${studentsToExport.length} thư học liệu và đánh dấu vào CRM!`);
+      showToast(`🎉 Đã lưu CRM & tải thành công ${studentsToExport.length} thư học liệu!`);
     } catch (err) {
       console.error('Lỗi khi xuất tệp ZIP:', err);
       showToast('Lỗi khi đóng gói ZIP: ' + err.message, 'error');
@@ -820,20 +926,38 @@ export default function CoursewareNoticeModal({
 
             {/* TÙY CHỌN 1..N GIÁO TRÌNH CHO HỌC VIÊN ĐANG CHỌN */}
             <div style={styles.sectionCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                <h3 style={styles.sectionTitle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '6px' }}>
+                <h3 style={{ ...styles.sectionTitle, margin: 0 }}>
                   <i className="fa-solid fa-book-bookmark" style={{ color: '#FFCA29' }}></i> Phân Quyền Giáo Trình (1..N Bộ Sách)
                 </h3>
-                <button
-                  type="button"
-                  onClick={handleSaveStudentBooks}
-                  disabled={savingBooks}
-                  style={styles.saveBtn}
-                  title="Lưu các bộ giáo trình đã tick vào CSDL CRM cho bé này"
-                >
-                  <i className={`fa-solid ${savingBooks ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
-                  {savingBooks ? 'Đang lưu...' : 'Lưu vào CRM'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveStudentBooks}
+                    disabled={savingBooks || savingAllBooks}
+                    style={styles.saveBtn}
+                    title="Lưu các bộ giáo trình đã tick vào CSDL CRM cho học viên đang xem"
+                  >
+                    <i className={`fa-solid ${savingBooks ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+                    {savingBooks ? 'Đang lưu...' : 'Lưu vào CRM'}
+                  </button>
+
+                  {isBatchMode && (
+                    <button
+                      type="button"
+                      onClick={handleSaveAllStudentsBooks}
+                      disabled={savingBooks || savingAllBooks}
+                      style={{
+                        ...styles.saveBtn,
+                        backgroundColor: '#059669',
+                      }}
+                      title="Lưu cấu hình phân quyền giáo trình của tất cả học viên trong lớp vào CRM"
+                    >
+                      <i className={`fa-solid ${savingAllBooks ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
+                      {savingAllBooks ? 'Đang lưu tất cả...' : '💾 Lưu tất cả vào CRM'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 0.75rem 0' }}>

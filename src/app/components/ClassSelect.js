@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatClassCode } from '@/lib/classHelper';
 
-export default function ClassSelect({ classes, value, onChange, placeholder = "-- Chọn lớp --", ...props }) {
+export default function ClassSelect({ classes, value, onChange, placeholder = "-- Chọn lớp --", hideEnded = false, ...props }) {
   if (!classes || !Array.isArray(classes)) return <select value={value} onChange={onChange} {...props}><option value="">{placeholder}</option></select>;
 
   const now = new Date();
@@ -16,7 +16,7 @@ export default function ClassSelect({ classes, value, onChange, placeholder = "-
       if (c.sessionsRemaining <= 0) isEnded = true;
     } else {
       // Fallback nếu API cũ
-      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') {
+      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc' || c.status === 'Đã hoàn thành') {
         isEnded = true;
       } else if (c.expectedEndDate) {
         const endD = new Date(c.expectedEndDate);
@@ -25,7 +25,9 @@ export default function ClassSelect({ classes, value, onChange, placeholder = "-
     }
 
     if (isEnded) {
-      endedClasses.push(c);
+      if (!hideEnded) {
+        endedClasses.push(c);
+      }
     } else {
       // Lấy capDo từ API, nếu là lớp học theo tháng (MONTHLY) thì gom vào nhóm riêng dễ nhận diện
       const groupName = c.level === 'MONTHLY'
@@ -50,7 +52,7 @@ export default function ClassSelect({ classes, value, onChange, placeholder = "-
         </optgroup>
       ))}
 
-      {endedClasses.length > 0 && (
+      {!hideEnded && endedClasses.length > 0 && (
         <optgroup label="--- Lớp đã kết thúc ---">
           {endedClasses.map(c => (
             <option key={c.code} value={c.code} style={{ color: '#94a3b8' }}>

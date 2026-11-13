@@ -19,7 +19,7 @@ function parseAnyDate(rawDate, isoDate) {
     const y = Number(isoMatch[1]);
     const m = Number(isoMatch[2]) - 1;
     const d = Number(isoMatch[3]);
-    return new Date(y, m, d);
+    return new Date(y, m, d, 12, 0, 0);
   }
 
   // Kiểm tra định dạng DD/MM/YYYY
@@ -28,7 +28,7 @@ function parseAnyDate(rawDate, isoDate) {
     const d = Number(vnMatch[1]);
     const m = Number(vnMatch[2]) - 1;
     const y = Number(vnMatch[3]);
-    return new Date(y, m, d);
+    return new Date(y, m, d, 12, 0, 0);
   }
 
   const parsed = new Date(str);
@@ -119,12 +119,17 @@ export default function CourseWelcomeModal({
       setStudentName(name);
       setStudentCode(isOfficialStudentCode ? rawId : '');
 
-      // Xác định lớp ban đầu
+      // Xác định lớp ban đầu từ danh sách các lớp ĐANG HOẠT ĐỘNG
+      const activeClasses = classList.filter(cls => {
+        if (cls.sessionsRemaining !== undefined && Number(cls.sessionsRemaining) <= 0) return false;
+        if (cls.status === 'Đã kết thúc' || cls.status === 'Kết thúc' || cls.status === 'Đã hoàn thành') return false;
+        return true;
+      });
+      const requestedClassCode = data.classCode || data.trialClassCode || data.enrolledClassCode;
       const initialClassCode =
-        data.classCode ||
-        data.trialClassCode ||
-        data.enrolledClassCode ||
-        (classList.length > 0 ? classList[0].code : '');
+        (requestedClassCode && activeClasses.some(c => c.code === requestedClassCode))
+          ? requestedClassCode
+          : (activeClasses.length > 0 ? activeClasses[0].code : (classList[0]?.code || ''));
       setSelectedClassCode(initialClassCode);
     }
   }, [isOpen, data, classList]);
@@ -203,14 +208,24 @@ export default function CourseWelcomeModal({
     setSuggestedMessage(msg);
   }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours, endDateText]);
 
-  // Nhóm danh sách lớp theo cấp độ
+  // Lọc chỉ lấy các lớp ĐANG HOẠT ĐỘNG (còn số buổi sessionsRemaining > 0 và chưa kết thúc)
+  const activeClassList = useMemo(() => {
+    return classList.filter(cls => {
+      if (cls.sessionsRemaining !== undefined && Number(cls.sessionsRemaining) <= 0) return false;
+      if (cls.status === 'Đã kết thúc' || cls.status === 'Kết thúc' || cls.status === 'Đã hoàn thành') return false;
+      return true;
+    });
+  }, [classList]);
+
+  // Nhóm danh sách lớp đang hoạt động theo cấp độ chuẩn
   const groupedClasses = useMemo(() => {
     const groups = {};
-    classList.forEach(cls => {
+    activeClassList.forEach(cls => {
       let capDo = cls.capDo || 'Khác';
-      if (!cls.capDo) {
+      if (!cls.capDo || cls.capDo === 'Khác') {
         const lvl = (cls.level || '').toUpperCase();
-        if (lvl.startsWith('S') || lvl.includes('STARTER')) capDo = 'Starters (Mầm non & Tiểu học)';
+        if (cls.level === 'MONTHLY' || lvl.includes('MONTHLY')) capDo = 'Lớp Học Kèm / Đóng Theo Tháng';
+        else if (lvl.startsWith('S') || lvl.includes('STARTER')) capDo = 'Starters (Mầm non & Tiểu học)';
         else if (lvl.startsWith('M') || lvl.includes('MOVER')) capDo = 'Movers (Tiểu học)';
         else if (lvl.startsWith('F') || lvl.includes('FLYER')) capDo = 'Flyers (Tiểu học & THCS)';
         else if (lvl.includes('KET') || lvl.includes('PET')) capDo = 'Cambridge KET / PET';
@@ -220,7 +235,7 @@ export default function CourseWelcomeModal({
       groups[capDo].push(cls);
     });
     return groups;
-  }, [classList]);
+  }, [activeClassList]);
 
   const templateData = {
     studentName,
