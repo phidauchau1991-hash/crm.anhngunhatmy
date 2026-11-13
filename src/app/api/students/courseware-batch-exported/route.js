@@ -15,13 +15,14 @@ export async function POST(request) {
 
     const now = new Date();
 
-    // Cập nhật từng học viên trong batch (hoặc qua transaction)
-    const updatePromises = studentIds.map(async (id) => {
+    // Cập nhật từng học viên (hỗ trợ cả Học viên chính thức bảng Student lẫn Học viên học thử bảng Lead)
+    const updatePromises = studentIds.map(async (rawId) => {
+      const idStr = String(rawId).trim();
       const updateData = {};
 
-      // 1. Phân quyền giáo trình nếu có cấu hình tùy chỉnh
-      if (customBooksMap && customBooksMap[id] !== undefined) {
-        const codes = customBooksMap[id];
+      // Lấy key map linh hoạt theo rawId hoặc idStr
+      const codes = customBooksMap[rawId] !== undefined ? customBooksMap[rawId] : customBooksMap[idStr];
+      if (codes !== undefined) {
         if (Array.isArray(codes)) {
           updateData.customBookCodes = JSON.stringify([...new Set(codes.map(c => String(c).trim()).filter(Boolean))]);
         } else if (typeof codes === 'string') {
@@ -29,22 +30,41 @@ export async function POST(request) {
         }
       }
 
-      // 2. Quyền bảo lưu học liệu khi tạm nghỉ / nghỉ luôn
-      if (retainAccessMap && retainAccessMap[id] !== undefined) {
-        updateData.retainCoursewareAccess = Boolean(retainAccessMap[id]);
+      const retainVal = retainAccessMap[rawId] !== undefined ? retainAccessMap[rawId] : retainAccessMap[idStr];
+      if (retainVal !== undefined) {
+        updateData.retainCoursewareAccess = Boolean(retainVal);
       }
 
-      // 3. Đánh dấu thời điểm xuất thư học liệu
       if (markExported) {
         updateData.coursewareLetterExportedAt = now;
       }
 
-      if (Object.keys(updateData).length > 0) {
+      if (Object.keys(updateData).length === 0) return null;
+
+      // Xác định là Lead học thử (ID dạng số nguyên hoặc LEAD_...) hay Student chính thức (HV...)
+      const isNumericLeadId = typeof rawId === 'number' || /^\d+$/.test(idStr) || idStr.startsWith('LEAD_');
+      if (isNumericLeadId) {
+        const numericId = Number(idStr.replace(/^LEAD_/, ''));
+        if (!isNaN(numericId)) {
+          const existingLead = await prisma.lead.findUnique({ where: { id: numericId } });
+          if (existingLead) {
+            return prisma.lead.update({
+              where: { id: numericId },
+              data: updateData,
+            });
+          }
+        }
+      }
+
+      // Học viên chính thức (String ID)
+      const existingStudent = await prisma.student.findUnique({ where: { id: idStr } });
+      if (existingStudent) {
         return prisma.student.update({
-          where: { id },
+          where: { id: idStr },
           data: updateData,
         });
       }
+
       return null;
     });
 

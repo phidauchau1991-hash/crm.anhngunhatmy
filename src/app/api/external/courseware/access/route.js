@@ -199,7 +199,64 @@ export async function GET(request) {
       studentId = decrypted;
     }
 
-    // 3. Tìm kiếm học viên trong CSDL CRM
+    // 2.5. Hỗ trợ học viên học thử (Lead) có mã dạng LEAD_<id> hoặc ID số nguyên
+    if (String(studentId).startsWith('LEAD_') || /^\d+$/.test(String(studentId))) {
+      const numericLeadId = Number(String(studentId).replace(/^LEAD_/, ''));
+      const lead = !isNaN(numericLeadId)
+        ? await prisma.lead.findUnique({ where: { id: numericLeadId } })
+        : null;
+
+      if (lead) {
+        const trialClass = lead.trialClassCode
+          ? await prisma.class.findUnique({ where: { code: lead.trialClassCode } })
+          : null;
+
+        const classBookCodes = getBookCodesFromClass(trialClass);
+        const customBookCodes = parseCustomBookCodes(lead.customBookCodes);
+        const effectiveBookCodes = customBookCodes && customBookCodes.length > 0 ? customBookCodes : classBookCodes;
+
+        const isDropped = lead.status === 'Trượt' || lead.status === 'Hủy';
+        const retainGranted = Boolean(lead.retainCoursewareAccess);
+        const accessGranted = !isDropped || retainGranted;
+
+        return NextResponse.json(
+          {
+            success: true,
+            student: {
+              student_id: `LEAD_${lead.id}`,
+              student_name: lead.name,
+              phone: lead.phone || '',
+              status: isDropped ? 'QUIT' : 'ACTIVE',
+              is_trial: true,
+              portal_token: encryptStudentId(`LEAD_${lead.id}`),
+              class_info: trialClass
+                ? {
+                    class_id: trialClass.code,
+                    class_name: trialClass.code,
+                    level: trialClass.level,
+                    teacher_name: trialClass.teacherName || '',
+                  }
+                : null,
+              retain_courseware_access: retainGranted,
+              custom_book_codes: customBookCodes,
+              effective_book_codes: accessGranted ? effectiveBookCodes : [],
+              access_granted: accessGranted,
+              access_reason: accessGranted ? 'OK' : 'NO_ACCESS',
+              effective_date: (lead.updatedAt || new Date()).toISOString(),
+            },
+          },
+          {
+            status: 200,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Cache-Control': 'no-store, max-age=0',
+            },
+          }
+        );
+      }
+    }
+
+    // 3. Tìm kiếm học viên chính thức trong CSDL CRM
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       include: {

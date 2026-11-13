@@ -455,7 +455,7 @@ export default function CoursewareNoticeModal({
         if (retainAccessMap[id] !== undefined) exportRetain[id] = retainAccessMap[id];
       });
 
-      await fetch('/api/students/courseware-batch-exported', {
+      const saveRes = await fetch('/api/students/courseware-batch-exported', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -465,6 +465,11 @@ export default function CoursewareNoticeModal({
           markExported: true, // Lưu sách đồng thời đánh dấu thời điểm xuất thư vào DB
         }),
       });
+
+      const saveJson = await saveRes.json();
+      if (!saveRes.ok || !saveJson.success) {
+        throw new Error(saveJson.error || 'Không thể lưu cấu hình sách vào CRM');
+      }
 
       // Cập nhật trạng thái xuất thư ở state local
       const nowIso = new Date().toISOString();
@@ -764,10 +769,15 @@ export default function CoursewareNoticeModal({
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.72rem', color: '#64748B', fontFamily: 'monospace' }}>
-                              {std.id}
+                              {std.isTrial ? `HT-${std.id}` : std.id}
                             </span>
+                            {std.isTrial && (
+                              <span style={{ fontSize: '0.68rem', color: '#9333EA', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                Học thử
+                              </span>
+                            )}
                             <span style={{ fontSize: '0.72rem', color: '#0369A1', background: '#E0F2FE', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
                               {bookCount} giáo trình
                             </span>

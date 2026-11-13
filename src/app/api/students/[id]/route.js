@@ -161,6 +161,56 @@ export async function PUT(request, { params }) {
     });
 
     if (!student) {
+      // Kiểm tra xem có phải học viên học thử (Lead) với ID số nguyên hoặc LEAD_... không
+      const idStr = String(id).trim();
+      const isNumericLead = /^\d+$/.test(idStr) || idStr.startsWith('LEAD_');
+      if (isNumericLead && (action === 'courseware' || action === 'markCoursewareExported' || (!action && body.customBookCodes !== undefined))) {
+        const numericLeadId = Number(idStr.replace(/^LEAD_/, ''));
+        const lead = !isNaN(numericLeadId)
+          ? await prisma.lead.findUnique({ where: { id: numericLeadId } })
+          : null;
+
+        if (lead) {
+          if (action === 'markCoursewareExported') {
+            const updatedLead = await prisma.lead.update({
+              where: { id: numericLeadId },
+              data: { coursewareLetterExportedAt: new Date() },
+            });
+            return NextResponse.json({
+              success: true,
+              message: 'Đã cập nhật trạng thái xuất thư học liệu cho học viên học thử thành công.',
+              student: updatedLead,
+            });
+          } else {
+            const { customBookCodes, retainCoursewareAccess } = body;
+            let formattedCodes = '[]';
+            if (Array.isArray(customBookCodes)) {
+              formattedCodes = JSON.stringify([...new Set(customBookCodes.map(c => String(c).trim()).filter(Boolean))]);
+            } else if (typeof customBookCodes === 'string') {
+              try {
+                const parsed = JSON.parse(customBookCodes);
+                formattedCodes = JSON.stringify(Array.isArray(parsed) ? parsed : []);
+              } catch {
+                formattedCodes = JSON.stringify([customBookCodes.trim()]);
+              }
+            }
+
+            const updatedLead = await prisma.lead.update({
+              where: { id: numericLeadId },
+              data: {
+                customBookCodes: formattedCodes,
+                retainCoursewareAccess: Boolean(retainCoursewareAccess),
+              },
+            });
+            return NextResponse.json({
+              success: true,
+              message: 'Đã cập nhật phân quyền giáo trình học thử thành công.',
+              student: updatedLead,
+            });
+          }
+        }
+      }
+
       return NextResponse.json({ success: false, error: 'Không tìm thấy học viên' }, { status: 404 });
     }
 

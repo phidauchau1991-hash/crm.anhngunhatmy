@@ -139,7 +139,7 @@ export async function GET(request, { params }) {
         customBookCodes: s.customBookCodes || null,
         retainCoursewareAccess: Boolean(s.retainCoursewareAccess),
         coursewareLetterExportedAt: s.coursewareLetterExportedAt ? s.coursewareLetterExportedAt.toISOString() : null,
-        portalToken: !isTrial && id ? encryptStudentId(id) : '',
+        portalToken: id ? (isTrial ? encryptStudentId(`LEAD_${id}`) : encryptStudentId(String(id))) : '',
         isTrial,
         totalAbsent,
         totalWb,

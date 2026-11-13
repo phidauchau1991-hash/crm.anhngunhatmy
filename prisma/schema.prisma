@@ -185,8 +185,11 @@ model Lead {
   followUpNote   String? // Ná»™i dung/LÃ½ do háº¹n gá»i láº¡i
   salesRep       String? // NhÃ¢n viÃªn Sale phá»¥ trÃ¡ch
   notes          String? // Ghi chÃº thÃªm
-  branchId       String       @default("CN1_BinhDuong") // Chi nhÃ¡nh quáº£n lÃ½ Lead
-  createdAt      DateTime     @default(now())
+  branchId                   String       @default("CN1_BinhDuong") // Chi nhánh quản lý Lead
+  customBookCodes            String?      // JSON Array: vd ["beehive_2", "beehive_3"]
+  coursewareLetterExportedAt DateTime?    // Thời điểm xuất thư học liệu gần nhất
+  retainCoursewareAccess     Boolean      @default(false)
+  createdAt                  DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   attendances    Attendance[] // LiÃªn káº¿t tá»›i báº£ng Äiá»ƒm danh há»c thá»­
   assessments    StudentAssessment[]
