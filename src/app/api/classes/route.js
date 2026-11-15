@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { getHolidayForDate } from '@/lib/holidayHelpers';
+import { getHolidayForDate, computeExpectedEndDate, recalculateClassEndDate } from '@/lib/holidayHelpers';
 
 // Helper chuyển đổi Date sang chuẩn ngày Việt Nam (GMT+7 Asia/Ho_Chi_Minh) tránh lệch ngày do Timezone UTC
 const formatToVnDate = (date) => {
@@ -231,9 +231,7 @@ export async function POST(request) {
     }
 
     const totalSessions = courseConfig.totalSessions;
-
-    const startDate = new Date(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
+    const startDate = new Date(`${startDateStr}T00:00:00.000+07:00`);
 
     let finalTeacherName = teacherName;
     if (teacherId) {
@@ -273,37 +271,17 @@ export async function POST(request) {
     }
 
     const holidays = await prisma.holiday.findMany();
+    const expectedEndDate = computeExpectedEndDate({
+      startDate: startDateStr,
+      totalSessions,
+      classCode,
+      schedule,
+      holidays,
+    });
 
-    const targetDays = [];
-    if (schedule.includes('2')) targetDays.push(1);
-    if (schedule.includes('3')) targetDays.push(2);
-    if (schedule.includes('4')) targetDays.push(3);
-    if (schedule.includes('5')) targetDays.push(4);
-    if (schedule.includes('6')) targetDays.push(5);
-    if (schedule.includes('7')) targetDays.push(6);
-    if (schedule.includes('8') || schedule.includes('CN') || schedule.toUpperCase().includes('C')) targetDays.push(0);
-
-    if (targetDays.length === 0) {
+    if (!expectedEndDate) {
       return NextResponse.json({ success: false, error: 'Lịch học không hợp lệ.' }, { status: 400 });
     }
-
-    let currentDate = new Date(startDate);
-    let sessionsCount = 0;
-
-    while (sessionsCount < totalSessions) {
-      const dayOfWeek = currentDate.getDay();
-      const isDayHoliday = getHolidayForDate(currentDate, classCode, schedule, holidays);
-
-      if (targetDays.includes(dayOfWeek) && !isDayHoliday) {
-        sessionsCount++;
-        if (sessionsCount === totalSessions) {
-          break;
-        }
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    const expectedEndDate = new Date(currentDate);
 
     const newClass = await prisma.class.create({
       data: {
@@ -319,11 +297,15 @@ export async function POST(request) {
       },
     });
 
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
+
     return NextResponse.json({ 
       success: true, 
       data: {
         ...newClass,
-        expectedEndDateStr: expectedEndDate.toLocaleDateString('vi-VN'),
+        expectedEndDateStr: formatToVnDate(expectedEndDate),
       } 
     });
   } catch (error) {
@@ -359,42 +341,21 @@ export async function PUT(request) {
     }
 
     const totalSessions = courseConfig.totalSessions;
-    const startDate = new Date(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
-
+    const startDate = new Date(`${startDateStr}T00:00:00.000+07:00`);
     const holidays = await prisma.holiday.findMany();
+    const targetClassCodeForHoliday = (newCode && newCode.trim()) ? newCode.trim() : code;
 
-    const targetDays = [];
-    if (schedule.includes('2')) targetDays.push(1);
-    if (schedule.includes('3')) targetDays.push(2);
-    if (schedule.includes('4')) targetDays.push(3);
-    if (schedule.includes('5')) targetDays.push(4);
-    if (schedule.includes('6')) targetDays.push(5);
-    if (schedule.includes('7')) targetDays.push(6);
-    if (schedule.includes('8') || schedule.includes('CN') || schedule.toUpperCase().includes('C')) targetDays.push(0);
+    const expectedEndDate = computeExpectedEndDate({
+      startDate: startDateStr,
+      totalSessions,
+      classCode: targetClassCodeForHoliday,
+      schedule,
+      holidays,
+    });
 
-    if (targetDays.length === 0) {
+    if (!expectedEndDate) {
       return NextResponse.json({ success: false, error: 'Lịch học không hợp lệ.' }, { status: 400 });
     }
-
-    let currentDate = new Date(startDate);
-    let sessionsCount = 0;
-
-    const targetClassCodeForHoliday = (newCode && newCode.trim()) ? newCode.trim() : code;
-    while (sessionsCount < totalSessions) {
-      const dayOfWeek = currentDate.getDay();
-      const isDayHoliday = getHolidayForDate(currentDate, targetClassCodeForHoliday, schedule, holidays);
-
-      if (targetDays.includes(dayOfWeek) && !isDayHoliday) {
-        sessionsCount++;
-        if (sessionsCount === totalSessions) {
-          break;
-        }
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    const expectedEndDate = new Date(currentDate);
 
     let finalTeacherName = teacherName;
     if (teacherId) {
@@ -434,7 +395,7 @@ export async function PUT(request) {
           }
         });
 
-        // Chuyển toàn bộ bản ghi con sang finalNewCode
+        // Chuyển toàn bộ bản ghi con sang finalNewCode (kể cả ngày nghỉ lễ của lớp)
         await tx.enrollment.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
         await tx.orderFinance.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
         await tx.attendance.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
@@ -443,19 +404,27 @@ export async function PUT(request) {
         await tx.monthlyInvoice.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
         await tx.tutoringPlan.updateMany({ where: { classCode: code }, data: { classCode: finalNewCode } });
         await tx.lead.updateMany({ where: { trialClassCode: code }, data: { trialClassCode: finalNewCode } });
+        await tx.holiday.updateMany({ where: { targetId: code }, data: { targetId: finalNewCode } });
 
         // Xóa lớp cũ sau khi tất cả dữ liệu đã được di dời sang lớp mới an toàn
         await tx.class.delete({ where: { code } });
 
+        // Tính lại ngày kết thúc sau khi đã đồng bộ ngày nghỉ
+        await recalculateClassEndDate(finalNewCode, tx);
+
         return created;
       });
+
+      try {
+        await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+      } catch (_) {}
 
       return NextResponse.json({ 
         success: true, 
         message: `Đổi mã lớp thành công: [${code}] -> [${finalNewCode}]`,
         data: {
           ...updatedClass,
-          expectedEndDateStr: expectedEndDate.toLocaleDateString('vi-VN'),
+          expectedEndDateStr: formatToVnDate(expectedEndDate),
         } 
       });
     }
@@ -473,11 +442,15 @@ export async function PUT(request) {
       },
     });
 
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
+
     return NextResponse.json({ 
       success: true, 
       data: {
         ...updatedClass,
-        expectedEndDateStr: expectedEndDate.toLocaleDateString('vi-VN'),
+        expectedEndDateStr: formatToVnDate(expectedEndDate),
       } 
     });
   } catch (error) {
@@ -486,7 +459,7 @@ export async function PUT(request) {
   }
 }
 
-// DELETE: Xóa lớp học theo mã lớp
+// DELETE: Xóa lớp học theo mã lớp (Kiểm tra an toàn học viên & tài chính trước khi xóa)
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -498,15 +471,38 @@ export async function DELETE(request) {
 
     const existingClass = await prisma.class.findUnique({
       where: { code },
+      include: {
+        enrollments: true,
+        orders: true,
+      }
     });
 
     if (!existingClass) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy lớp học cần xóa' }, { status: 404 });
     }
 
-    await prisma.class.delete({
-      where: { code },
+    const activeEnrCount = existingClass.enrollments.filter(e => e.status === 'Đang học').length;
+    const paidOrdersCount = existingClass.orders.filter(o => (o.amountPaid || 0) > 0).length;
+
+    if (activeEnrCount > 0 || paidOrdersCount > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Không thể xóa lớp [${code}] vì lớp đang có ${activeEnrCount} học viên đang học hoặc ${paidOrdersCount} hóa đơn đã thu tiền. Vui lòng chuyển học viên sang lớp khác trước khi xóa!`
+      }, { status: 400 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.attendance.deleteMany({ where: { classCode: code } });
+      await tx.attendanceSummary.deleteMany({ where: { classCode: code } });
+      await tx.enrollment.deleteMany({ where: { classCode: code } });
+      await tx.orderFinance.deleteMany({ where: { classCode: code, amountPaid: 0 } });
+      await tx.holiday.deleteMany({ where: { targetId: code } });
+      await tx.class.delete({ where: { code } });
     });
+
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
 
     return NextResponse.json({ success: true, message: `Đã xóa lớp học ${code} thành công` });
   } catch (error) {

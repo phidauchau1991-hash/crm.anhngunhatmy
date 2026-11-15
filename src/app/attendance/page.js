@@ -27,6 +27,12 @@ export default function AttendancePage() {
   const [userRole, setUserRole] = useState('');
   const [isSubstitute, setIsSubstitute] = useState(false);
   const [classSessionNumber, setClassSessionNumber] = useState(1);
+  const [sessionMeta, setSessionMeta] = useState({
+    totalSessions: null,
+    sessionsTaught: 0,
+    sessionsRemaining: null,
+    isAlreadySaved: false,
+  });
 
   // Nội dung bài học & Bài tập về nhà (Sprint 1)
   const [lessonContent, setLessonContent] = useState({
@@ -97,6 +103,12 @@ export default function AttendancePage() {
       if (result.success) {
         setAttendanceData(result.data.records || []);
         setClassSessionNumber(result.data.classSessionNumber || 1);
+        setSessionMeta({
+          totalSessions: result.data.totalSessions ?? null,
+          sessionsTaught: result.data.sessionsTaught ?? 0,
+          sessionsRemaining: result.data.sessionsRemaining ?? null,
+          isAlreadySaved: !!result.data.isAlreadySaved,
+        });
         setClassNotes(result.data.classNotes || '');
         setIsHoliday(!!result.data.isHoliday);
         setHolidayName(result.data.holidayName || '');
@@ -511,6 +523,87 @@ export default function AttendancePage() {
           </button>
         )}
       </div>
+
+      {/* THANH TIẾN ĐỘ BUỔI HỌC & TRẠNG THÁI LƯU ĐIỂM DANH */}
+      {selectedClass && !loading && !isHoliday && isDateValid && (
+        <div
+          className="glass-panel"
+          style={{
+            padding: '0.75rem 1.15rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            borderLeft: sessionMeta.isAlreadySaved ? '4px solid #10b981' : '4px solid #f59e0b',
+            background: sessionMeta.isAlreadySaved ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.3rem 0.7rem',
+                borderRadius: '999px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                background: '#e0f2fe',
+                color: '#0369a1',
+              }}
+            >
+              <i className="fa-solid fa-calendar-check"></i>
+              Buổi thứ {classSessionNumber}
+              {sessionMeta.totalSessions ? ` / ${sessionMeta.totalSessions} buổi` : ''}
+            </span>
+            {sessionMeta.totalSessions !== null && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                Đã dạy: <strong style={{ color: 'var(--color-text)' }}>{sessionMeta.sessionsTaught}</strong> buổi • Còn lại:{' '}
+                <strong style={{ color: sessionMeta.sessionsRemaining <= 4 ? '#dc2626' : '#047857' }}>
+                  {sessionMeta.sessionsRemaining} buổi
+                </strong>
+              </span>
+            )}
+          </div>
+
+          <div>
+            {sessionMeta.isAlreadySaved ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.3rem 0.75rem',
+                  borderRadius: '999px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  background: '#d1fae5',
+                  color: '#065f46',
+                }}
+              >
+                <i className="fa-solid fa-circle-check"></i> Đã lưu điểm danh buổi này (Có thể cập nhật lại)
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.3rem 0.75rem',
+                  borderRadius: '999px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  background: '#fef3c7',
+                  color: '#92400e',
+                }}
+              >
+                <i className="fa-solid fa-clock"></i> Chưa lưu điểm danh buổi này
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* CẢNH BÁO QUY TẮC KHÓA SỔ 48 GIỜ */}
       {isLocked && (

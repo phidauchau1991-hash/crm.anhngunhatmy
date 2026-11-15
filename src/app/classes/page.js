@@ -31,17 +31,26 @@ const joinScheduleArray = (arr) => {
     .join('');
 };
 
+const toVnDateStr = (d) => {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+};
+
 const getHolidayForDate = (date, classCode, schedule, holidays) => {
   if (!holidays || !Array.isArray(holidays)) return null;
-  const normalizedTime = new Date(date).setHours(0, 0, 0, 0);
+  const dateKey = toVnDateStr(date);
+  const normSchedule = joinScheduleArray(parseScheduleString(schedule));
 
   for (const h of holidays) {
-    const start = new Date(h.startDate).setHours(0, 0, 0, 0);
-    const end = new Date(h.endDate).setHours(0, 0, 0, 0);
+    const startKey = toVnDateStr(h.startDate);
+    const endKey = toVnDateStr(h.endDate);
 
-    if (normalizedTime >= start && normalizedTime <= end) {
+    if (dateKey >= startKey && dateKey <= endKey) {
       if (h.scope === 'GLOBAL') return h;
-      if (h.scope === 'SHIFT' && h.targetId === schedule) return h;
+      if (h.scope === 'SHIFT') {
+        const normTarget = joinScheduleArray(parseScheduleString(h.targetId));
+        if (normTarget && normTarget === normSchedule) return h;
+      }
       if (h.scope === 'CLASS' && h.targetId === classCode) return h;
     }
   }
@@ -99,6 +108,7 @@ export default function ClassesPage() {
     shift: 'Ca1',
     customNewClassCode: '',
   });
+  const [upgradePreviewEndDate, setUpgradePreviewEndDate] = useState('');
 
   const openUpgradeModal = (cls) => {
     setUpgradeClass(cls);
@@ -118,6 +128,7 @@ export default function ClassesPage() {
       shift: detectedShift,
       customNewClassCode: '',
     });
+    setUpgradePreviewEndDate('');
     setIsUpgradeModalOpen(true);
     setMessage({ type: '', text: '' });
   };
@@ -125,11 +136,14 @@ export default function ClassesPage() {
   const openEditClassModal = (cls) => {
     setSelectedClass(cls);
     
-    // Parse "DD/MM/YYYY" to "YYYY-MM-DD"
-    const parts = cls.startDate.split('/');
     let formattedDate = '';
-    if (parts.length === 3) {
-      formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    if (cls.startDateIso) {
+      formattedDate = toVnDateStr(cls.startDateIso);
+    } else if (cls.startDate) {
+      const parts = cls.startDate.split('/');
+      if (parts.length === 3) {
+        formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
     }
 
     const detectedShift = extractClassShiftCode(cls.code);
@@ -340,6 +354,53 @@ export default function ClassesPage() {
 
     setEditPreviewEndDate(currentDate.toLocaleDateString('vi-VN'));
   }, [editFormData.startDateStr, editFormData.schedule, selectedClass, courseConfigs, holidays]);
+
+  // Tính toán Ngày kết thúc dự kiến cho Form Lên khóa cả lớp
+  useEffect(() => {
+    if (!upgradeForm.newLevel || !upgradeForm.newStartDateStr || !upgradeForm.schedule) {
+      setUpgradePreviewEndDate('');
+      return;
+    }
+
+    const config = courseConfigs.find(c => c.level === upgradeForm.newLevel);
+    if (!config) return;
+
+    const totalSessions = config.totalSessions;
+    const startDate = new Date(`${upgradeForm.newStartDateStr}T00:00:00+07:00`);
+
+    const targetDays = [];
+    const parsed = parseScheduleString(upgradeForm.schedule);
+    if (parsed.includes('2')) targetDays.push(1);
+    if (parsed.includes('3')) targetDays.push(2);
+    if (parsed.includes('4')) targetDays.push(3);
+    if (parsed.includes('5')) targetDays.push(4);
+    if (parsed.includes('6')) targetDays.push(5);
+    if (parsed.includes('7')) targetDays.push(6);
+    if (parsed.includes('CN')) targetDays.push(0);
+
+    if (targetDays.length === 0) {
+      setUpgradePreviewEndDate('Lịch học không hợp lệ');
+      return;
+    }
+
+    let currentDate = new Date(startDate);
+    let sessionsCount = 0;
+
+    while (sessionsCount < totalSessions) {
+      const dayOfWeek = currentDate.getDay();
+      const isDayHoliday = getHolidayForDate(currentDate, 'UPGRADE_CLASS', upgradeForm.schedule, holidays);
+
+      if (targetDays.includes(dayOfWeek) && !isDayHoliday) {
+        sessionsCount++;
+        if (sessionsCount === totalSessions) {
+          break;
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    setUpgradePreviewEndDate(currentDate.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  }, [upgradeForm.newLevel, upgradeForm.newStartDateStr, upgradeForm.schedule, courseConfigs, holidays]);
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
@@ -1096,6 +1157,19 @@ export default function ClassesPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Preview Kết quả tự động tính ngày bế giảng cho khóa mới */}
+              {upgradePreviewEndDate && (
+                <div className="preview-box" style={{ marginBottom: '0.75rem', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
+                  <div className="preview-label" style={{ color: '#047857' }}>Ngày kết thúc (Bế giảng) dự kiến của khóa mới:</div>
+                  <div className="preview-value" style={{ color: '#047857' }}>
+                    <i className="fa-solid fa-flag-checkered"></i> {upgradePreviewEndDate}
+                    <span className="preview-sub" style={{ color: '#059669' }}>
+                      (Đã tính đủ {courseConfigs.find(c => c.level === upgradeForm.newLevel)?.totalSessions || 24} buổi học và trừ ngày nghỉ lễ)
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Tùy chỉnh mã lớp mới (Để trống nếu dùng mặc định trên):</label>

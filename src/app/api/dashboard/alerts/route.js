@@ -16,8 +16,12 @@ export async function GET() {
       };
     }
 
-    // 2. Lấy tất cả học viên và lớp học (Enrollments)
+    // 2. Lấy tất cả học viên và lớp học đang hoạt động (Enrollments)
     const enrollments = await prisma.enrollment.findMany({
+      where: {
+        status: 'Đang học',
+        student: { status: 'Đang học' },
+      },
       include: {
         student: true,
       },

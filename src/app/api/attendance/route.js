@@ -100,14 +100,27 @@ export async function GET(request) {
       },
     });
 
-    // Tính toán BUỔI THỨ MẤY của lớp dựa vào số ngày đã điểm danh trước đó
-    const pastSessionsCount = await prisma.attendanceSummary.count({
+    // Tính toán BUỔI THỨ MẤY của lớp dựa vào số ngày điểm danh thực tế trong bảng Attendance (đồng bộ 100% với trang Quản lý Lớp học)
+    const pastUniqueDates = await prisma.attendance.groupBy({
+      by: ['date'],
       where: {
         classCode,
         date: { lt: targetDate },
       },
     });
-    const classSessionNumber = pastSessionsCount + 1;
+    const classSessionNumber = pastUniqueDates.length + 1;
+
+    const allUniqueDates = await prisma.attendance.groupBy({
+      by: ['date'],
+      where: { classCode },
+    });
+    const courseConfig = classInfo.level && classInfo.level !== 'MONTHLY'
+      ? await prisma.courseConfig.findUnique({ where: { level: classInfo.level } })
+      : null;
+    const totalSessions = courseConfig?.totalSessions || null;
+    const sessionsTaught = allUniqueDates.length;
+    const sessionsRemaining = totalSessions ? Math.max(0, totalSessions - sessionsTaught) : null;
+    const isAlreadySaved = attendanceLogs.length > 0;
 
     // 3. Tính toán cộng dồn số buổi đi học/nghỉ của từng học sinh chính thức
     const studentData = await Promise.all(students.map(async (student) => {
@@ -208,6 +221,10 @@ export async function GET(request) {
       data: {
         records: finalData,
         classSessionNumber,
+        totalSessions,
+        sessionsTaught,
+        sessionsRemaining,
+        isAlreadySaved,
         classNotes: summary?.classNotes || '',
         teacherId: summary?.teacherId || classInfo.teacherId, // Mặc định GV chính
         isSubstitute: summary?.isSubstitute || false,
@@ -357,6 +374,44 @@ export async function POST(request) {
     });
 
     await Promise.all(promises);
+
+    // Tự động khép sổ lớp cũ nếu lớp đã điểm danh đủ 100% số buổi và học viên đã được nâng sang lớp mới
+    if (classInfo.level && classInfo.level !== 'MONTHLY') {
+      const courseConfig = await prisma.courseConfig.findUnique({
+        where: { level: classInfo.level }
+      });
+      if (courseConfig && courseConfig.totalSessions > 0) {
+        const uniqueDatesAfterSave = await prisma.attendance.groupBy({
+          by: ['date'],
+          where: { classCode }
+        });
+        if (uniqueDatesAfterSave.length >= courseConfig.totalSessions) {
+          const activeEnrsInClass = await prisma.enrollment.findMany({
+            where: { classCode, status: 'Đang học' }
+          });
+          for (const enr of activeEnrsInClass) {
+            const newerActiveEnr = await prisma.enrollment.findFirst({
+              where: {
+                studentId: enr.studentId,
+                status: 'Đang học',
+                classCode: { not: classCode },
+                id: { gt: enr.id }
+              }
+            });
+            if (newerActiveEnr) {
+              await prisma.enrollment.update({
+                where: { id: enr.id },
+                data: { status: 'Đã chuyển' }
+              });
+            }
+          }
+        }
+      }
+    }
+
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
 
     return NextResponse.json({ success: true, message: 'Ghi nhận điểm danh thành công!' });
   } catch (error) {

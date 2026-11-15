@@ -58,8 +58,12 @@ export async function GET() {
     // 2. Cảnh báo Nhận xét Định kỳ (Periodic Review Alerts)
     // ==========================================
     
-    // Lấy tất cả dữ liệu ghi danh kèm thông tin học viên
+    // Lấy tất cả dữ liệu ghi danh đang hoạt động kèm thông tin học viên
     const enrollments = await prisma.enrollment.findMany({
+      where: {
+        status: 'Đang học',
+        student: { status: 'Đang học' },
+      },
       include: {
         student: true,
       },

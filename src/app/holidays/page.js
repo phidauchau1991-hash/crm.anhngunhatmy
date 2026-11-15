@@ -140,12 +140,12 @@ export default function HolidaysPage() {
 
   const getActiveShifts = () => {
     const activeClasses = classes.filter(c => {
+      if (c.level === 'MONTHLY') return false;
       if (c.sessionsRemaining !== undefined) return c.sessionsRemaining > 0;
       if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') return false;
-      if (c.expectedEndDate && new Date(c.expectedEndDate) < new Date()) return false;
       return true;
     });
-    return Array.from(new Set(activeClasses.map(c => c.schedule).filter(Boolean)));
+    return Array.from(new Set(activeClasses.map(c => c.scheduleRaw || c.schedule).filter(Boolean)));
   };
 
   const getActiveClasses = () => {
@@ -336,8 +336,8 @@ export default function HolidaysPage() {
                 {holidays.map((h) => (
                   <tr key={h.id} className="table-row">
                     <td style={{ fontWeight: 'bold' }}>{h.name}</td>
-                    <td>{new Date(h.startDate).toLocaleDateString('vi-VN')}</td>
-                    <td>{new Date(h.endDate).toLocaleDateString('vi-VN')}</td>
+                    <td>{new Date(h.startDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
+                    <td>{new Date(h.endDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
                     <td>
                       <span className={`status-badge-profile ${
                         h.scope === 'GLOBAL' ? 'bg-danger-light' :

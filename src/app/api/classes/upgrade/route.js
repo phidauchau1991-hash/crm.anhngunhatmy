@@ -39,8 +39,7 @@ export async function POST(request) {
 
     const finalTeacher = teacherName || oldClass.teacherName || 'Ms My';
     const finalSchedule = schedule || oldClass.schedule || '35';
-    const startDate = new Date(newStartDateStr);
-    startDate.setHours(0, 0, 0, 0);
+    const startDate = new Date(`${newStartDateStr}T00:00:00.000+07:00`);
 
     // Kế thừa chính xác Ca học từ lớp cũ (hoặc ca học người dùng chọn nếu đổi ca)
     const inheritedShift = extractClassShiftCode(oldClassCode);
@@ -121,9 +120,14 @@ export async function POST(request) {
           }
         });
 
-        // Tính toán công nợ cũ (Học phí phải đóng - Đã đóng)
+        // Tính toán công nợ cũ (Học phí phải đóng - Đã đóng, loại trừ đơn sách ORD_BK)
         const oldOrder = await tx.orderFinance.findFirst({
-          where: { studentId: en.studentId, classCode: oldClassCode }
+          where: {
+            studentId: en.studentId,
+            classCode: oldClassCode,
+            id: { not: { startsWith: 'ORD_BK' } }
+          },
+          orderBy: { createdAt: 'desc' }
         });
         const feeToPayOld = oldOrder ? oldOrder.feeToPay : 0;
         const amountPaidOld = oldOrder ? oldOrder.amountPaid : 0;
@@ -167,6 +171,10 @@ export async function POST(request) {
 
       return { newClassCode, movedCount };
     });
+
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
 
     return NextResponse.json({
       success: true,
