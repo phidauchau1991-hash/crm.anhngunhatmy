@@ -165,16 +165,28 @@ export default async function StudentDetailPage({ params }) {
 
   // 2. Thêm sự kiện kết quả thi chính thức từ ExamResult
   (student.examResults || []).forEach(exam => {
-    const examName = exam.config?.examName || 'Bài thi';
-    const examTypeLabel = exam.config?.examType === 'MIDTERM' ? 'Giữa kỳ' : exam.config?.examType === 'FINAL' ? 'Cuối kỳ' : 'Kỳ thi';
-    const scoreInfo = `Điểm: ${exam.totalScore ?? '-'}/${exam.maxScore || 100} (${exam.grade || 'Đạt'})`;
-    const feedback = exam.teacherNotes ? `GV: ${exam.teacherNotes}` : (exam.aiFeedback ? `AI: ${exam.aiFeedback}` : '');
+    const examTypeLabel = exam.config?.examType || 'Kỳ thi';
+    const examLevel = exam.config?.level || '';
+    const examName = examLevel ? `${examLevel} - ${examTypeLabel}` : examTypeLabel;
+    const formattedScore = exam.totalScore !== null && exam.totalScore !== undefined ? Number(exam.totalScore).toFixed(1) : '-';
+    const skillParts = [
+      exam.speakingScore !== null && exam.speakingScore !== undefined ? `Nói: ${exam.speakingScore}/${exam.config?.speakingMax ?? '-'}` : '',
+      exam.listeningScore !== null && exam.listeningScore !== undefined ? `Nghe: ${exam.listeningScore}/${exam.config?.listeningMax ?? '-'}` : '',
+      exam.rwScore !== null && exam.rwScore !== undefined ? `Đọc-Viết: ${exam.rwScore}/${exam.config?.rwMax ?? '-'}` : '',
+    ].filter(Boolean).join(' • ');
+    const scoreInfo = `Tổng điểm: ${formattedScore}/100 (${exam.grade || 'Chưa xếp loại'})${skillParts ? ` [${skillParts}]` : ''}`;
+    const commentParts = [
+      exam.commentSpeaking ? `Speaking: ${exam.commentSpeaking}` : '',
+      exam.commentListening ? `Listening: ${exam.commentListening}` : '',
+      exam.commentRW ? `R&W: ${exam.commentRW}` : '',
+      exam.commentDev ? `Định hướng: ${exam.commentDev}` : '',
+    ].filter(Boolean).join(' | ');
 
     timelineEvents.push({
       date: exam.examDate || exam.createdAt,
       type: 'exam',
-      title: `Kết quả thi ${examTypeLabel}: ${examName} (Lớp ${exam.classCode})`,
-      desc: [scoreInfo, feedback].filter(Boolean).join(' — ') || 'Đã ghi nhận kết quả thi.',
+      title: `Kết quả thi ${examName} (Lớp ${exam.classCode})`,
+      desc: [scoreInfo, commentParts].filter(Boolean).join(' — ') || 'Đã ghi nhận kết quả thi.',
       icon: 'fa-solid fa-graduation-cap',
       color: 'bg-warning',
     });
@@ -456,13 +468,13 @@ export default async function StudentDetailPage({ params }) {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
                       <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e293b' }}>
-                        {latestExam.config?.examName || 'Bài thi chính thức'}
+                        {latestExam.config?.level ? `${latestExam.config.level} - ${latestExam.config.examType}` : (latestExam.config?.examType || 'Bài thi chính thức')}
                       </span>
                       <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#d97706' }}>
-                        {latestExam.totalScore ?? '-'}/{latestExam.maxScore || 100}
+                        {latestExam.totalScore !== null && latestExam.totalScore !== undefined ? Number(latestExam.totalScore).toFixed(1) : '-'}/100
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                         Lớp {latestExam.classCode}
                       </span>
@@ -472,9 +484,9 @@ export default async function StudentDetailPage({ params }) {
                         </span>
                       )}
                     </div>
-                    {latestExam.teacherNotes && (
+                    {(latestExam.commentSpeaking || latestExam.commentDev) && (
                       <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontStyle: 'italic', lineHeight: '1.3' }}>
-                        "{latestExam.teacherNotes}"
+                        &quot;{latestExam.commentDev || latestExam.commentSpeaking}&quot;
                       </p>
                     )}
                   </div>

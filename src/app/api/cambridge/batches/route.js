@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { CAMBRIDGE_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
+import { CAMBRIDGE_CONFIG, DEFAULT_LEVELS_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
 
 // GET: Lấy danh sách toàn bộ các Đợt thi Cambridge kèm thống kê KPI
 export async function GET() {

@@ -10,6 +10,7 @@ export async function POST(request) {
       speakingKeywords,
       listeningKeywords,
       rwKeywords,
+      potentialKeywords,
       behaviorKeywords,
       tone
     } = body;
@@ -45,9 +46,8 @@ Lưu ý: Bắt đầu mỗi ý bằng dấu gạch ngang '-' và xuống dòng b
     const userPrompt = `Thông tin học sinh học thử:
 - Họ và tên: ${studentName}
 - Số buổi đã tham gia: ${sessionsAttended || 1}
-- Điểm nổi bật phần Nói (Speaking): ${speakingKeywords || 'Không có thông tin cụ thể'}
-- Điểm nổi bật phần Nghe (Listening): ${listeningKeywords || 'Không có thông tin cụ thể'}
-- Điểm nổi bật phần Đọc/Viết (Reading/Writing): ${rwKeywords || 'Không có thông tin cụ thể'}
+- Kỹ năng ngôn ngữ nổi bật (Speaking/Listening): ${speakingKeywords || 'Không có thông tin cụ thể'}${listeningKeywords ? ` (${listeningKeywords})` : ''}
+- Tiềm năng & Định hướng lộ trình: ${potentialKeywords || rwKeywords || 'Không có thông tin cụ thể'}
 - Thái độ và hành vi (Behavior): ${behaviorKeywords || 'Không có thông tin cụ thể'}
 
 Dựa vào các thông tin trên, hãy sinh ra báo cáo theo đúng định dạng JSON yêu cầu.`;

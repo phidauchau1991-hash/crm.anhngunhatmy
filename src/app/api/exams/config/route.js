@@ -46,6 +46,45 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Thiếu cấp độ hoặc loại kỳ thi' }, { status: 400 });
     }
 
+    const parseWeight = (val, defaultVal) => {
+      if (val === undefined || val === null || val === '') return defaultVal;
+      const num = parseFloat(val);
+      return Number.isFinite(num) ? num : NaN;
+    };
+
+    const pw = parseWeight(processWeight, 10);
+    const ew = parseWeight(examWeight, 90);
+    const sw = parseWeight(speakingWeight, 30);
+    const sm = parseWeight(speakingMax, 40);
+    const lw = parseWeight(listeningWeight, 20);
+    const lm = parseWeight(listeningMax, 26);
+    const rww = parseWeight(rwWeight, 40);
+    const rwm = parseWeight(rwMax, 36);
+
+    if ([pw, ew, sw, sm, lw, lm, rww, rwm].some(v => !Number.isFinite(v) || v < 0)) {
+      return NextResponse.json({ success: false, error: 'Các giá trị trọng số và điểm tối đa phải là số >= 0' }, { status: 400 });
+    }
+    if (Math.abs((pw + ew) - 100) > 0.01) {
+      return NextResponse.json({ success: false, error: `Tổng Trọng số Quá trình (${pw}%) + Bài thi (${ew}%) phải bằng 100% (hiện tại: ${pw + ew}%)` }, { status: 400 });
+    }
+    if (Math.abs((sw + lw + rww) - ew) > 0.01) {
+      return NextResponse.json({ success: false, error: `Tổng trọng số Nói (${sw}%) + Nghe (${lw}%) + Đọc Viết (${rww}%) phải bằng Trọng số Bài thi (${ew}%)` }, { status: 400 });
+    }
+    if ((sw > 0 && sm <= 0) || (lw > 0 && lm <= 0) || (rww > 0 && rwm <= 0)) {
+      return NextResponse.json({ success: false, error: 'Điểm tối đa của kỹ năng có trọng số > 0% phải lớn hơn 0' }, { status: 400 });
+    }
+
+    const weightFields = {
+      processWeight: pw,
+      examWeight: ew,
+      speakingWeight: sw,
+      speakingMax: sm,
+      listeningWeight: lw,
+      listeningMax: lm,
+      rwWeight: rww,
+      rwMax: rwm,
+    };
+
     let config;
     if (id) {
       // Update
@@ -54,14 +93,7 @@ export async function POST(request) {
         data: {
           level,
           examType,
-          processWeight: parseFloat(processWeight) || 10,
-          examWeight: parseFloat(examWeight) || 90,
-          speakingWeight: parseFloat(speakingWeight) || 30,
-          speakingMax: parseFloat(speakingMax) || 40,
-          listeningWeight: parseFloat(listeningWeight) || 20,
-          listeningMax: parseFloat(listeningMax) || 26,
-          rwWeight: parseFloat(rwWeight) || 40,
-          rwMax: parseFloat(rwMax) || 36,
+          ...weightFields,
         },
       });
     } else {
@@ -73,27 +105,11 @@ export async function POST(request) {
             examType,
           },
         },
-        update: {
-          processWeight: parseFloat(processWeight) || 10,
-          examWeight: parseFloat(examWeight) || 90,
-          speakingWeight: parseFloat(speakingWeight) || 30,
-          speakingMax: parseFloat(speakingMax) || 40,
-          listeningWeight: parseFloat(listeningWeight) || 20,
-          listeningMax: parseFloat(listeningMax) || 26,
-          rwWeight: parseFloat(rwWeight) || 40,
-          rwMax: parseFloat(rwMax) || 36,
-        },
+        update: weightFields,
         create: {
           level,
           examType,
-          processWeight: parseFloat(processWeight) || 10,
-          examWeight: parseFloat(examWeight) || 90,
-          speakingWeight: parseFloat(speakingWeight) || 30,
-          speakingMax: parseFloat(speakingMax) || 40,
-          listeningWeight: parseFloat(listeningWeight) || 20,
-          listeningMax: parseFloat(listeningMax) || 26,
-          rwWeight: parseFloat(rwWeight) || 40,
-          rwMax: parseFloat(rwMax) || 36,
+          ...weightFields,
         },
       });
     }

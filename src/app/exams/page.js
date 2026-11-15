@@ -477,15 +477,15 @@ export default function ExamsPage() {
     const pron = parseFloat(r.pronunciationScore) || 0;
     const comm = parseFloat(r.communicationScore) || 0;
     const processTotal = (att + hw + act + pron + comm) / 5;
-    const processContribution = (processTotal / 10) * (config.processWeight || 10);
+    const processContribution = (processTotal / 10) * (config.processWeight ?? 10);
 
     const spk = parseFloat(r.speakingScore) || 0;
     const lis = parseFloat(r.listeningScore) || 0;
     const rw = parseFloat(r.rwScore) || 0;
 
-    const spkPercent = config.speakingMax > 0 ? (spk / config.speakingMax) * (config.speakingWeight || 30) : 0;
-    const lisPercent = config.listeningMax > 0 ? (lis / config.listeningMax) * (config.listeningWeight || 20) : 0;
-    const rwPercent = config.rwMax > 0 ? (rw / config.rwMax) * (config.rwWeight || 40) : 0;
+    const spkPercent = config.speakingMax > 0 ? (spk / config.speakingMax) * (config.speakingWeight ?? 30) : 0;
+    const lisPercent = config.listeningMax > 0 ? (lis / config.listeningMax) * (config.listeningWeight ?? 20) : 0;
+    const rwPercent = config.rwMax > 0 ? (rw / config.rwMax) * (config.rwWeight ?? 40) : 0;
 
     const totalScore = Math.round((processContribution + spkPercent + lisPercent + rwPercent) * 10) / 10;
 
@@ -669,7 +669,29 @@ export default function ExamsPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={isSavingConfig} style={{ padding: '0.875rem', marginTop: '1rem', background: '#0D88C4', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
+              <div style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                {(() => {
+                  const pw = Number(configForm.processWeight) || 0;
+                  const ew = Number(configForm.examWeight) || 0;
+                  const sw = Number(configForm.speakingWeight) || 0;
+                  const lw = Number(configForm.listeningWeight) || 0;
+                  const rww = Number(configForm.rwWeight) || 0;
+                  const totalOk = Math.abs((pw + ew) - 100) < 0.01;
+                  const examOk = Math.abs((sw + lw + rww) - ew) < 0.01;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ color: totalOk ? '#15803d' : '#b91c1c', fontWeight: '600' }}>
+                        {totalOk ? '✅' : '⚠️'} Quá trình ({pw}%) + Bài thi ({ew}%) = {pw + ew}% / 100%
+                      </span>
+                      <span style={{ color: examOk ? '#15803d' : '#b91c1c', fontWeight: '600' }}>
+                        {examOk ? '✅' : '⚠️'} Nói ({sw}%) + Nghe ({lw}%) + Đọc Viết ({rww}%) = {sw + lw + rww}% / {ew}%
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <button type="submit" disabled={isSavingConfig} style={{ padding: '0.875rem', marginTop: '0.5rem', background: '#0D88C4', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
                 {isSavingConfig ? 'Đang lưu...' : 'Lưu Cấu Hình'}
               </button>
               {configForm.id && (
@@ -728,7 +750,22 @@ export default function ExamsPage() {
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Chọn Cấu Hình Đề Thi</label>
               <select value={selectedConfig} onChange={e => setSelectedConfig(e.target.value)} className="input-field" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                 <option value="">-- Chọn Đề --</option>
-                {configs.map(c => <option key={c.id} value={c.id}>{c.level} - {c.examType}</option>)}
+                {selectedClassObj ? (
+                  <>
+                    <optgroup label={`⭐ Đề phù hợp cấp độ lớp (${selectedClassObj.level})`}>
+                      {configs.filter(c => c.level === selectedClassObj.level).map(c => (
+                        <option key={c.id} value={c.id}>{c.level} - {c.examType}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="📂 Đề cấp độ khác (Dùng khi chấm bù lớp cũ)">
+                      {configs.filter(c => c.level !== selectedClassObj.level).map(c => (
+                        <option key={c.id} value={c.id}>{c.level} - {c.examType}</option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  configs.map(c => <option key={c.id} value={c.id}>{c.level} - {c.examType}</option>)
+                )}
               </select>
             </div>
             <div style={{ flex: 1 }}>

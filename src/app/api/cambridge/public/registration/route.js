@@ -1,15 +1,24 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { verifyCambridgeEditToken } from '@/lib/cambridgeServer';
 
 // GET: Lấy thông tin đăng ký của thí sinh để phụ huynh chỉnh sửa
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const sig = searchParams.get('sig');
 
     const idNum = parseInt(id, 10);
     if (!id || isNaN(idNum)) {
       return NextResponse.json({ success: false, error: 'Mã hồ sơ không hợp lệ' }, { status: 400 });
+    }
+
+    if (!verifyCambridgeEditToken(idNum, sig)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Liên kết chỉnh sửa không hợp lệ hoặc thiếu mã xác thực. Vui lòng mở đúng nút Chỉnh sửa từ email xác nhận hoặc liên hệ Hotline!'
+      }, { status: 403 });
     }
 
     const registration = await prisma.cambridgeRegistration.findUnique({

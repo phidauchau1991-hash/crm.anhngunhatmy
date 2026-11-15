@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { renderReceiptEmailHtml, generateReceiptCode, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
+import { renderReceiptEmailHtml, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
+import { generateNextCambridgeReceiptCode } from '@/lib/cambridgeServer';
 import { sendEmail } from '@/lib/emailService';
 
 // POST: Gửi Email Biên lai điện tử cho thí sinh đã đóng phí
@@ -72,19 +73,10 @@ export async function POST(request) {
         continue;
       }
 
-      // Đảm bảo có mã biên lai
+      // Đảm bảo có mã biên lai không trùng lặp
       let receiptCode = candidate.receiptCode;
       if (!receiptCode) {
-        const now = new Date();
-        const yy = String(now.getFullYear()).slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const todayPrefix = `BL-CAM-${yy}${mm}${dd}-`;
-
-        const countToday = await prisma.cambridgeRegistration.count({
-          where: { receiptCode: { startsWith: todayPrefix } }
-        });
-        receiptCode = generateReceiptCode(now, countToday + 1);
+        receiptCode = await generateNextCambridgeReceiptCode(prisma, new Date());
 
         await prisma.cambridgeRegistration.update({
           where: { id: candidate.id },

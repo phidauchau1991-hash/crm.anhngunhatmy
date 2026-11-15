@@ -414,12 +414,19 @@ export default function ParentPortalPage() {
                       {exam.scores && typeof exam.scores === 'object' && Object.keys(exam.scores).length > 0 && (
                         <div className="grades-section" style={{ marginBottom: '1rem' }}>
                           <div className="grade-metrics-grid">
-                            {Object.entries(exam.scores).map(([k, val]) => (
-                              <div key={k} className="metric-box">
-                                <label style={{ textTransform: 'capitalize' }}>{k}</label>
-                                <span className="score-val">{typeof val === 'object' ? (val.score ?? '-') : val}</span>
-                              </div>
-                            ))}
+                            {Object.entries(exam.scores).map(([k, val]) => {
+                              const isObj = val && typeof val === 'object';
+                              const labelText = isObj ? (val.label || k) : k;
+                              const scoreText = isObj
+                                ? (val.max ? `${val.score ?? '-'}/${val.max}` : `${val.score ?? '-'}`)
+                                : val;
+                              return (
+                                <div key={k} className="metric-box">
+                                  <label>{labelText}</label>
+                                  <span className="score-val">{scoreText}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -430,17 +437,17 @@ export default function ParentPortalPage() {
                           {exam.teacherNotes && (
                             <div style={{ marginBottom: exam.aiFeedback ? '0.5rem' : 0 }}>
                               <h4 style={{ fontSize: '0.8rem', color: '#FFCA29', margin: '0 0 0.25rem 0' }}>
-                                <i className="fa-solid fa-pen-nib"></i> Nhận xét từ Giáo viên chấm thi:
+                                <i className="fa-solid fa-pen-nib"></i> Nhận xét kỹ năng từ Giáo viên:
                               </h4>
-                              <p className="remark-text">"{exam.teacherNotes}"</p>
+                              <p className="remark-text" style={{ whiteSpace: 'pre-line' }}>{exam.teacherNotes}</p>
                             </div>
                           )}
                           {exam.aiFeedback && (
                             <div>
                               <h4 style={{ fontSize: '0.8rem', color: '#38bdf8', margin: '0 0 0.25rem 0' }}>
-                                <i className="fa-solid fa-wand-magic-sparkles"></i> Phân tích sư phạm AI:
+                                <i className="fa-solid fa-wand-magic-sparkles"></i> Thái độ &amp; Định hướng phát triển:
                               </h4>
-                              <p className="remark-text" style={{ color: '#cbd5e1' }}>{exam.aiFeedback}</p>
+                              <p className="remark-text" style={{ color: '#cbd5e1', whiteSpace: 'pre-line' }}>{exam.aiFeedback}</p>
                             </div>
                           )}
                         </div>

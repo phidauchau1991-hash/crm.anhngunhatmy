@@ -181,8 +181,7 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
             sessionsAttended: sessions,
             behaviorKeywords: attitude,
             speakingKeywords: skills,
-            listeningKeywords: skills,
-            rwKeywords: potential, // Mượn trường để gửi
+            potentialKeywords: potential,
             tone: 'encouraging'
           })
         });
@@ -455,38 +454,32 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
                   </>
                 ) : (
                   <>
-                    <div>
-                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nói (Speaking)</label>
-                      <textarea
-                        value={generatedResult?.speaking || ''}
-                        onChange={e => setGeneratedResult(prev => ({ ...prev, speaking: e.target.value }))}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Kỹ năng Nghe (Listening)</label>
-                      <textarea
-                        value={generatedResult?.listening || ''}
-                        onChange={e => setGeneratedResult(prev => ({ ...prev, listening: e.target.value }))}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Đọc & Viết (Read/Write)</label>
-                      <textarea
-                        value={generatedResult?.rw || ''}
-                        onChange={e => setGeneratedResult(prev => ({ ...prev, rw: e.target.value }))}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Định hướng phát triển</label>
-                      <textarea
-                        value={generatedResult?.dev || ''}
-                        onChange={e => setGeneratedResult(prev => ({ ...prev, dev: e.target.value }))}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
-                      />
-                    </div>
+                    {[
+                      { key: 'speaking', enKey: 'speaking_en', label: 'Kỹ năng Nói (Speaking)' },
+                      { key: 'listening', enKey: 'listening_en', label: 'Kỹ năng Nghe (Listening)' },
+                      { key: 'rw', enKey: 'rw_en', label: 'Đọc & Viết (Read/Write)' },
+                      { key: 'dev', enKey: 'dev_en', label: 'Định hướng phát triển' },
+                    ].map(({ key, enKey, label }) => {
+                      const showEnglish = bilingual || Boolean(generatedResult?.[enKey]);
+                      return (
+                        <div key={key}>
+                          <label style={{ fontWeight: '600', display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>{label}</label>
+                          <textarea
+                            value={generatedResult?.[key] || ''}
+                            onChange={e => setGeneratedResult(prev => ({ ...prev, [key]: e.target.value }))}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', minHeight: '60px', fontFamily: 'inherit' }}
+                          />
+                          {showEnglish && (
+                            <textarea
+                              placeholder="English version..."
+                              value={generatedResult?.[enKey] || ''}
+                              onChange={e => setGeneratedResult(prev => ({ ...prev, [enKey]: e.target.value }))}
+                              style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #bfdbfe', background: '#f8fafc', minHeight: '54px', fontFamily: 'inherit', marginTop: '0.35rem', fontSize: '0.88rem' }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </>
                 )}
               </div>

@@ -77,8 +77,9 @@ export default function CandidateModal({ isOpen, onClose, batch, candidate, onSa
       try {
         const res = await fetch(`/api/students?search=${encodeURIComponent(searchStudentText.trim())}`);
         const data = await res.json();
-        if (data.students) {
-          setStudentSuggestions(data.students.slice(0, 5));
+        const studentList = data.data || data.students || [];
+        if (Array.isArray(studentList)) {
+          setStudentSuggestions(studentList.slice(0, 5));
         }
       } catch (e) {
         console.error(e);
@@ -95,13 +96,18 @@ export default function CandidateModal({ isOpen, onClose, batch, candidate, onSa
   // Chọn học viên từ CRM
   const handleSelectStudent = (student) => {
     let dobVal = '';
-    if (student.birthday) {
+    const rawDob = student.dobRaw || student.birthday;
+    if (rawDob) {
       try {
-        dobVal = new Date(student.birthday).toISOString().slice(0, 10);
+        const d = new Date(rawDob);
+        if (!isNaN(d.getTime())) dobVal = d.toISOString().slice(0, 10);
       } catch (e) {}
+    } else if (student.dob && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(student.dob)) {
+      const [dd, mm, yyyy] = student.dob.split('/');
+      dobVal = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
     }
 
-    const phone = student.parentPhone || student.phone || '';
+    const phone = student.parentPhone || (student.phone && student.phone !== 'N/A' ? student.phone : '') || '';
     const email = student.parentEmail || student.email || '';
 
     setFormData(prev => ({

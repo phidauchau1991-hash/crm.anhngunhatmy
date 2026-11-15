@@ -16,6 +16,7 @@ function RegisterContent() {
   const searchParams = useSearchParams();
   const batchIdParam = searchParams.get('batchId') || '';
   const editIdParam = searchParams.get('editId') || searchParams.get('id') || '';
+  const sigParam = searchParams.get('sig') || '';
 
   const [loading, setLoading] = useState(true);
   const [batch, setBatch] = useState(null);
@@ -72,7 +73,7 @@ function RegisterContent() {
         // Nếu có editId, tải dữ liệu thí sinh cũ
         if (editIdParam) {
           setIsEditMode(true);
-          const regRes = await fetch(`/api/cambridge/public/registration?id=${editIdParam}`);
+          const regRes = await fetch(`/api/cambridge/public/registration?id=${encodeURIComponent(editIdParam)}&sig=${encodeURIComponent(sigParam)}`);
           const regJson = await regRes.json();
 
           if (regJson.success && regJson.registration) {
@@ -156,6 +157,7 @@ function RegisterContent() {
       const payload = {
         batchId: batch.id,
         registrationId: editIdParam || undefined,
+        editSig: editIdParam ? sigParam : undefined,
         fullName: formData.fullName.trim(),
         gender: formData.gender,
         dob: formData.dob,

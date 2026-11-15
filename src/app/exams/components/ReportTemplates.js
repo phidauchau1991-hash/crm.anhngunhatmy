@@ -148,7 +148,7 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
   const communicationScore = parseFloat(result.communicationScore) || 0;
   
   const processTotal = (attendanceScore + hwScore + activityScore + pronunciationScore + communicationScore) / 5;
-  const processContribution = (processTotal / 10) * (config.processWeight || 10);
+  const processContribution = (processTotal / 10) * (config.processWeight ?? 10);
 
   const speakingScore = parseFloat(result.speakingScore) || 0;
   const listeningScore = parseFloat(result.listeningScore) || 0;
@@ -158,9 +158,9 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
   const listeningMax = config.listeningMax > 0 ? config.listeningMax : 26;
   const rwMax = config.rwMax > 0 ? config.rwMax : 36;
 
-  const speakingPercent = (speakingScore / speakingMax) * (config.speakingWeight || 30);
-  const listeningPercent = (listeningScore / listeningMax) * (config.listeningWeight || 20);
-  const rwPercent = (rwScore / rwMax) * (config.rwWeight || 40);
+  const speakingPercent = (speakingScore / speakingMax) * (config.speakingWeight ?? 30);
+  const listeningPercent = (listeningScore / listeningMax) * (config.listeningWeight ?? 20);
+  const rwPercent = (rwScore / rwMax) * (config.rwWeight ?? 40);
 
   const examContribution = speakingPercent + listeningPercent + rwPercent;
   const totalScore = processContribution + examContribution;

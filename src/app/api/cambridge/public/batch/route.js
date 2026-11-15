@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { CAMBRIDGE_CONFIG, parseBatchLevels, formatHotline } from '@/lib/cambridgeHelper';
+import { evaluateBatchDeadline } from '@/lib/cambridgeServer';
 
 // GET: Lấy thông tin công khai của đợt thi Cambridge cho phụ huynh đăng ký
 export async function GET(request) {
@@ -35,29 +36,17 @@ export async function GET(request) {
       }, { status: 404 });
     }
 
-    // Kiểm tra hạn chót
-    let isClosed = batch.status !== 'OPEN';
-    let deadlineDateTime = null;
-
-    if (batch.registrationDeadline) {
-      const deadline = new Date(batch.registrationDeadline);
-      const [hours, minutes] = (batch.closeHour || '17:00').split(':').map(n => parseInt(n, 10) || 0);
-      deadline.setHours(hours, minutes, 59, 999);
-      deadlineDateTime = deadline;
-
-      if (new Date() > deadline) {
-        isClosed = true;
-      }
-    }
+    // Kiểm tra hạn chót theo múi giờ Việt Nam (+07:00)
+    const { isClosed } = evaluateBatchDeadline(batch);
 
     const { activeLevels, fees } = parseBatchLevels(batch.levelsConfig);
 
     const examDateFormatted = batch.examDate
-      ? new Date(batch.examDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      ? new Date(batch.examDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })
       : '';
 
     const deadlineFormatted = batch.registrationDeadline
-      ? `${batch.closeHour || '17:00'} ngày ${new Date(batch.registrationDeadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+      ? `${batch.closeHour || '17:00'} ngày ${new Date(batch.registrationDeadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })}`
       : '';
 
     return NextResponse.json({

@@ -57,7 +57,11 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                 } catch {}
               }
               if (prev.scoresData && typeof prev.scoresData === 'object') {
-                setScores(prev.scoresData);
+                setScores({
+                  listening: { score: '', max: '', weight: DEFAULT_WEIGHTS.listening, ...(prev.scoresData.listening || {}) },
+                  speaking:  { score: '', max: '', weight: DEFAULT_WEIGHTS.speaking,  ...(prev.scoresData.speaking  || {}) },
+                  rw:        { score: '', max: '', weight: DEFAULT_WEIGHTS.rw,        ...(prev.scoresData.rw        || {}) },
+                });
               }
               if (prev.keywordsData && typeof prev.keywordsData === 'object') {
                 setLsKeywords(prev.keywordsData.lsKeywords || '');

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { removeVietnameseTones, formatHotline, renderRegistrationEmailHtml, parseBatchLevels, CAMBRIDGE_CONFIG } from '@/lib/cambridgeHelper';
+import { createCambridgeEditToken, verifyCambridgeEditToken, evaluateBatchDeadline, findMatchedStudentForCambridge } from '@/lib/cambridgeServer';
 import { sendEmail } from '@/lib/emailService';
 
 export async function POST(request) {
@@ -9,6 +10,7 @@ export async function POST(request) {
     const {
       batchId,
       registrationId,
+      editSig,
       fullName,
       gender = 'MALE',
       dob,
@@ -34,17 +36,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Đợt thi không tồn tại' }, { status: 404 });
     }
 
-    // Kiểm tra hạn chót nếu là đăng ký mới
-    if (!registrationId && batch.registrationDeadline) {
-      const deadline = new Date(batch.registrationDeadline);
-      const [hours, minutes] = (batch.closeHour || '17:00').split(':').map(n => parseInt(n, 10) || 0);
-      deadline.setHours(hours, minutes, 59, 999);
-      if (new Date() > deadline || batch.status !== 'OPEN') {
-        return NextResponse.json({
-          success: false,
-          error: `Đợt thi này đã hết hạn đăng ký vào lúc ${batch.closeHour || '17:00'} ngày ${new Date(batch.registrationDeadline).toLocaleDateString('vi-VN')}. Vui lòng liên hệ Hotline ${formatHotline(batch.hotline)} để được hỗ trợ!`
-        }, { status: 400 });
-      }
+    // Kiểm tra hạn chót nếu là đăng ký mới (chuẩn múi giờ +07:00)
+    const { isClosed, deadlineStr: evaluatedDeadlineStr } = evaluateBatchDeadline(batch);
+    if (!registrationId && isClosed) {
+      return NextResponse.json({
+        success: false,
+        error: `Đợt thi này đã hết hạn đăng ký vào lúc ${batch.closeHour || '17:00'} ngày ${evaluatedDeadlineStr || 'đã định'}. Vui lòng liên hệ Hotline ${formatHotline(batch.hotline)} để được hỗ trợ!`
+      }, { status: 400 });
     }
 
     // 2. Tính lệ phí và kiểm tra cấp độ mở
@@ -73,12 +71,19 @@ export async function POST(request) {
     // 4. Nếu là chỉnh sửa hồ sơ cũ
     if (registrationId) {
       const idNum = parseInt(registrationId, 10);
+      if (isNaN(idNum) || !verifyCambridgeEditToken(idNum, editSig)) {
+        return NextResponse.json({
+          success: false,
+          error: 'Mã xác thực chỉnh sửa không hợp lệ. Vui lòng mở đúng liên kết trong email xác nhận!'
+        }, { status: 403 });
+      }
+
       const existing = await prisma.cambridgeRegistration.findUnique({
         where: { id: idNum }
       });
 
-      if (!existing) {
-        return NextResponse.json({ success: false, error: 'Hồ sơ cần sửa không tồn tại' }, { status: 404 });
+      if (!existing || existing.batchId !== batchId) {
+        return NextResponse.json({ success: false, error: 'Hồ sơ cần sửa không tồn tại trong đợt thi này' }, { status: 404 });
       }
 
       if (existing.paymentStatus === 'DA_DONG') {
@@ -106,27 +111,10 @@ export async function POST(request) {
         }
       });
     } else {
-      // 5. Nếu là đăng ký mới: Tự động tìm liên kết Student trong CRM an toàn
+      // 5. Nếu là đăng ký mới: Tự động tìm liên kết Student trong CRM an toàn (tránh ghép nhầm anh/chị/em cùng SĐT)
       let matchedStudentId = null;
       try {
-        const cleanPhone = parentPhone ? parentPhone.replace(/[^0-9]/g, '') : '';
-        const searchConditions = [];
-        if (cleanPhone) {
-          searchConditions.push({ phone: cleanPhone });
-        }
-        if (fullNameUpper) {
-          searchConditions.push({ name: fullNameUpper });
-        }
-
-        if (searchConditions.length > 0) {
-          const found = await prisma.student.findFirst({
-            where: { OR: searchConditions },
-            select: { id: true }
-          });
-          if (found) {
-            matchedStudentId = found.id;
-          }
-        }
+        matchedStudentId = await findMatchedStudentForCambridge(prisma, { fullNameUpper, parentPhone });
       } catch (errStudent) {
         console.warn('Bỏ qua lỗi tìm kiếm học viên CRM:', errStudent?.message);
       }
@@ -159,11 +147,10 @@ export async function POST(request) {
     if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
       origin = `${proto}://${host}`;
     }
-    const editUrl = `${origin}/cambridge/register?batchId=${batchId}&editId=${registration.id}`;
+    const editSigToken = createCambridgeEditToken(registration.id);
+    const editUrl = `${origin}/cambridge/register?batchId=${batchId}&editId=${registration.id}&sig=${editSigToken}`;
 
-    const deadlineStr = batch.registrationDeadline
-      ? new Date(batch.registrationDeadline).toLocaleDateString('vi-VN')
-      : '';
+    const deadlineStr = evaluatedDeadlineStr || '';
 
     // 7. Gửi Email Xác nhận Đăng ký kèm mã VietQR cho Phụ huynh
     const emailSubject = isEdit

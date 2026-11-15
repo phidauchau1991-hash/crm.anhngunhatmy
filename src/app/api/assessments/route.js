@@ -99,17 +99,38 @@ export async function POST(request) {
       return JSON.stringify(val);
     };
 
+    // Hỗ trợ chuẩn ISO và định dạng ngày Việt Nam dd/MM/yyyy hoặc dd-MM-yyyy
+    const parseAssessmentDate = (val) => {
+      if (!val) return new Date();
+      if (val instanceof Date && !isNaN(val.getTime())) return val;
+      const str = String(val).trim();
+      const vnMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (vnMatch) {
+        const day = parseInt(vnMatch[1], 10);
+        const month = parseInt(vnMatch[2], 10);
+        const year = parseInt(vnMatch[3], 10);
+        const parsed = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+07:00`);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const parsedTotalScore = totalScore !== undefined && totalScore !== null && totalScore !== '' ? parseFloat(totalScore) : null;
+    const parsedMaxScore = maxScore !== undefined && maxScore !== null && maxScore !== '' ? parseFloat(maxScore) : 100;
+    const parsedLeadId = leadId ? parseInt(leadId, 10) : null;
+
     const payload = {
       studentId: studentId || null,
-      leadId: leadId ? parseInt(leadId) : null,
+      leadId: parsedLeadId && !isNaN(parsedLeadId) ? parsedLeadId : null,
       classCode: classCode || null,
       type,
       title: title || (type === 'PLACEMENT_TEST' ? 'Đánh giá Năng lực Đầu vào' : type === 'TRIAL_EVALUATION' ? 'Nhận xét Học thử' : 'Nhận xét Định kỳ / Đột xuất'),
-      assessmentDate: assessmentDate ? new Date(assessmentDate) : new Date(),
+      assessmentDate: parseAssessmentDate(assessmentDate),
       assessorName: assessorName || null,
       scores: stringifyIfNeeded(scores),
-      totalScore: totalScore !== undefined && totalScore !== null ? parseFloat(totalScore) : null,
-      maxScore: maxScore ? parseFloat(maxScore) : 100,
+      totalScore: Number.isFinite(parsedTotalScore) ? parsedTotalScore : null,
+      maxScore: Number.isFinite(parsedMaxScore) ? parsedMaxScore : 100,
       keywords: stringifyIfNeeded(keywords),
       comments: stringifyIfNeeded(comments),
       notes: notes || null

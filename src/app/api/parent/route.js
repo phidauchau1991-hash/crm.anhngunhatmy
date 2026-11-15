@@ -235,19 +235,61 @@ export async function GET(request) {
           };
         }),
         examResults: (student.examResults || []).map(e => {
-          let scores = null;
-          try { scores = e.scores ? JSON.parse(e.scores) : null; } catch {}
+          const cfg = e.config || {};
+          const examType = cfg.examType || 'Kỳ thi';
+          const level = cfg.level || '';
+          const examName = level ? `${level} - ${examType}` : examType;
+          const scores = {
+            process: {
+              label: 'Quá trình',
+              score: Number(((e.processTotal ?? 0)).toFixed(1)),
+              max: 10,
+              weight: cfg.processWeight ?? 10,
+            },
+            speaking: {
+              label: 'Nói (Speaking)',
+              score: e.speakingScore ?? 0,
+              max: cfg.speakingMax ?? 40,
+              weight: cfg.speakingWeight ?? 30,
+            },
+            listening: {
+              label: 'Nghe (Listening)',
+              score: e.listeningScore ?? 0,
+              max: cfg.listeningMax ?? 26,
+              weight: cfg.listeningWeight ?? 20,
+            },
+            rw: {
+              label: 'Đọc & Viết (R&W)',
+              score: e.rwScore ?? 0,
+              max: cfg.rwMax ?? 36,
+              weight: cfg.rwWeight ?? 40,
+            },
+          };
+          const comments = {
+            speaking: e.commentSpeaking || '',
+            listening: e.commentListening || '',
+            rw: e.commentRW || '',
+            dev: e.commentDev || '',
+          };
+          const combinedNotes = [
+            e.commentSpeaking ? `• Speaking: ${e.commentSpeaking}` : '',
+            e.commentListening ? `• Listening: ${e.commentListening}` : '',
+            e.commentRW ? `• Reading & Writing: ${e.commentRW}` : '',
+          ].filter(Boolean).join('\n');
+
           return {
             id: e.id,
-            examName: e.config?.examName || 'Kỳ thi',
-            examType: e.config?.examType || 'Kỳ thi',
+            examName,
+            examType,
+            level,
             classCode: e.classCode,
             examDate: e.examDate ? new Date(e.examDate).toISOString().split('T')[0] : '',
-            totalScore: e.totalScore,
-            maxScore: e.maxScore,
+            totalScore: e.totalScore !== null && e.totalScore !== undefined ? Number(Number(e.totalScore).toFixed(1)) : null,
+            maxScore: 100,
             grade: e.grade || '',
-            teacherNotes: e.teacherNotes || '',
-            aiFeedback: e.aiFeedback || '',
+            teacherNotes: combinedNotes,
+            aiFeedback: e.commentDev || '',
+            comments,
             scores,
           };
         }),

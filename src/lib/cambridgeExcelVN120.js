@@ -13,7 +13,7 @@ export async function generateVN120ExcelBuffer({ batch, candidates = [] }) {
   wb.modified = new Date();
 
   const examDateFormatted = batch?.examDate
-    ? new Date(batch.examDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    ? new Date(batch.examDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })
     : '';
 
   const centerName = batch?.centerName || CAMBRIDGE_CONFIG.TEN_TRUNG_TAM;
@@ -150,9 +150,9 @@ export async function generateVN120ExcelBuffer({ batch, candidates = [] }) {
 
     let dobStr = c.dobStr || '';
     if (!dobStr && c.dob) {
-      dobStr = new Date(c.dob).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      dobStr = new Date(c.dob).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
     }
-    const dobFormatted = dobStr ? `'${dobStr}` : '';
+    const dobFormatted = dobStr ? String(dobStr).replace(/^'+/, '') : '';
 
     const level = (c.level || '').toUpperCase().trim();
     const note = c.receiptCode ? `BL: ${c.receiptCode}` : (c.notes || '');
@@ -166,6 +166,7 @@ export async function generateVN120ExcelBuffer({ batch, candidates = [] }) {
       level,
       note
     ];
+    row.getCell(5).numFmt = '@'; // Định dạng văn bản thuần dd/mm/yyyy không cần ký tự nháy đơn thừa
     row.height = 24;
 
     for (let col = 1; col <= 7; col++) {

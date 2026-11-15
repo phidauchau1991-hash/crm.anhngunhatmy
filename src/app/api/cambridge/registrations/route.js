@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { removeVietnameseTones, generateReceiptCode, DEFAULT_LEVELS_CONFIG } from '@/lib/cambridgeHelper';
+import { removeVietnameseTones, parseBatchLevels, DEFAULT_LEVELS_CONFIG } from '@/lib/cambridgeHelper';
+import { findMatchedStudentForCambridge, generateNextCambridgeReceiptCode } from '@/lib/cambridgeServer';
 
 // GET: Lấy danh sách thí sinh đăng ký Cambridge
 export async function GET(request) {
@@ -105,17 +106,11 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Đợt thi không tồn tại' }, { status: 404 });
     }
 
-    // Tính học phí nếu chưa truyền
+    // Tính học phí nếu chưa truyền (hỗ trợ cả cấu trúc levelsConfig mới lẫn cũ)
     let candidateFee = Number(fee);
     if (!candidateFee || candidateFee <= 0) {
-      try {
-        const levels = typeof batch.levelsConfig === 'string'
-          ? JSON.parse(batch.levelsConfig)
-          : (batch.levelsConfig || DEFAULT_LEVELS_CONFIG);
-        candidateFee = Number(levels[level]) || DEFAULT_LEVELS_CONFIG[level] || 1200000;
-      } catch (e) {
-        candidateFee = DEFAULT_LEVELS_CONFIG[level] || 1200000;
-      }
+      const { fees } = parseBatchLevels(batch.levelsConfig);
+      candidateFee = Number(fees[level]) || DEFAULT_LEVELS_CONFIG[level] || 1200000;
     }
 
     // Chuẩn hóa tên viết hoa và không dấu theo chuẩn Cambridge & VN120
@@ -134,23 +129,11 @@ export async function POST(request) {
       dobStr = `${d}/${m}/${y}`;
     }
 
-    // Tự động tìm học viên trong CRM nếu chưa truyền studentId
+    // Tự động tìm học viên trong CRM an toàn nếu chưa truyền studentId
     let finalStudentId = studentId;
     try {
       if (!finalStudentId && (parentPhone || fullNameUpper)) {
-        const cleanPhone = parentPhone ? parentPhone.replace(/[^0-9]/g, '') : '';
-        const searchConditions = [];
-        if (cleanPhone) searchConditions.push({ phone: cleanPhone });
-        if (fullNameUpper) searchConditions.push({ name: fullNameUpper });
-        if (searchConditions.length > 0) {
-          const matched = await prisma.student.findFirst({
-            where: { OR: searchConditions },
-            select: { id: true }
-          });
-          if (matched) {
-            finalStudentId = matched.id;
-          }
-        }
+        finalStudentId = await findMatchedStudentForCambridge(prisma, { fullNameUpper, parentPhone });
       }
     } catch (e) {
       console.warn('Lỗi tìm kiếm học viên CRM:', e?.message);
@@ -214,20 +197,9 @@ export async function PATCH(request) {
 
       if (paymentStatus === 'DA_DONG') {
         dataToUpdate.paymentDate = new Date();
-        // Nếu chưa có mã biên lai thì tự động sinh
+        // Nếu chưa có mã biên lai thì tự động sinh không trùng lặp
         if (!existing.receiptCode) {
-          const now = new Date();
-          const yy = String(now.getFullYear()).slice(-2);
-          const mm = String(now.getMonth() + 1).padStart(2, '0');
-          const dd = String(now.getDate()).padStart(2, '0');
-          const todayPrefix = `BL-CAM-${yy}${mm}${dd}-`;
-
-          const countToday = await prisma.cambridgeRegistration.count({
-            where: {
-              receiptCode: { startsWith: todayPrefix }
-            }
-          });
-          dataToUpdate.receiptCode = generateReceiptCode(now, countToday + 1);
+          dataToUpdate.receiptCode = await generateNextCambridgeReceiptCode(prisma, new Date());
         }
       } else if (paymentStatus === 'CHUA_DONG') {
         dataToUpdate.paymentDate = null;
@@ -236,9 +208,12 @@ export async function PATCH(request) {
 
     // Các trường cập nhật khác
     if (updateFields.fullName !== undefined) {
-      dataToUpdate.fullName = updateFields.fullName.trim();
-      dataToUpdate.fullNameNoTone = removeVietnameseTones(updateFields.fullName);
-      dataToUpdate.transferContent = `CAM - ${dataToUpdate.fullNameNoTone}`;
+      const upperName = updateFields.fullName.trim().toUpperCase();
+      dataToUpdate.fullName = upperName;
+      dataToUpdate.fullNameNoTone = removeVietnameseTones(upperName);
+      if (existing.paymentStatus !== 'DA_DONG' && paymentStatus !== 'DA_DONG') {
+        dataToUpdate.transferContent = `CAM - ${dataToUpdate.fullNameNoTone}`;
+      }
     }
     if (updateFields.gender !== undefined) dataToUpdate.gender = updateFields.gender;
     if (updateFields.dob !== undefined) {
