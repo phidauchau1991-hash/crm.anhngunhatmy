@@ -100,6 +100,9 @@ export async function GET(request) {
           include: {
             class: true,
           },
+          orderBy: {
+            id: 'desc',
+          },
         },
         orders: true,
       },
@@ -129,9 +132,14 @@ export async function GET(request) {
         }
       }
 
-      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn học phí khác, lấy đơn học phí mới nhất
+      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn học phí khác (chỉ fallback sang đơn chưa gắn mã lớp hoặc khi xem tất cả lớp)
       if (!targetOrder && tuitionOrders.length > 0) {
-        targetOrder = [...tuitionOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        const fallbackOrders = targetClassCode
+          ? tuitionOrders.filter(o => !o.classCode)
+          : tuitionOrders;
+        if (fallbackOrders.length > 0) {
+          targetOrder = [...fallbackOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        }
       }
 
       let totalToPay = 0;

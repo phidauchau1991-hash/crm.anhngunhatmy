@@ -346,13 +346,35 @@ export default function StudentsPage() {
     setTransferPreview(null);
 
     try {
-      const res = await fetch(`/api/students/${studentId}`);
+      const classQuery = classFilter && classFilter !== 'all' ? `?classCode=${encodeURIComponent(classFilter)}` : '';
+      const res = await fetch(`/api/students/${studentId}${classQuery}`);
       const result = await res.json();
       if (result.success) {
         setEditStudentData(result.data);
         
         const std = result.data.student;
         const currentClassPaid = result.data.currentClass?.amountPaid || 0;
+        const currentClassFee = result.data.currentClass?.feeToPay || 0;
+        const currentClassDebt = Math.max(0, currentClassFee - currentClassPaid);
+        const totalUnpaidDebt = (result.data.orders || [])
+          .filter(o => !String(o.id).startsWith('ORD_BK') && (o.feeToPay || 0) > (o.amountPaid || 0))
+          .reduce((sum, o) => sum + ((o.feeToPay || 0) - (o.amountPaid || 0)), 0);
+        const initialCollectDebt = currentClassDebt > 0 ? currentClassDebt : totalUnpaidDebt;
+
+        setPaymentForm({
+          collectAmount: initialCollectDebt > 0 ? formatNumber(initialCollectDebt) : '',
+          paymentMethod: 'Chuyển khoản',
+          notes: '',
+          includeItem: false,
+          itemId: '',
+          itemDistributionType: 'TANG_KEM_KHOA',
+          itemPrice: '0',
+          itemQuantity: 1,
+          includeGift: false,
+          giftId: '',
+          giftQuantity: 1,
+        });
+
         setEditForm({
           name: std.name || '',
           phone: std.phone || '',
@@ -672,7 +694,8 @@ export default function StudentsPage() {
   const refreshEditData = async () => {
     if (!selectedStudentId) return;
     try {
-      const res = await fetch(`/api/students/${selectedStudentId}`);
+      const classQuery = classFilter && classFilter !== 'all' ? `?classCode=${encodeURIComponent(classFilter)}` : '';
+      const res = await fetch(`/api/students/${selectedStudentId}${classQuery}`);
       const result = await res.json();
       if (result.success) {
         setEditStudentData(result.data);
@@ -751,6 +774,9 @@ export default function StudentsPage() {
       const isBookGift = paymentForm.itemDistributionType === 'TANG_KEM_KHOA';
       const parsedItemPrice = isBookGift ? 0 : parseNumber(paymentForm.itemPrice);
 
+      const targetClassCode = editStudentData?.currentClass?.classCode || null;
+      const targetOrderId = editStudentData?.currentClass?.orderId || null;
+
       const res = await fetch(`/api/students/${selectedStudentId}`, {
         method: 'PUT',
         headers: {
@@ -758,6 +784,8 @@ export default function StudentsPage() {
         },
         body: JSON.stringify({
           action: 'collectTuition',
+          targetOrderId,
+          classCode: targetClassCode,
           amountPaid: parseNumber(paymentForm.collectAmount),
           paymentMethod: paymentForm.paymentMethod,
           notes: paymentForm.notes,
@@ -777,10 +805,11 @@ export default function StudentsPage() {
         setMessage({ type: 'success', text: `Ghi nhận thu tiền học phí & giáo trình/tặng phẩm thành công!` });
         fetchStudents();
         fetchConfigsAndClasses();
+        refreshEditData();
         
         const studentName = editStudentData?.student?.name || 'Học viên';
         const totalCourseFee = editStudentData?.orders?.reduce((sum, o) => sum + (o.feeToPay || 0), 0) || 0;
-        const oldDebt = editStudentData?.orders?.reduce((sum, o) => sum + ((o.feeToPay || 0) - (o.amountPaid || 0)), 0) || 0;
+        const clientOldDebt = editStudentData?.orders?.reduce((sum, o) => sum + Math.max(0, (o.feeToPay || 0) - (o.amountPaid || 0)), 0) || 0;
         const totalPaid = parseNumber(paymentForm.collectAmount);
         
         const receiptItems = [];
@@ -827,8 +856,11 @@ export default function StudentsPage() {
           });
         }
 
-        const tuitionPaid = Math.max(0, totalPaid - bookCost);
-        const remainingDebt = Math.max(0, oldDebt - tuitionPaid);
+        const summary = result.receiptSummary;
+        const oldDebt = summary?.oldDebt !== undefined ? summary.oldDebt : clientOldDebt;
+        const tuitionPaid = summary?.tuitionPaid !== undefined ? summary.tuitionPaid : Math.max(0, totalPaid - bookCost);
+        const remainingDebt = summary?.remainingDebt !== undefined ? summary.remainingDebt : Math.max(0, oldDebt - tuitionPaid);
+        const finalTotalPaid = summary?.totalCollected !== undefined ? summary.totalCollected : totalPaid;
         const receiptCode = result.receiptCode || `PT-${new Date().toISOString().replace(/[-:T]/g, '').slice(2, 10)}`;
         
         setEReceiptData({
@@ -841,7 +873,7 @@ export default function StudentsPage() {
           items: receiptItems,
           bookName,
           bookCost,
-          totalPaid,
+          totalPaid: finalTotalPaid,
           date: new Date().toLocaleDateString('vi-VN'),
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           cashier: 'Thu ngân / Kế toán',
@@ -2073,7 +2105,24 @@ export default function StudentsPage() {
                                          type="checkbox" 
                                          id="includeItem" 
                                          checked={paymentForm.includeItem} 
-                                         onChange={(e) => setPaymentForm(prev => ({ ...prev, includeItem: e.target.checked }))} 
+                                         onChange={(e) => {
+                                           const checked = e.target.checked;
+                                           setPaymentForm(prev => {
+                                             const oldBookCost = (prev.includeItem && prev.itemDistributionType === 'BAN')
+                                               ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
+                                               : 0;
+                                             const newBookCost = (checked && prev.itemDistributionType === 'BAN')
+                                               ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
+                                               : 0;
+                                             const currentTotal = parseNumber(prev.collectAmount);
+                                             const nextTotal = Math.max(0, currentTotal - oldBookCost + newBookCost);
+                                             return {
+                                               ...prev,
+                                               includeItem: checked,
+                                               collectAmount: nextTotal > 0 ? formatNumber(nextTotal) : prev.collectAmount,
+                                             };
+                                           });
+                                         }} 
                                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                                        />
                                        <label htmlFor="includeItem" style={{ fontWeight: '700', color: 'var(--color-primary-dark)', cursor: 'pointer', margin: 0 }}>
@@ -2088,7 +2137,19 @@ export default function StudentsPage() {
                                            <button
                                              type="button"
                                              onClick={() => {
-                                               setPaymentForm(prev => ({ ...prev, itemDistributionType: 'TANG_KEM_KHOA', itemPrice: '0' }));
+                                               setPaymentForm(prev => {
+                                                 const oldBookCost = prev.itemDistributionType === 'BAN'
+                                                   ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
+                                                   : 0;
+                                                 const currentTotal = parseNumber(prev.collectAmount);
+                                                 const nextTotal = Math.max(0, currentTotal - oldBookCost);
+                                                 return {
+                                                   ...prev,
+                                                   itemDistributionType: 'TANG_KEM_KHOA',
+                                                   itemPrice: '0',
+                                                   collectAmount: nextTotal > 0 ? formatNumber(nextTotal) : prev.collectAmount,
+                                                 };
+                                               });
                                              }}
                                              style={{
                                                flex: 1,
@@ -2114,8 +2175,20 @@ export default function StudentsPage() {
                                                setPaymentForm(prev => {
                                                  const item = inventoryItems.find(i => i.id === prev.itemId);
                                                  const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                                 const defaultPrice = cfg?.bookPrice || 200000;
-                                                 return { ...prev, itemDistributionType: 'BAN', itemPrice: formatNumber(defaultPrice) };
+                                                 const defaultPrice = cfg?.bookPrice || (item?.id === 'GT_STARTERS_1234' ? 250000 : 200000);
+                                                 const qty = parseInt(prev.itemQuantity, 10) || 1;
+                                                 const oldBookCost = prev.itemDistributionType === 'BAN'
+                                                   ? parseNumber(prev.itemPrice) * qty
+                                                   : 0;
+                                                 const newBookCost = prev.itemId ? (defaultPrice * qty) : 0;
+                                                 const currentTotal = parseNumber(prev.collectAmount);
+                                                 const nextTotal = Math.max(0, currentTotal - oldBookCost + newBookCost);
+                                                 return {
+                                                   ...prev,
+                                                   itemDistributionType: 'BAN',
+                                                   itemPrice: formatNumber(defaultPrice),
+                                                   collectAmount: nextTotal > 0 ? formatNumber(nextTotal) : prev.collectAmount,
+                                                 };
                                                });
                                              }}
                                              style={{
@@ -2147,12 +2220,24 @@ export default function StudentsPage() {
                                                  const selectedId = e.target.value;
                                                  const item = inventoryItems.find(i => i.id === selectedId);
                                                  const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                                 const defaultPrice = cfg?.bookPrice || 0;
-                                                 setPaymentForm(prev => ({
-                                                   ...prev,
-                                                   itemId: selectedId,
-                                                   itemPrice: prev.itemDistributionType === 'TANG_KEM_KHOA' ? '0' : formatNumber(defaultPrice),
-                                                 }));
+                                                 const defaultPrice = cfg?.bookPrice || (selectedId === 'GT_STARTERS_1234' ? 250000 : 200000);
+                                                 setPaymentForm(prev => {
+                                                   const qty = parseInt(prev.itemQuantity, 10) || 1;
+                                                   const oldBookCost = (prev.itemDistributionType === 'BAN' && prev.itemId)
+                                                     ? parseNumber(prev.itemPrice) * qty
+                                                     : 0;
+                                                   const newBookCost = (prev.itemDistributionType === 'BAN' && selectedId)
+                                                     ? defaultPrice * qty
+                                                     : 0;
+                                                   const currentTotal = parseNumber(prev.collectAmount);
+                                                   const nextTotal = Math.max(0, currentTotal - oldBookCost + newBookCost);
+                                                   return {
+                                                     ...prev,
+                                                     itemId: selectedId,
+                                                     itemPrice: prev.itemDistributionType === 'TANG_KEM_KHOA' ? '0' : formatNumber(defaultPrice),
+                                                     collectAmount: nextTotal > 0 ? formatNumber(nextTotal) : prev.collectAmount,
+                                                   };
+                                                 });
                                                }}
                                              >
                                                <option value="">-- Chọn giáo trình trong kho --</option>
@@ -2239,6 +2324,28 @@ export default function StudentsPage() {
                                    </div>
 
                                  </div>
+
+                                 {paymentForm.includeItem && paymentForm.itemDistributionType === 'BAN' && parseNumber(paymentForm.collectAmount) > 0 && (() => {
+                                   const bookAmt = parseNumber(paymentForm.itemPrice) * (parseInt(paymentForm.itemQuantity, 10) || 1);
+                                   const totalAmt = parseNumber(paymentForm.collectAmount);
+                                   const tuitionAmt = Math.max(0, totalAmt - bookAmt);
+                                   return (
+                                     <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', borderRadius: '8px', background: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.84rem', color: '#1E3A8A' }}>
+                                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                         <span>Học phí thực thu vào hóa đơn:</span>
+                                         <strong>{tuitionAmt.toLocaleString('vi-VN')}đ</strong>
+                                       </div>
+                                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                         <span>Tiền giáo trình bán kèm:</span>
+                                         <strong>+ {bookAmt.toLocaleString('vi-VN')}đ</strong>
+                                       </div>
+                                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #93C5FD', paddingTop: '0.25rem', fontWeight: '800', color: '#085E8A' }}>
+                                         <span>Tổng thu thực tế đợt này:</span>
+                                         <span>{totalAmt.toLocaleString('vi-VN')}đ</span>
+                                       </div>
+                                     </div>
+                                   );
+                                 })()}
 
                                  <div className="form-group" style={{ marginTop: '0.75rem' }}>
                                   <label>Ghi chú thu tiền</label>

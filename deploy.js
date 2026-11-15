@@ -49,14 +49,14 @@ async function deploy() {
     console.log(result.stdout);
     if (result.stderr) console.error(result.stderr);
 
-    console.log('3.1. Đang sao lưu CSDL an toàn trên VPS trước khi cập nhật...');
-    const backupCmd = 'TIMESTAMP=$(date +"%Y%m%d_%H%M%S") && cp /var/www/nhat-my-crm/dev.db /var/www/nhat-my-crm/dev.db.backup_$TIMESTAMP && echo "Đã tạo bản sao lưu VPS: dev.db.backup_$TIMESTAMP"';
+    console.log('3.1. Đang đồng bộ WAL và sao lưu CSDL an toàn trên VPS trước khi cập nhật...');
+    const backupCmd = `cd /var/www/nhat-my-crm && node -e "const D=require('better-sqlite3');const db=new D('/var/www/nhat-my-crm/dev.db');db.pragma('wal_checkpoint(PASSIVE)');db.close();" && TIMESTAMP=$(date +"%Y%m%d_%H%M%S") && cp /var/www/nhat-my-crm/dev.db /var/www/nhat-my-crm/dev.db.backup_$TIMESTAMP && echo "Đã tạo bản sao lưu VPS: dev.db.backup_$TIMESTAMP"`;
     const backupResult = await ssh.execCommand(backupCmd);
     console.log(backupResult.stdout);
     if (backupResult.stderr) console.error(backupResult.stderr);
 
-    console.log('4. Đang cài đặt dependencies và đồng bộ cấu trúc bảng CSDL an toàn...');
-    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npm install && node scripts/migrate-inventory-cost.js && node scripts/migrate-courseware-fields.js && node scripts/fix-s4-enrollments.js && npx prisma generate && npx prisma db push --accept-data-loss && rm -rf .next && npm run build');
+    console.log('4. Đang cài đặt dependencies và biên dịch hệ thống an toàn...');
+    const dbPushResult = await ssh.execCommand('cd /var/www/nhat-my-crm && npm install && node scripts/migrate-inventory-cost.js && node scripts/migrate-courseware-fields.js && npx prisma generate && npm run build');
     console.log(dbPushResult.stdout);
     if (dbPushResult.stderr) console.error(dbPushResult.stderr);
 

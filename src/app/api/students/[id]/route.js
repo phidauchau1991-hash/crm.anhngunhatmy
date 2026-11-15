@@ -12,6 +12,9 @@ export async function GET(request, { params }) {
     const resolvedParams = await params;
     const { id } = resolvedParams;
 
+    const { searchParams } = new URL(request.url);
+    const requestedClassCode = searchParams.get('classCode');
+
     const student = await prisma.student.findUnique({
       where: { id },
       include: {
@@ -19,6 +22,9 @@ export async function GET(request, { params }) {
           where: { status: 'Đang học' },
           include: {
             class: true,
+          },
+          orderBy: {
+            id: 'desc',
           },
         },
         orders: true,
@@ -29,8 +35,10 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy học viên' }, { status: 404 });
     }
 
-    // Lấy thông tin lớp học hiện tại
-    const currentEnrollment = student.enrollments[0];
+    // Lấy thông tin lớp học hiện tại (ưu tiên lớp theo bộ lọc nếu đang chọn, ngược lại lấy lớp mới nhất)
+    const currentEnrollment = (requestedClassCode && requestedClassCode !== 'all'
+      ? student.enrollments.find(e => e.classCode === requestedClassCode)
+      : null) || student.enrollments[0];
     let classDetails = null;
 
     if (currentEnrollment) {
@@ -48,16 +56,20 @@ export async function GET(request, { params }) {
         },
       }) : 0;
 
-      // Tổng số tiền đã đóng cho lớp này
-      const order = student.orders.find(o => o.classCode === (classInfo?.code || currentEnrollment.classCode));
+      // Tổng số tiền đã đóng cho lớp này (loại trừ đơn sách ORD_BK, ưu tiên đơn mới nhất của lớp)
+      const targetClass = classInfo?.code || currentEnrollment.classCode;
+      const order = student.orders
+        .filter(o => !o.id.startsWith('ORD_BK') && o.classCode === targetClass)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
       classDetails = {
-        classCode: classInfo?.code || currentEnrollment.classCode,
+        classCode: targetClass,
         level: classInfo?.level || 'N/A',
         teacherName: classInfo?.teacherName || 'N/A',
         totalSessions: config?.totalSessions || 32,
         price: config?.price || 0,
         attendedSessions,
+        orderId: order ? order.id : null,
         amountPaid: order ? order.amountPaid : 0,
         feeToPay: order ? order.feeToPay : 0,
         billingType: currentEnrollment.billingType,
@@ -154,7 +166,8 @@ export async function PUT(request, { params }) {
       where: { id },
       include: {
         enrollments: {
-          where: { status: 'Đang học' }
+          where: { status: 'Đang học' },
+          orderBy: { id: 'desc' },
         },
         orders: true,
       },
@@ -297,30 +310,43 @@ export async function PUT(request, { params }) {
       const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
       const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
       const receiptCode = `PT-${timestamp.slice(2, 8)}-${randomStr}`;
+      const activeClassCode = body.classCode || student.enrollments[0]?.classCode || null;
+
+      let totalTuitionApplied = 0;
+      let oldDebtBeforePayment = 0;
+      let remainingDebtAfterPayment = 0;
 
       await prisma.$transaction(async (tx) => {
-        // 1. Thu tiền học phí (Ưu tiên đơn hàng chỉ định targetOrderId, sau đó theo thứ tự FIFO)
+        // 1. Thu tiền học phí (Ưu tiên đơn hàng chỉ định targetOrderId -> đơn lớp đang học -> FIFO theo công nợ thực tế)
         if (tuitionPayment > 0) {
-          let unpaidOrders = [];
-          if (body.targetOrderId) {
-            const specificOrder = await tx.orderFinance.findUnique({
-              where: { id: body.targetOrderId }
-            });
-            if (specificOrder && (specificOrder.feeToPay - specificOrder.amountPaid > 0)) {
-              unpaidOrders.push(specificOrder);
-            }
-          }
-
-          const otherUnpaidOrders = await tx.orderFinance.findMany({
-            where: {
-              studentId: id,
-              id: body.targetOrderId ? { not: body.targetOrderId } : undefined,
-              paymentStatus: { in: ['Chưa đóng', 'Chưa đóng đủ'] },
-            },
+          const allStudentOrders = await tx.orderFinance.findMany({
+            where: { studentId: id },
             orderBy: { createdAt: 'asc' },
           });
 
-          unpaidOrders = [...unpaidOrders, ...otherUnpaidOrders];
+          const rawUnpaidOrders = allStudentOrders.filter(
+            o => !o.id.startsWith('ORD_BK') && (o.feeToPay - o.amountPaid) > 0
+          );
+
+          const unpaidOrders = [...rawUnpaidOrders].sort((a, b) => {
+            if (body.targetOrderId) {
+              if (a.id === body.targetOrderId && b.id !== body.targetOrderId) return -1;
+              if (b.id === body.targetOrderId && a.id !== body.targetOrderId) return 1;
+            }
+            if (activeClassCode) {
+              const aMatch = a.classCode === activeClassCode ? 1 : 0;
+              const bMatch = b.classCode === activeClassCode ? 1 : 0;
+              if (aMatch !== bMatch) return bMatch - aMatch;
+            }
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
+
+          if (unpaidOrders.length === 0) {
+            throw new Error('Không tìm thấy hóa đơn học phí cần thu của học viên này (hoặc học viên đã đóng đủ học phí trước đó).');
+          }
+
+          const primaryOrder = unpaidOrders[0];
+          oldDebtBeforePayment = Math.max(0, primaryOrder.feeToPay - primaryOrder.amountPaid);
 
           let remainingPayment = tuitionPayment;
           for (const order of unpaidOrders) {
@@ -344,19 +370,29 @@ export async function PUT(request, { params }) {
               },
             });
 
-            // Lịch sử thanh toán
+            // Lịch sử thanh toán (kèm mã phiếu thu để đối soát)
             await tx.paymentLog.create({
               data: {
                 orderId: order.id,
                 amount: payForThisOrder,
                 paymentMethod: paymentMethod || 'Tiền mặt',
-                notes: notes || 'Thu học phí'
+                notes: notes ? `${notes} (${receiptCode})` : `Thu học phí (${receiptCode})`
               }
             });
 
             updatedOrders.push(updated);
+            totalTuitionApplied += payForThisOrder;
             remainingPayment -= payForThisOrder;
           }
+
+          if (totalTuitionApplied <= 0) {
+            throw new Error('Không thể áp dụng khoản thu học phí vào hóa đơn. Vui lòng tải lại trang và thử lại.');
+          }
+
+          const updatedPrimary = updatedOrders.find(o => o.id === primaryOrder.id);
+          remainingDebtAfterPayment = updatedPrimary
+            ? Math.max(0, updatedPrimary.feeToPay - updatedPrimary.amountPaid)
+            : Math.max(0, oldDebtBeforePayment - totalTuitionApplied);
         }
 
         // 2. Xuất bán hoặc Tặng kèm Giáo trình / Sách
@@ -394,7 +430,7 @@ export async function PUT(request, { params }) {
           // Nếu có thu tiền giáo trình, tự động tạo hóa đơn tài chính
           if (totalItemCost > 0) {
             const currentEnrollment = student.enrollments[0];
-            const classCode = currentEnrollment?.classCode || 'THU_GIAO_TRINH';
+            const classCode = activeClassCode || currentEnrollment?.classCode || 'THU_GIAO_TRINH';
             const year = String(now.getFullYear()).substring(2);
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const orderId = `ORD_BK_${year}${month}_${randomStr}`;
@@ -448,11 +484,25 @@ export async function PUT(request, { params }) {
         }
       });
 
+      // Đồng bộ tức thì dữ liệu từ bộ nhớ đệm WAL xuống file dev.db vật lý để chống mất dữ liệu
+      try {
+        await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+      } catch (walErr) {
+        console.warn('WAL checkpoint warning:', walErr?.message);
+      }
+
       return NextResponse.json({ 
         success: true, 
         message: `Ghi nhận thu tiền thành công!`,
         data: updatedOrders,
-        receiptCode
+        receiptCode,
+        receiptSummary: {
+          oldDebt: oldDebtBeforePayment,
+          tuitionPaid: totalTuitionApplied,
+          remainingDebt: remainingDebtAfterPayment,
+          totalItemCost,
+          totalCollected: totalTuitionApplied + totalItemCost,
+        }
       });
     }
 

@@ -180,6 +180,7 @@ export default function FinancePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'collectTuition',
+          targetOrderId: collectForm.orderId,
           amountPaid: parseNumber(collectForm.collectAmount),
           paymentMethod: collectForm.paymentMethod,
           notes: collectForm.notes,
