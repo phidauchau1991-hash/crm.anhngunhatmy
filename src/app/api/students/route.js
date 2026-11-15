@@ -55,26 +55,39 @@ export async function GET(request) {
     }
 
     if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { id: { contains: search } },
-        { phone: { contains: search } },
-        { nationalId: { contains: search } },
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { name: { contains: search } },
+            { id: { contains: search } },
+            { phone: { contains: search } },
+            { nationalId: { contains: search } },
+          ],
+        },
       ];
     }
 
     if (studentStatus && studentStatus !== 'all') {
       if (studentStatus === 'Nghỉ luôn' || studentStatus === 'Thôi học') {
-        where.OR = [
-          ...(where.OR || []),
-          { status: 'Nghỉ luôn' },
-          { status: 'Thôi học' }
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { status: 'Nghỉ luôn' },
+              { status: 'Thôi học' },
+            ],
+          },
         ];
       } else if (studentStatus === 'Đang học') {
-        where.OR = [
-          ...(where.OR || []),
-          { status: 'Đang học' },
-          { status: 'Ä ang há» c' }
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { status: 'Đang học' },
+              { status: 'Ä ang há» c' },
+            ],
+          },
         ];
       } else {
         where.status = studentStatus;
@@ -88,8 +101,8 @@ export async function GET(request) {
     }
 
     const enrollmentWhere = includeHistorical
-      ? { status: { in: ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã hoàn thành', 'Tạm nghỉ'] } }
-      : { status: 'Đang học' };
+      ? { status: { in: ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã chuyển lớp', 'Đã hoàn thành', 'Tạm nghỉ'] } }
+      : { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } };
 
     // Lấy danh sách học viên
     const students = await prisma.student.findMany({
@@ -105,6 +118,10 @@ export async function GET(request) {
           },
         },
         orders: true,
+        tutoringPlans: {
+          where: { status: 'ACTIVE' },
+          orderBy: { id: 'desc' },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -114,8 +131,11 @@ export async function GET(request) {
     // Tính toán trạng thái thanh toán và thông tin hiển thị cho từng học viên theo ngữ cảnh lớp học
     const formattedStudents = students.map((student) => {
       // Xác định lớp học mục tiêu theo ngữ cảnh: Nếu có lọc classCode cụ thể thì dùng classCode đó,
-      // ngược lại dùng lớp đang học (status = 'Đang học') hoặc lớp đầu tiên trong danh sách enrollment
-      const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
+      // ngược lại ưu tiên lớp đang học (status = 'Đang học'), sau đó tới lớp Bảo lưu/Tạm nghỉ hoặc lớp đầu tiên
+      const activeEnrollment =
+        student.enrollments.find(e => e.status === 'Đang học') ||
+        student.enrollments.find(e => e.status === 'Bảo lưu' || e.status === 'Tạm nghỉ') ||
+        student.enrollments[0];
       const targetClassCode = (classCode && classCode !== 'all') ? classCode : activeEnrollment?.classCode;
 
       // Tách bạch hoàn toàn Đơn học phí và Đơn giáo trình/vật tư
@@ -191,11 +211,16 @@ export async function GET(request) {
         cleanStatus = 'Đang học';
       }
 
+      const activeTutoring = student.tutoringPlans?.[0];
+      const fallbackClassDisplay = activeTutoring
+        ? `Kèm 1-1 (${activeTutoring.level})`
+        : 'Chưa xếp lớp';
+
       return {
         id: student.id,
         name: student.name,
         phone: student.phone || 'N/A',
-        dob: student.dob ? new Date(student.dob).toLocaleDateString('vi-VN') : 'N/A',
+        dob: student.dob ? new Date(student.dob).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A',
         dobRaw: student.dob,
         address: student.address || 'N/A',
         nationalId: student.nationalId || 'N/A',
@@ -203,10 +228,10 @@ export async function GET(request) {
         specialPolicyType: student.specialPolicyType || 'Không giảm',
         specialPolicyValue: student.specialPolicyValue || 0,
         referralCode: student.referralCode || 'N/A',
-        classCode: targetClassCode || student.enrollments[0]?.classCode || 'Chưa xếp lớp',
-        className: student.enrollments[0]?.class?.teacherName 
-          ? `${student.enrollments[0]?.classCode} (${student.enrollments[0]?.class?.teacherName})`
-          : 'Chưa xếp lớp',
+        classCode: targetClassCode || activeEnrollment?.classCode || fallbackClassDisplay,
+        className: activeEnrollment?.class?.teacherName 
+          ? `${activeEnrollment?.classCode} (${activeEnrollment?.class?.teacherName})`
+          : fallbackClassDisplay,
         totalToPay,
         totalPaid,
         debt,
@@ -262,8 +287,23 @@ export async function GET(request) {
 
     // Tính toán summary số lượng học viên theo trạng thái
     let summaryWhere = { ...branchFilter };
-    if (search) summaryWhere.OR = where.OR;
-    if (classCode && classCode !== 'all') summaryWhere.enrollments = { some: { classCode: classCode, status: { in: ['Đang học', 'Bảo lưu'] } } };
+    const summaryAnd = [];
+    if (search) {
+      summaryAnd.push({
+        OR: [
+          { name: { contains: search } },
+          { id: { contains: search } },
+          { phone: { contains: search } },
+          { nationalId: { contains: search } },
+        ],
+      });
+    }
+    if (classCode && classCode !== 'all') {
+      summaryAnd.push({
+        enrollments: { some: { classCode: classCode, status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } } },
+      });
+    }
+    if (summaryAnd.length > 0) summaryWhere.AND = summaryAnd;
 
     const allMatchingStudents = await prisma.student.findMany({
       where: summaryWhere
@@ -518,6 +558,20 @@ export async function POST(request) {
               paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // Hạn 7 ngày
             },
           });
+
+          if (paidAmount > 0) {
+            const timestamp = now.toISOString().replace(/[-:T]/g, '').slice(2, 8);
+            const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const receiptCode = `PT-${timestamp}-${randomStr}`;
+            await prisma.paymentLog.create({
+              data: {
+                orderId,
+                amount: paidAmount,
+                paymentMethod: body.paymentMethod || 'Chuyển khoản',
+                notes: `Thu học phí khi ghi danh mới (${receiptCode})`,
+              },
+            });
+          }
         }
       }
     }
@@ -591,6 +645,10 @@ export async function POST(request) {
         });
       }
     }
+
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (e) {}
 
     return NextResponse.json({ success: true, data: newStudent });
   } catch (error) {

@@ -134,7 +134,7 @@ export default function ParentPortalPage() {
   }
 
   const { student, stats, enrollments = [], attendanceHistory = [], inventoryLogs = [], assessments = [], examResults = [] } = data;
-  const currentEnrollment = enrollments[0]; // Active class enrollment
+  const currentEnrollment = enrollments.find(e => e.status === 'Đang học') || enrollments[0]; // Active class enrollment
 
   return (
     <div className="portal-container">
@@ -250,6 +250,11 @@ export default function ParentPortalPage() {
                   {stats.outstanding.toLocaleString('vi-VN')}đ
                 </span>
               </p>
+              {student.walletBalance > 0 && (
+                <p style={{ marginTop: '0.25rem', color: '#38bdf8', fontWeight: '700', fontSize: '0.78rem' }}>
+                  <i className="fa-solid fa-wallet"></i> Ví bảo lưu / Học phí dư: +{student.walletBalance.toLocaleString('vi-VN')}đ
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -292,9 +297,24 @@ export default function ParentPortalPage() {
               ) : (
                 enrollments.map((enroll) => (
                   <div key={enroll.id} className="class-grade-card">
-                    <h3 className="class-title-header">
-                      <i className="fa-solid fa-graduation-cap"></i> Lớp {enroll.classCode}
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <h3 className="class-title-header" style={{ margin: 0 }}>
+                        <i className="fa-solid fa-graduation-cap"></i> Lớp {enroll.classCode}
+                      </h3>
+                      <span
+                        style={{
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: enroll.status === 'Đang học' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
+                          color: enroll.status === 'Đang học' ? '#34d399' : '#94a3b8',
+                          border: enroll.status === 'Đang học' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(148, 163, 184, 0.3)',
+                        }}
+                      >
+                        {enroll.status === 'Đang học' ? '🟢 Đang theo học' : '✓ Khóa trước / Đã chuyển'}
+                      </span>
+                    </div>
 
                     {/* Midterm Grades */}
                     <div className="grades-section">

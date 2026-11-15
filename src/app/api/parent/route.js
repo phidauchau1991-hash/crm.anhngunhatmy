@@ -27,6 +27,9 @@ export async function GET(request) {
           include: {
             class: true,
           },
+          orderBy: {
+            id: 'desc',
+          },
         },
         orders: true,
         certificates: {
@@ -115,10 +118,21 @@ export async function GET(request) {
       presenceRate = Math.round((totalSessionsAttended / totalSessionsChecked) * 1000) / 10;
     }
 
-    const activeEnrollment = student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
+    // Sắp xếp enrollments sao cho lớp Đang học luôn đứng đầu (enrollments[0])
+    const sortedEnrollments = [...(student.enrollments || [])].sort((a, b) => {
+      const aActive = a.status === 'Đang học' ? 1 : 0;
+      const bActive = b.status === 'Đang học' ? 1 : 0;
+      if (aActive !== bActive) return bActive - aActive;
+      return b.id - a.id;
+    });
+
+    const activeEnrollment = sortedEnrollments.find(e => e.status === 'Đang học') || sortedEnrollments[0];
     const currentClassCode = activeEnrollment?.classCode;
     const tuitionOrders = student.orders.filter(o => !o.id.startsWith('ORD_BK'));
-    const currentOrder = currentClassCode ? tuitionOrders.find(o => o.classCode === currentClassCode) : (tuitionOrders[tuitionOrders.length - 1] || null);
+    const matchingClassOrders = currentClassCode ? tuitionOrders.filter(o => o.classCode === currentClassCode) : [];
+    const currentOrder = matchingClassOrders.length > 0
+      ? [...matchingClassOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+      : (tuitionOrders.length > 0 ? [...tuitionOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] : null);
 
     let totalToPay = 0;
     let totalPaid = 0;
@@ -170,12 +184,14 @@ export async function GET(request) {
           historicalDebt,
           allTimeTotalPaid,
         },
-        enrollments: student.enrollments.map(e => ({
+        enrollments: sortedEnrollments.map(e => ({
           id: e.id,
           classCode: e.classCode,
+          status: e.status || 'Đang học',
+          level: e.class?.level || '',
           teacherName: e.class?.teacherName || 'N/A',
-          startDate: e.class?.startDate ? new Date(e.class.startDate).toISOString().split('T')[0] : 'N/A',
-          expectedEndDate: e.class?.expectedEndDate ? new Date(e.class.expectedEndDate).toISOString().split('T')[0] : 'N/A',
+          startDate: e.class?.startDate ? new Date(e.class.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A',
+          expectedEndDate: e.class?.expectedEndDate ? new Date(e.class.expectedEndDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A',
           schedule: e.class?.schedule || '',
           midTermListening: e.midTermListening,
           midTermSpeaking: e.midTermSpeaking,

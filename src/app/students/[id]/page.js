@@ -20,6 +20,9 @@ export default async function StudentDetailPage({ params }) {
         include: {
           class: true,
         },
+        orderBy: {
+          id: 'desc',
+        },
       },
       orders: {
         include: {
@@ -45,6 +48,10 @@ export default async function StudentDetailPage({ params }) {
   }
 
   const encryptedToken = encryptStudentId(student.id);
+  const activeEnrollment =
+    student.enrollments?.find(e => e.status === 'Đang học') ||
+    student.enrollments?.[0] ||
+    null;
 
   // Lấy thêm assessments tạo từ giai đoạn Lead (nếu có bài test/học thử trước khi convert)
   let leadAssessments = [];
@@ -287,9 +294,9 @@ export default async function StudentDetailPage({ params }) {
             <div style={{ marginTop: '0.5rem', width: '100%' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>Sổ liên lạc điện tử: </span>
               <CopyLinkButton token={encryptedToken} />
-              <ReviewActionClient studentId={student.id} studentName={student.name} classCode={student.enrollments?.[0]?.classCode || ''} />
+              <ReviewActionClient studentId={student.id} studentName={student.name} classCode={activeEnrollment?.classCode || ''} />
               <TuitionNoticeAction student={student} />
-              <CoursewareStudentAction student={{ ...student, portalToken: encryptedToken }} classInfo={student.enrollments?.[0]?.class} />
+              <CoursewareStudentAction student={{ ...student, portalToken: encryptedToken, classCode: activeEnrollment?.classCode }} classInfo={activeEnrollment?.class} />
             </div>
           </div>
 

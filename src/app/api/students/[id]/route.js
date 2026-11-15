@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
       where: { id },
       include: {
         enrollments: {
-          where: { status: 'Đang học' },
+          where: { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } },
           include: {
             class: true,
           },
@@ -35,10 +35,10 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy học viên' }, { status: 404 });
     }
 
-    // Lấy thông tin lớp học hiện tại (ưu tiên lớp theo bộ lọc nếu đang chọn, ngược lại lấy lớp mới nhất)
+    // Lấy thông tin lớp học hiện tại (ưu tiên lớp theo bộ lọc nếu đang chọn, sau đó lớp Đang học, ngược lại lấy lớp Bảo lưu/Tạm nghỉ mới nhất)
     const currentEnrollment = (requestedClassCode && requestedClassCode !== 'all'
       ? student.enrollments.find(e => e.classCode === requestedClassCode)
-      : null) || student.enrollments[0];
+      : null) || student.enrollments.find(e => e.status === 'Đang học') || student.enrollments[0];
     let classDetails = null;
 
     if (currentEnrollment) {
@@ -166,12 +166,21 @@ export async function PUT(request, { params }) {
       where: { id },
       include: {
         enrollments: {
-          where: { status: 'Đang học' },
+          where: { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } },
           orderBy: { id: 'desc' },
         },
         orders: true,
       },
     });
+
+    if (student?.enrollments?.length > 1) {
+      student.enrollments.sort((a, b) => {
+        const aActive = a.status === 'Đang học' ? 1 : 0;
+        const bActive = b.status === 'Đang học' ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return b.id - a.id;
+      });
+    }
 
     if (!student) {
       // Kiểm tra xem có phải học viên học thử (Lead) với ID số nguyên hoặc LEAD_... không
@@ -598,8 +607,29 @@ export async function PUT(request, { params }) {
             where: { studentId: id, status: 'Đang học' },
             data: { status: status === 'Tạm nghỉ' ? 'Bảo lưu' : 'Nghỉ học' }
           });
+        } else if (status === 'Đang học') {
+          // Nếu học viên quay lại Đang học từ Tạm nghỉ / Bảo lưu mà chưa có lớp Đang học, khôi phục lớp Bảo lưu gần nhất
+          const activeEnr = await tx.enrollment.findFirst({
+            where: { studentId: id, status: 'Đang học' },
+          });
+          if (!activeEnr) {
+            const latestReserved = await tx.enrollment.findFirst({
+              where: { studentId: id, status: { in: ['Bảo lưu', 'Tạm nghỉ'] } },
+              orderBy: { id: 'desc' },
+            });
+            if (latestReserved) {
+              await tx.enrollment.update({
+                where: { id: latestReserved.id },
+                data: { status: 'Đang học' },
+              });
+            }
+          }
         }
       });
+
+      try {
+        await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+      } catch (e) {}
 
       return NextResponse.json({ success: true, message: `Đã chuyển trạng thái học viên thành "${status}" thành công!` });
     }
@@ -671,7 +701,15 @@ export async function PUT(request, { params }) {
         const proRatedTuitionNew = costPerSessionNew * sessionsRemainingNew;
 
         const specialDiscount = student.specialPolicyValue || 0;
-        const feeToPay = roundDown5000(Math.max(0, proRatedTuitionNew - specialDiscount));
+        let feeToPay = roundDown5000(Math.max(0, proRatedTuitionNew - specialDiscount));
+        let currentWallet = Math.ceil((student.walletBalance || 0) / 5000) * 5000;
+        let walletUsed = 0;
+
+        if (body.useWalletBalance && currentWallet > 0 && feeToPay > 0) {
+          walletUsed = Math.min(currentWallet, feeToPay);
+          feeToPay = roundDown5000(Math.max(0, feeToPay - walletUsed));
+          currentWallet = Math.max(0, currentWallet - walletUsed);
+        }
 
         await prisma.$transaction(async (tx) => {
           // 1. Tạo enrollment
@@ -683,25 +721,47 @@ export async function PUT(request, { params }) {
             },
           });
 
-          // 2. Tạo hóa đơn học phí khởi điểm
+          // 2. Tạo hóa đơn học phí khởi điểm (chống trùng ID nếu xếp lớp nhiều lần trong tháng)
           const year = String(now.getFullYear()).substring(2);
           const month = String(now.getMonth() + 1).padStart(2, '0');
-          const orderId = `ORD_${year}${month}_${id.split('_')[1]}`;
+          let orderId = `ORD_${year}${month}_${id.split('_')[1]}`;
+          if (student.orders.some(o => o.id === orderId)) {
+            const randSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+            orderId = `${orderId}_${randSuffix}`;
+          }
+
+          const walletNote = walletUsed > 0 ? ` [Đã cấn trừ Ví bảo lưu: -${walletUsed.toLocaleString('vi-VN')}đ]` : '';
 
           await tx.orderFinance.create({
             data: {
               id: orderId,
               studentId: id,
               classCode: newClassCode,
-              promoType: `Xếp lớp khởi điểm (Khấu trừ còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)`,
-              promoDiscount: newConfig.price - proRatedTuitionNew, // Ghi nhận phần khấu trừ như discount
+              promoType: `Xếp lớp khởi điểm (Khấu trừ còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${walletNote}`,
+              promoDiscount: (newConfig.price - proRatedTuitionNew) + walletUsed, // Ghi nhận phần khấu trừ như discount
               feeToPay: feeToPay,
               amountPaid: 0,
               paymentStatus: feeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',
+              paymentPolicy: 'Đóng trước',
               paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
             },
           });
+
+          await tx.student.update({
+            where: { id },
+            data: {
+              status: 'Đang học',
+              callbackDate: null,
+              reservationAmount: 0,
+              reservationDeadline: null,
+              walletBalance: currentWallet,
+            },
+          });
         });
+
+        try {
+          await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+        } catch (e) {}
 
         return NextResponse.json({
           success: true,
@@ -710,12 +770,14 @@ export async function PUT(request, { params }) {
             isInitialEnrollment: true,
             newClassCode,
             feeToPay,
+            walletUsed,
+            walletBalance: currentWallet,
           },
         });
       }
 
       const oldClassCode = currentEnrollment.classCode;
-      if (oldClassCode === newClassCode) {
+      if (oldClassCode === newClassCode && currentEnrollment.status === 'Đang học') {
         return NextResponse.json({ success: false, error: 'Lớp mới trùng với lớp hiện tại' }, { status: 400 });
       }
 
@@ -723,9 +785,9 @@ export async function PUT(request, { params }) {
       const oldClass = await prisma.class.findUnique({
         where: { code: oldClassCode },
       });
-      const oldConfig = await prisma.courseConfig.findUnique({
+      const oldConfig = oldClass ? await prisma.courseConfig.findUnique({
         where: { level: oldClass.level },
-      });
+      }) : null;
 
       // Số buổi đã điểm danh "Có mặt" ở lớp cũ
       const attendedSessions = await prisma.attendance.count({
@@ -736,8 +798,10 @@ export async function PUT(request, { params }) {
         },
       });
 
-      // Hóa đơn của lớp cũ để xem thực đóng
-      const oldOrder = student.orders.find(o => o.classCode === oldClassCode);
+      // Hóa đơn của lớp cũ để xem thực đóng (BẮT BUỘC loại trừ đơn sách ORD_BK, lấy đơn mới nhất)
+      const oldOrder = student.orders
+        .filter(o => !o.id.startsWith('ORD_BK') && o.classCode === oldClassCode)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
       const amountPaidOld = (body.overrideAmountPaidOld !== undefined && body.overrideAmountPaidOld !== null && body.overrideAmountPaidOld !== '')
         ? parseFloat(body.overrideAmountPaidOld)
         : (oldOrder ? oldOrder.amountPaid : 0);
@@ -823,11 +887,17 @@ export async function PUT(request, { params }) {
 
       let finalFeeToPay = 0;
       let finalAmountPaid = 0;
-      let newWalletBalance = student.walletBalance || 0;
+      let newWalletBalance = Math.ceil((student.walletBalance || 0) / 5000) * 5000;
+      let walletUsed = 0;
 
       if (difference > 0) {
         // Học phí lớp mới cao hơn -> Học sinh phải đóng thêm (Phát sinh công nợ)
         finalFeeToPay = roundDown5000(difference);
+        if (body.useWalletBalance && newWalletBalance > 0 && finalFeeToPay > 0) {
+          walletUsed = Math.min(newWalletBalance, finalFeeToPay);
+          finalFeeToPay = roundDown5000(Math.max(0, finalFeeToPay - walletUsed));
+          newWalletBalance = Math.max(0, newWalletBalance - walletUsed);
+        }
         finalAmountPaid = 0;
       } else {
         // Lớp mới rẻ hơn hoặc tiền dư nhiều hơn -> Tiền dư chảy vào Ví học viên
@@ -865,38 +935,52 @@ export async function PUT(request, { params }) {
           },
         });
 
-        // 2. Tạo hóa đơn mới cho lớp mới
+        // 2. Tạo hóa đơn mới cho lớp mới (chống trùng ID nếu chuyển lớp nhiều lần trong cùng tháng)
         const year = String(now.getFullYear()).substring(2);
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        const orderId = `ORD_TR_${year}${month}_${id.split('_')[1]}`;
+        let orderId = `ORD_TR_${year}${month}_${id.split('_')[1]}`;
+        if (student.orders.some(o => o.id === orderId)) {
+          const randSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+          orderId = `${orderId}_${randSuffix}`;
+        }
 
         const adjNote = adjVal !== 0 ? ` [Điều chỉnh thủ công: ${adjVal.toLocaleString()}đ. Lý do: ${manualReason}]` : '';
         const debtNote = debtOld > 0 ? ` [Nợ cũ: ${Math.round(debtOld).toLocaleString()}đ]` : '';
         const repeatNote = transferType === 'repeat' && repeatDiscountAmount > 0 ? ` [Ưu đãi học lại: -${Math.round(repeatDiscountAmount).toLocaleString('vi-VN')}đ]` : '';
         const lateralNote = transferType === 'lateral' ? ` [Chuyển ngang trọn gói]` : '';
+        const walletNote = walletUsed > 0 ? ` [Đã cấn trừ Ví: -${walletUsed.toLocaleString('vi-VN')}đ]` : '';
 
         await tx.orderFinance.create({
           data: {
             id: orderId,
             studentId: id,
             classCode: newClassCode,
-            promoType: `Chuyển lớp từ ${oldClassCode} (Lớp mới còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${repeatNote}${lateralNote}${debtNote}${adjNote}`,
-            promoDiscount: balanceOld + repeatDiscountAmount + specialDiscount + (newConfig.price - proRatedTuitionNew) + (adjVal < 0 ? Math.abs(adjVal) : 0), // Ghi nhận các khoản cấn trừ và ưu đãi
+            promoType: `Chuyển lớp từ ${oldClassCode} (Lớp mới còn ${sessionsRemainingNew}/${totalSessionsNew} buổi)${repeatNote}${lateralNote}${debtNote}${walletNote}${adjNote}`,
+            promoDiscount: balanceOld + repeatDiscountAmount + specialDiscount + walletUsed + (newConfig.price - proRatedTuitionNew) + (adjVal < 0 ? Math.abs(adjVal) : 0), // Ghi nhận các khoản cấn trừ và ưu đãi
             feeToPay: finalFeeToPay,
             amountPaid: finalAmountPaid,
             paymentStatus: finalFeeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',
+            paymentPolicy: 'Đóng trước',
             paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           },
         });
 
-        // 3. Cập nhật Ví học viên (Wallet)
+        // 3. Cập nhật Ví học viên (Wallet) & đảm bảo trạng thái Đang học
         await tx.student.update({
           where: { id },
           data: {
+            status: 'Đang học',
+            callbackDate: null,
+            reservationAmount: 0,
+            reservationDeadline: null,
             walletBalance: newWalletBalance,
           },
         });
       });
+
+      try {
+        await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+      } catch (e) {}
 
       return NextResponse.json({
         success: true,
@@ -908,6 +992,7 @@ export async function PUT(request, { params }) {
           debtOld,
           newClassFeeBase,
           difference,
+          walletUsed,
           walletBalance: newWalletBalance,
         },
       });

@@ -398,6 +398,7 @@ export default function StudentsPage() {
           repeatDiscountAmount: '',
           repeatDiscountPercent: '',
           overrideAmountPaidOld: formatNumber(currentClassPaid),
+          useWalletBalance: (std.walletBalance || 0) > 0,
           manualAdjustment: '',
           manualReason: '',
         });
@@ -501,8 +502,14 @@ export default function StudentsPage() {
     const totalDiscountNew = repeatDiscountAmount + specialDiscount;
     const newClassFeeBase = Math.max(0, proRatedPriceNew - totalDiscountNew);
 
+    const walletAvailable = Math.ceil((editStudentData?.student?.walletBalance || 0) / 5000) * 5000;
+
     if (!editStudentData?.currentClass) {
       // Học viên chưa có lớp -> Xem trước học phí xếp lớp ban đầu (khấu trừ)
+      const walletUsedInit = (editForm.useWalletBalance && walletAvailable > 0 && newClassFeeBase > 0)
+        ? Math.min(walletAvailable, newClassFeeBase)
+        : 0;
+      const finalDiffInit = Math.max(0, newClassFeeBase - walletUsedInit);
       setTransferPreview({
         isInitial: true,
         priceNew: newConfig.price,
@@ -510,7 +517,9 @@ export default function StudentsPage() {
         repeatDiscountAmount,
         specialDiscount,
         newClassFeeBase,
-        difference: newClassFeeBase,
+        walletAvailable,
+        walletUsed: walletUsedInit,
+        difference: finalDiffInit,
         selectedClassInfo: newClass,
       });
       return;
@@ -536,7 +545,11 @@ export default function StudentsPage() {
 
     // Cấn trừ + Điều chỉnh thủ công
     const manualAdj = parseNumber(editForm.manualAdjustment);
-    const difference = (newClassFeeBase - balanceOld + debtOld) + manualAdj;
+    const rawDifference = (newClassFeeBase - balanceOld + debtOld) + manualAdj;
+    const walletUsed = (editForm.useWalletBalance && walletAvailable > 0 && rawDifference > 0)
+      ? Math.min(walletAvailable, rawDifference)
+      : 0;
+    const difference = rawDifference > 0 ? Math.max(0, rawDifference - walletUsed) : rawDifference;
 
     setTransferPreview({
       isInitial: false,
@@ -551,6 +564,8 @@ export default function StudentsPage() {
       repeatDiscountAmount,
       specialDiscount,
       newClassFeeBase,
+      walletAvailable,
+      walletUsed,
       difference,
       selectedClassInfo: newClass,
       manualAdj,
@@ -567,7 +582,8 @@ export default function StudentsPage() {
     editForm.repeatDiscountType,
     editForm.repeatDiscountAmount,
     editForm.repeatDiscountPercent,
-    editForm.overrideAmountPaidOld
+    editForm.overrideAmountPaidOld,
+    editForm.useWalletBalance
   ]);
 
   // Submit chỉnh sửa học viên (Phân loại theo Action)
@@ -624,6 +640,7 @@ export default function StudentsPage() {
         overrideAmountPaidOld: editForm.overrideAmountPaidOld !== undefined && editForm.overrideAmountPaidOld !== ''
           ? parseNumber(editForm.overrideAmountPaidOld)
           : undefined,
+        useWalletBalance: Boolean(editForm.useWalletBalance),
       };
     } else if (actionType === 'reserve') {
       payload = {
@@ -2621,6 +2638,22 @@ export default function StudentsPage() {
                           </div>
                         )}
 
+                        {(editStudentData?.student?.walletBalance || 0) > 0 && (
+                          <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0, fontWeight: '700', color: '#065f46', fontSize: '0.88rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(editForm.useWalletBalance)}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, useWalletBalance: e.target.checked }))}
+                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              />
+                              <span>
+                                <i className="fa-solid fa-wallet"></i> Sử dụng số dư Ví học viên hiện có ({Math.ceil((editStudentData.student.walletBalance || 0) / 5000 * 5000).toLocaleString('vi-VN')}đ) để khấu trừ trực tiếp học phí lớp mới
+                              </span>
+                            </label>
+                          </div>
+                        )}
+
                         {transferPreview && (
                           <div className="fee-preview-box animated-scale" style={{ marginTop: '1rem', border: '1px solid #93c5fd', background: '#f8fafc', borderRadius: '10px', padding: '1.25rem' }}>
                             <h4 style={{ margin: '0 0 1rem 0', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2639,9 +2672,15 @@ export default function StudentsPage() {
                                     <span>-{transferPreview.repeatDiscountAmount.toLocaleString()}đ</span>
                                   </div>
                                 )}
+                                {transferPreview.walletUsed > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: '700' }}>
+                                    <span>Khấu trừ từ Ví học viên:</span>
+                                    <span>-{transferPreview.walletUsed.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                  </div>
+                                )}
                                 <div style={{ borderTop: '2px solid #3b82f6', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem', color: '#1e40af' }}>
                                   <span>Tổng học phí cần đóng:</span>
-                                  <span>{transferPreview.newClassFeeBase.toLocaleString()}đ</span>
+                                  <span>{transferPreview.difference.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
                                 </div>
                               </div>
                             ) : (
@@ -2692,7 +2731,13 @@ export default function StudentsPage() {
                                   </div>
                                 </div>
 
-                                {/* 3. Điều chỉnh thủ công */}
+                                {/* 3. Điều chỉnh thủ công & Khấu trừ Ví */}
+                                {transferPreview.walletUsed > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: '#d1fae5', borderRadius: '6px', color: '#065f46', fontWeight: '700', fontSize: '0.85rem' }}>
+                                    <span><i className="fa-solid fa-wallet"></i> Khấu trừ trực tiếp từ Ví học viên:</span>
+                                    <span>-{transferPreview.walletUsed.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}đ</span>
+                                  </div>
+                                )}
                                 {transferPreview.manualAdj !== 0 && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: '#fef3c7', borderRadius: '6px', color: '#b45309', fontWeight: '600', fontSize: '0.85rem' }}>
                                     <span>Điều chỉnh thủ công ({editForm.manualReason || 'Giám đốc'}):</span>
@@ -2852,7 +2897,7 @@ export default function StudentsPage() {
                     </div>
                   </form>
                     {/* TAB 7: Cấp phát vật tư / Bán bổ sung / Mua lại */}
-                  <form onSubmit={(e) => handleEditSubmit(e, 'gift')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
+                  <form onSubmit={handleGiftSubmit} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative' }}>
                       <div className="form-section">
                         <h3>Luồng Nghiệp vụ: Cấp phát Vật tư / Bán bổ sung / Đổi trả</h3>
                         
