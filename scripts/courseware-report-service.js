@@ -1,10 +1,11 @@
 const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
+const path = require('path');
 
-const DB_PATH = process.env.DB_PATH || '/var/www/nhat-my-crm/dev.db';
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'dev.db');
 
 function getDb() {
-  return new Database(DB_PATH);
+  return new Database(DB_PATH, { readonly: true });
 }
 
 function formatDateVN(date) {
@@ -39,12 +40,18 @@ function get14DayReportData(filterClassCode = null) {
     const classSummaries = [];
     const allStudentsList = [];
 
+    const stmt14 = db.prepare(`
+      SELECT COALESCE(SUM(durationSeconds), 0) / 60.0 AS m14, MAX(createdAt) AS lastAt
+      FROM StudySession
+      WHERE studentId = ? AND createdAt >= datetime('now', '-14 days')
+    `);
+
     for (const c of classes) {
       const students = db.prepare(`
-        SELECT s.id, s.name, s.phone, s.status, s.coursewareStudyMinutes, s.coursewareLastActiveAt, s.coursewareCurrentProgress
+        SELECT s.id, s.name, s.phone, s.status, s.coursewareActivatedAt, s.coursewareLastActiveAt, s.coursewareCurrentProgress
         FROM Student s
         JOIN Enrollment e ON s.id = e.studentId
-        WHERE e.classCode = ? AND e.status = 'Đang học'
+        WHERE e.classCode = ? AND e.status = 'Đang học' AND s.status = 'Đang học'
         ORDER BY s.name ASC
       `).all(c.code);
 
@@ -55,7 +62,8 @@ function get14DayReportData(filterClassCode = null) {
       let cDanger = 0;
 
       for (const st of students) {
-        const mins = st.coursewareStudyMinutes || 0;
+        const s14 = stmt14.get(st.id) || { m14: 0, lastAt: null };
+        const mins = Math.round(s14.m14 || 0);
         let stStatus = 'danger';
         if (mins >= 45) {
           stStatus = 'active';
@@ -73,7 +81,7 @@ function get14DayReportData(filterClassCode = null) {
           phone: st.phone,
           classCode: c.code,
           durationMinutes: mins,
-          lastActive: st.coursewareLastActiveAt || 'Chưa từng vào học',
+          lastActive: s14.lastAt || st.coursewareLastActiveAt || 'Chưa từng vào học',
           currentProgress: st.coursewareCurrentProgress || 'Chưa học',
           status: stStatus
         });
@@ -149,8 +157,11 @@ function buildReportHtml(reportData) {
     
     <!-- HEADER -->
     <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
-      <div style="font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #38bdf8; text-transform: uppercase; margin-bottom: 6px;">
-        🌸 ANH NGỮ NHẬT MỸ
+      <div style="font-size: 16px; font-weight: 800; letter-spacing: 1.5px; color: #ffffff; text-transform: uppercase;">
+        ANH NGỮ NHẬT MỸ
+      </div>
+      <div style="font-size: 12px; font-style: italic; color: #38bdf8; margin-bottom: 10px;">
+        Dedicated to Excellence
       </div>
       <h1 style="margin: 0 0 10px 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">
         BÁO CÁO ĐỊNH KỲ 14 NGÀY
@@ -280,21 +291,27 @@ async function sendBiweeklyReport(toEmail = 'academic@anhngunhatmy.edu.vn', filt
   const reportData = get14DayReportData(filterClassCode);
   const html = buildReportHtml(reportData);
 
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  if (!smtpUser || !smtpPass) {
+    throw new Error('Chưa cấu hình SMTP_USER / SMTP_PASS trong biến môi trường .env trên máy chủ.');
+  }
+
   const transporter = nodemailer.createTransport({
-    host: 'smtp.zoho.com',
-    port: 465,
+    host: process.env.SMTP_HOST || 'smtp.zoho.com',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
     secure: true,
     auth: {
-      user: 'academic@anhngunhatmy.edu.vn',
-      pass: '1aWMQdULwuDF'
+      user: smtpUser,
+      pass: smtpPass,
     }
   });
 
   const subject = `🔔 [Anh Ngữ Nhật Mỹ] Báo Cáo Định Kỳ 14 Ngày · Tiến Độ Học Liệu Số (${reportData.cycleStart} - ${reportData.cycleEnd})`;
 
   const info = await transporter.sendMail({
-    from: '"Anh Ngữ Nhật Mỹ" <cambridge@anhngunhatmy.edu.vn>',
-    replyTo: 'academic@anhngunhatmy.edu.vn',
+    from: `"Anh Ngữ Nhật Mỹ" <${process.env.SMTP_FROM || smtpUser}>`,
+    replyTo: smtpUser,
     to: toEmail,
     subject: subject,
     html: html

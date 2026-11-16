@@ -80,12 +80,32 @@ export async function GET(request) {
       }
     }
 
-    // 1.1 Tải danh sách lớp đang hoạt động + dữ liệu học thật 14 ngày phục vụ Dashboard
+    // 1.1 Tải danh sách lớp đang hoạt động + dữ liệu học thật (14 ngày mặc định hoặc lọc Từ ngày - Đến ngày) phục vụ Dashboard
     if (action === 'classes' || action === 'dashboard') {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const rawFrom = (searchParams.get('from') || '').trim();
+      const rawTo = (searchParams.get('to') || '').trim();
+      const fromDate = dateRegex.test(rawFrom) ? rawFrom : null;
+      const toDate = dateRegex.test(rawTo) ? rawTo : null;
+      const hasCustomRange = Boolean(fromDate || toDate);
+
+      let rangeDays = 14;
+      if (fromDate && toDate) {
+        const diffMs = new Date(`${toDate}T00:00:00Z`) - new Date(`${fromDate}T00:00:00Z`);
+        rangeDays = Math.max(1, Math.round(diffMs / 86400000) + 1);
+      } else if (fromDate) {
+        const diffMs = Date.now() - new Date(`${fromDate}T00:00:00Z`).getTime();
+        rangeDays = Math.max(1, Math.round(diffMs / 86400000));
+      }
+      const targetMinutes = rangeDays <= 1 ? 10 : (rangeDays <= 7 ? 25 : 45);
+
       const classes = await prisma.class.findMany({
         include: {
           enrollments: {
-            where: { status: 'Đang học' },
+            where: {
+              status: 'Đang học',
+              student: { status: 'Đang học' },
+            },
             include: { student: true },
           },
           teacher: {
@@ -104,7 +124,13 @@ export async function GET(request) {
 
       try {
         const stmt14 = db.prepare(
-          "SELECT COALESCE(SUM(durationSeconds), 0)/60 as m14 FROM StudySession WHERE studentId = ? AND createdAt >= datetime('now', '-14 days')"
+          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt FROM StudySession WHERE studentId = ? AND createdAt >= datetime('now', '-14 days')"
+        );
+        const stmtRange = db.prepare(
+          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt FROM StudySession WHERE studentId = ? AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) >= ?) AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) <= ?)"
+        );
+        const stmtRangeLesson = db.prepare(
+          "SELECT lessonTitle FROM StudySession WHERE studentId = ? AND lessonTitle IS NOT NULL AND lessonTitle != '' AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) >= ?) AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) <= ?) ORDER BY id DESC LIMIT 1"
         );
         const stmtTel = db.prepare(
           'SELECT coursewareLastActiveAt, coursewareCurrentProgress, coursewareActivatedAt FROM Student WHERE id = ?'
@@ -122,22 +148,38 @@ export async function GET(request) {
               const customBooks = parseCustomBookCodes(s.customBookCodes);
               const effectiveBooks = customBooks && customBooks.length > 0 ? customBooks : classBooks;
               const tel = stmtTel.get(s.id) || {};
-              const s14 = stmt14.get(s.id) || { m14: 0 };
-              const m14 = Math.round(s14.m14 || 0);
-              const isAct = Boolean(tel.coursewareActivatedAt || m14 > 0);
+
+              const sessionStats = hasCustomRange
+                ? (stmtRange.get(s.id, fromDate, fromDate, toDate, toDate) || { mPeriod: 0, periodLastActiveAt: null })
+                : (stmt14.get(s.id) || { mPeriod: 0, periodLastActiveAt: null });
+
+              const mPeriod = Math.round(sessionStats.mPeriod || 0);
+              const isAct = Boolean(tel.coursewareActivatedAt || mPeriod > 0);
 
               let stStatus = 'danger';
-              if (m14 >= 45) stStatus = 'active';
-              else if (m14 > 0) stStatus = 'warn';
+              if (mPeriod >= targetMinutes) stStatus = 'active';
+              else if (mPeriod > 0) stStatus = 'warn';
+
+              let progressText = tel.coursewareCurrentProgress || (effectiveBooks[0] ? effectiveBooks.join(', ') : 'Chưa học');
+              if (hasCustomRange) {
+                const rangeLessonRow = stmtRangeLesson.get(s.id, fromDate, fromDate, toDate, toDate);
+                if (rangeLessonRow && rangeLessonRow.lessonTitle) {
+                  progressText = rangeLessonRow.lessonTitle;
+                }
+              }
+
+              const lastActiveSource = hasCustomRange
+                ? (sessionStats.periodLastActiveAt || tel.coursewareLastActiveAt)
+                : tel.coursewareLastActiveAt;
 
               return {
                 id: s.id,
                 name: s.name,
                 phone: s.phone || '',
                 status: stStatus,
-                last_active: formatRelativeTime(tel.coursewareLastActiveAt),
-                duration_minutes: m14,
-                current_progress: tel.coursewareCurrentProgress || (effectiveBooks[0] ? effectiveBooks.join(', ') : 'Chưa học'),
+                last_active: formatRelativeTime(lastActiveSource),
+                duration_minutes: mPeriod,
+                current_progress: progressText,
                 activated: isAct,
                 custom_book_codes: customBooks,
                 effective_book_codes: effectiveBooks,
@@ -147,6 +189,7 @@ export async function GET(request) {
 
             return {
               code: cls.code,
+              branch_id: cls.branchId || 'CN1_BinhDuong',
               level: cls.level,
               teacher_name: teacherName,
               care_staff: cls.careStaff || 'Chưa phân công',
@@ -164,6 +207,13 @@ export async function GET(request) {
         {
           success: true,
           total_classes: formattedClasses.length,
+          date_range: {
+            from: fromDate,
+            to: toDate,
+            days: rangeDays,
+            target_minutes: targetMinutes,
+            is_custom: hasCustomRange,
+          },
           classes: formattedClasses,
         },
         {
@@ -280,16 +330,25 @@ export async function GET(request) {
     const rawStatus = (student.status || '').trim();
     if (rawStatus === 'Tạm nghỉ' || rawStatus === 'Bảo lưu') {
       normalizedStatus = 'PAUSED';
-    } else if (rawStatus === 'Nghỉ luôn' || rawStatus === 'Đã chuyển') {
+    } else if (
+      rawStatus === 'Nghỉ luôn' ||
+      rawStatus === 'Đã chuyển' ||
+      rawStatus === 'Thôi học' ||
+      rawStatus === 'Nghỉ học'
+    ) {
       normalizedStatus = 'QUIT';
     } else if (rawStatus === 'Chờ xếp lớp') {
       normalizedStatus = 'PENDING';
     }
 
-    // 5. Tính toán danh sách giáo trình được cấp phát
+    // 5. Tính toán danh sách giáo trình được cấp phát (gộp sách từ mọi lớp đang học nếu chưa cấu hình riêng)
     const activeEnrollment = student.enrollments?.[0] || null;
     const classInfo = activeEnrollment?.class || null;
-    const classBookCodes = getBookCodesFromClass(classInfo);
+    const classBookCodes = [
+      ...new Set(
+        (student.enrollments || []).flatMap((e) => getBookCodesFromClass(e.class))
+      ),
+    ];
     const customBookCodes = parseCustomBookCodes(student.customBookCodes);
     const effectiveBookCodes = customBookCodes && customBookCodes.length > 0 ? customBookCodes : classBookCodes;
 
@@ -420,10 +479,15 @@ export async function POST(request) {
         'INSERT INTO StudySession (studentId, bookCode, lessonTitle, durationSeconds) VALUES (?, ?, ?, ?)'
       ).run(studentId, bookCode, lessonTitle, durationSeconds);
 
-      const minutesAdd = Math.round(durationSeconds / 60);
+      // Tính tổng phút chính xác từ toàn bộ StudySession (tránh mất phút do làm tròn từng nhịp < 30s)
+      const totalRow = db.prepare(
+        'SELECT COALESCE(SUM(durationSeconds), 0) AS totalSec FROM StudySession WHERE studentId = ?'
+      ).get(studentId);
+      const exactTotalMinutes = Math.round((totalRow?.totalSec || 0) / 60.0);
+
       db.prepare(
-        "UPDATE Student SET coursewareLastActiveAt = CURRENT_TIMESTAMP, coursewareCurrentProgress = CASE WHEN ? != '' THEN ? ELSE coursewareCurrentProgress END, coursewareStudyMinutes = COALESCE(coursewareStudyMinutes, 0) + ?, coursewareActivatedAt = COALESCE(coursewareActivatedAt, CURRENT_TIMESTAMP), updatedAt = CURRENT_TIMESTAMP WHERE id = ?"
-      ).run(lessonTitle, lessonTitle, minutesAdd, studentId);
+        "UPDATE Student SET coursewareLastActiveAt = CURRENT_TIMESTAMP, coursewareCurrentProgress = CASE WHEN ? != '' THEN ? ELSE coursewareCurrentProgress END, coursewareStudyMinutes = ?, coursewareActivatedAt = COALESCE(coursewareActivatedAt, CURRENT_TIMESTAMP), updatedAt = CURRENT_TIMESTAMP WHERE id = ?"
+      ).run(lessonTitle, lessonTitle, exactTotalMinutes, studentId);
     } finally {
       db.close();
     }

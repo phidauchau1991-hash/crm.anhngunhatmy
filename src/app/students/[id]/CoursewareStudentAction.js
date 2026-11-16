@@ -5,6 +5,7 @@ import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
 
 export default function CoursewareStudentAction({ student, classInfo = null }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasUpdates, setHasUpdates] = useState(false);
 
   // Chuẩn hóa dữ liệu học viên truyền vào modal
   const normalizedStudent = {
@@ -52,13 +53,16 @@ export default function CoursewareStudentAction({ student, classInfo = null }) {
 
       <CoursewareNoticeModal
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        students={[normalizedStudent]}
-        classInfo={classInfo || student.enrollments?.[0]?.class}
-        onStudentUpdated={(stdId, codes, retain) => {
-          if (typeof window !== 'undefined') {
+        onClose={() => {
+          setIsOpen(false);
+          if (hasUpdates && typeof window !== 'undefined') {
             window.location.reload();
           }
+        }}
+        students={[normalizedStudent]}
+        classInfo={classInfo || student.enrollments?.[0]?.class}
+        onStudentUpdated={() => {
+          setHasUpdates(true);
         }}
       />
     </>

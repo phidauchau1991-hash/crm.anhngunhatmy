@@ -298,7 +298,7 @@ export default function CoursewareNoticeModal({
     }));
   };
 
-  // Lưu cấu hình giáo trình vào CSDL CRM cho học viên hiện tại
+  // Lưu cấu hình giáo trình vào CSDL CRM cho học viên hiện tại (Hỗ trợ cả Student & Lead)
   const handleSaveStudentBooks = async () => {
     if (!activeStudent) return;
     setSavingBooks(true);
@@ -306,16 +306,32 @@ export default function CoursewareNoticeModal({
       const stdId = activeStudent.id;
       const codes = customBooksMap[stdId] || [];
       const retain = Boolean(retainAccessMap[stdId]);
+      const idStr = String(stdId).trim();
+      const isLead = idStr.startsWith('LEAD_') || /^\d+$/.test(idStr);
 
-      const res = await fetch(`/api/students/${stdId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'courseware',
-          customBookCodes: codes,
-          retainCoursewareAccess: retain,
-        }),
-      });
+      let res;
+      if (isLead) {
+        res = await fetch('/api/students/courseware-batch-exported', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentIds: [stdId],
+            customBooksMap: { [stdId]: codes },
+            retainAccessMap: { [stdId]: retain },
+            markExported: false,
+          }),
+        });
+      } else {
+        res = await fetch(`/api/students/${stdId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'courseware',
+            customBookCodes: codes,
+            retainCoursewareAccess: retain,
+          }),
+        });
+      }
 
       const data = await res.json();
       if (data.success) {

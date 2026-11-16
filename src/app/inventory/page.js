@@ -36,6 +36,7 @@ export default function InventoryPage() {
     notes: '',
     inventoryId: '',
     quantity: 1,
+    actualStock: 0,
     unitCost: 0,
     campaignName: '',
   });
@@ -177,14 +178,16 @@ export default function InventoryPage() {
   // TRANSACTION MANAGEMENT
   const openTransModal = (type, item) => {
     const isNhap = type.startsWith('NHAP');
+    const isAudit = type === 'KIEM_KE';
     setTransForm({
-      actionType: isNhap ? 'NHAP' : (type.startsWith('XUAT') ? 'XUAT' : 'KIEM_KE'),
+      actionType: isAudit ? 'KIEM_KE' : (isNhap ? 'NHAP' : 'XUAT'),
       type,
-      targetType: isNhap ? 'SUPPLIER' : 'STUDENT',
+      targetType: isAudit ? 'SYSTEM' : (isNhap ? 'SUPPLIER' : 'STUDENT'),
       targetName: '',
       notes: '',
       inventoryId: item.id,
       quantity: 1,
+      actualStock: item.currentStock ?? 0,
       unitCost: item.unitCost || 0,
       campaignName: '',
     });
@@ -193,15 +196,17 @@ export default function InventoryPage() {
 
   const openGeneralTransModal = (type) => {
     const isNhap = type.startsWith('NHAP');
+    const isAudit = type === 'KIEM_KE';
     const firstItem = items[0];
     setTransForm({
-      actionType: isNhap ? 'NHAP' : (type.startsWith('XUAT') ? 'XUAT' : 'KIEM_KE'),
+      actionType: isAudit ? 'KIEM_KE' : (isNhap ? 'NHAP' : 'XUAT'),
       type,
-      targetType: isNhap ? 'SUPPLIER' : 'STUDENT',
+      targetType: isAudit ? 'SYSTEM' : (isNhap ? 'SUPPLIER' : 'STUDENT'),
       targetName: '',
       notes: '',
       inventoryId: firstItem ? firstItem.id : '',
       quantity: 1,
+      actualStock: firstItem ? (firstItem.currentStock ?? 0) : 0,
       unitCost: firstItem ? (firstItem.unitCost || 0) : 0,
       campaignName: '',
     });
@@ -213,7 +218,8 @@ export default function InventoryPage() {
     setTransForm(prev => ({
       ...prev,
       inventoryId: invId,
-      unitCost: it ? (it.unitCost || 0) : prev.unitCost
+      unitCost: it ? (it.unitCost || 0) : prev.unitCost,
+      actualStock: it ? (it.currentStock ?? 0) : prev.actualStock,
     }));
   };
 
@@ -228,7 +234,9 @@ export default function InventoryPage() {
         campaignName: transForm.campaignName || null,
         items: [{
           inventoryId: transForm.inventoryId,
-          quantity: parseInt(transForm.quantity),
+          ...(transForm.type === 'KIEM_KE'
+            ? { actualStock: parseInt(transForm.actualStock, 10) }
+            : { quantity: parseInt(transForm.quantity, 10) }),
           unitCost: parseFloat(transForm.unitCost) || 0
         }]
       };
@@ -379,6 +387,9 @@ export default function InventoryPage() {
           <button className="btn" onClick={() => openGeneralTransModal('XUAT_TANG')} style={{ color: 'white', background: '#e11d48', cursor: 'pointer' }}>
             <i className="fa-solid fa-gift"></i> Xuất Tặng Marketing
           </button>
+          <button className="btn" onClick={() => openGeneralTransModal('KIEM_KE')} style={{ color: 'white', background: '#0284c7', cursor: 'pointer' }}>
+            <i className="fa-solid fa-clipboard-check"></i> Kiểm Kê Kho
+          </button>
           <button className="btn btn-primary" onClick={() => openItemModal()}>
             <i className="fa-solid fa-plus"></i> Thêm Mã Vật Tư
           </button>
@@ -524,6 +535,7 @@ export default function InventoryPage() {
                           <div className="action-buttons" style={{ justifyContent: 'center' }}>
                             <button className="btn-icon" title="Nhập hàng" onClick={() => openTransModal('NHAP_MOI', item)} style={{ color: 'var(--color-success)' }}><i className="fa-solid fa-arrow-right-to-bracket"></i></button>
                             <button className="btn-icon" title="Xuất tặng/bán" onClick={() => openTransModal('XUAT_TANG', item)} style={{ color: 'var(--color-error)' }}><i className="fa-solid fa-arrow-right-from-bracket"></i></button>
+                            <button className="btn-icon" title="Kiểm kê thực tế" onClick={() => openTransModal('KIEM_KE', item)} style={{ color: '#0284c7' }}><i className="fa-solid fa-clipboard-check"></i></button>
                             <button className="btn-icon" title="Lịch sử giao dịch" onClick={() => viewHistory(item)} style={{ color: 'var(--color-primary)' }}><i className="fa-solid fa-clock-rotate-left"></i></button>
                             <button className="btn-icon" title="Chỉnh sửa thông tin & giá vốn" onClick={() => openItemModal(item)}><i className="fa-solid fa-pen"></i></button>
                             <button className="btn-icon text-error" title="Xóa" onClick={() => deleteItem(item.id)}><i className="fa-solid fa-trash"></i></button>
@@ -1018,8 +1030,8 @@ export default function InventoryPage() {
           <div className="modal-content animated-scale" style={{ maxWidth: '620px' }}>
             <div className="modal-header">
               <h2>
-                <i className={`fa-solid ${transForm.actionType === 'NHAP' ? 'fa-arrow-down' : (transForm.type === 'XUAT_TANG' ? 'fa-gift' : 'fa-arrow-up')}`} style={{ color: transForm.actionType === 'NHAP' ? '#10b981' : '#e11d48' }}></i>{' '}
-                {transForm.actionType === 'NHAP' ? 'Lập Phiếu Nhập Kho' : (transForm.type === 'XUAT_TANG' ? 'Lập Phiếu Xuất Tặng Quà Marketing' : 'Lập Phiếu Xuất Kho')}
+                <i className={`fa-solid ${transForm.actionType === 'NHAP' ? 'fa-arrow-down' : (transForm.actionType === 'KIEM_KE' ? 'fa-clipboard-check' : (transForm.type === 'XUAT_TANG' ? 'fa-gift' : 'fa-arrow-up'))}`} style={{ color: transForm.actionType === 'NHAP' ? '#10b981' : (transForm.actionType === 'KIEM_KE' ? '#0284c7' : '#e11d48') }}></i>{' '}
+                {transForm.actionType === 'NHAP' ? 'Lập Phiếu Nhập Kho' : (transForm.actionType === 'KIEM_KE' ? 'Phiếu Kiểm Kê Cân Bằng Tồn Kho' : (transForm.type === 'XUAT_TANG' ? 'Lập Phiếu Xuất Tặng Quà Marketing' : 'Lập Phiếu Xuất Kho'))}
               </h2>
               <button className="btn-close" onClick={() => setShowTransModal(false)}><i className="fa-solid fa-xmark"></i></button>
             </div>
@@ -1059,18 +1071,44 @@ export default function InventoryPage() {
                         <option value="XUAT_HONG">Xuất Tiêu Hủy / Hỏng Hóc</option>
                       </optgroup>
                     )}
+                    {transForm.actionType === 'KIEM_KE' && (
+                      <optgroup label="KIỂM KÊ TỒN THỰC TẾ">
+                        <option value="KIEM_KE">📋 Kiểm Kê Cân Bằng Sổ Kho</option>
+                      </optgroup>
+                    )}
                   </select>
                 </div>
-                <div className="form-group" style={{ width: '130px' }}>
-                  <label>Số lượng: <span className="text-error">*</span></label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={transForm.quantity}
-                    onChange={e => setTransForm({ ...transForm, quantity: e.target.value })}
-                    required
-                  />
-                </div>
+                {transForm.actionType === 'KIEM_KE' ? (() => {
+                  const selItem = items.find(i => i.id === transForm.inventoryId);
+                  const sysStock = selItem ? selItem.currentStock : 0;
+                  const diff = (parseInt(transForm.actualStock, 10) || 0) - sysStock;
+                  return (
+                    <div className="form-group" style={{ width: '190px' }}>
+                      <label>Tồn thực tế đếm được: <span className="text-error">*</span></label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={transForm.actualStock}
+                        onChange={e => setTransForm({ ...transForm, actualStock: e.target.value })}
+                        required
+                      />
+                      <small style={{ fontWeight: '700', color: diff === 0 ? '#64748b' : (diff > 0 ? '#16a34a' : '#dc2626') }}>
+                        Chênh lệch: {diff > 0 ? `+${diff}` : diff} ({sysStock} &rarr; {parseInt(transForm.actualStock, 10) || 0})
+                      </small>
+                    </div>
+                  );
+                })() : (
+                  <div className="form-group" style={{ width: '130px' }}>
+                    <label>Số lượng: <span className="text-error">*</span></label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={transForm.quantity}
+                      onChange={e => setTransForm({ ...transForm, quantity: e.target.value })}
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               {/* GIÁ VỐN & CHIẾN DỊCH MARKETING */}
@@ -1142,12 +1180,12 @@ export default function InventoryPage() {
                   type="submit"
                   className="btn"
                   style={{
-                    background: transForm.actionType === 'NHAP' ? 'var(--color-success)' : '#e11d48',
+                    background: transForm.actionType === 'NHAP' ? 'var(--color-success)' : (transForm.actionType === 'KIEM_KE' ? '#0284c7' : '#e11d48'),
                     color: 'white',
                     fontWeight: 'bold'
                   }}
                 >
-                  <i className="fa-solid fa-file-invoice"></i> {transForm.actionType === 'NHAP' ? 'Xác Nhận Nhập Kho' : 'Xác Nhận Xuất Kho'}
+                  <i className="fa-solid fa-file-invoice"></i> {transForm.actionType === 'NHAP' ? 'Xác Nhận Nhập Kho' : (transForm.actionType === 'KIEM_KE' ? 'Xác Nhận Cân Bằng Tồn' : 'Xác Nhận Xuất Kho')}
                 </button>
               </div>
             </form>

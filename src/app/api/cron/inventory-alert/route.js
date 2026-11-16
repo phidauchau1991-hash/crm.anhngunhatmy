@@ -196,23 +196,46 @@ async function handleInventoryAlert(request) {
 </body>
 </html>`;
 
-      // Determine where to write the log file
-      // Check the exact workspace root folder first, fallback to Next.js root directory
-      const workspaceRoot = 'd:\\2. TÀI LIỆU LỖI THỜI\\4. CRM NHẬT MỸ';
-      let logsDir = path.join(workspaceRoot, 'logs');
-      if (!fs.existsSync(workspaceRoot)) {
-        logsDir = path.join(process.cwd(), 'logs');
-      }
-      
-      // Create folder if not exists
+      // Ghi log an toàn vào thư mục logs của dự án hiện tại
+      const logsDir = path.join(process.cwd(), 'logs');
       fs.mkdirSync(logsDir, { recursive: true });
       logFilePath = path.join(logsDir, 'inventory-alerts.log');
 
-      // Construct detailed log format
       const itemsListText = lowStockItems.map(item => {
         const statusText = item.currentStock === 0 ? 'HẾT HÀNG' : 'SẮP HẾT HÀNG';
         return `- ${item.id}: ${item.name} (${item.category}) - Stock: ${item.currentStock}/${item.threshold} [${statusText}]`;
       }).join('\n');
+
+      // Gửi Email thật nếu đã cấu hình SMTP_USER & SMTP_PASS trong môi trường
+      let sentViaSmtp = false;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+      const targetEmail = process.env.INVENTORY_ALERT_EMAIL || smtpUser || 'academic@anhngunhatmy.edu.vn';
+
+      if (smtpUser && smtpPass) {
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.zoho.com',
+            port: parseInt(process.env.SMTP_PORT || '465', 10),
+            secure: true,
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+          await transporter.sendMail({
+            from: `"CRM Anh Ngữ Nhật Mỹ" <${smtpUser}>`,
+            to: targetEmail,
+            subject: `[Cảnh báo Kho] Có ${lowStockItems.length} vật tư dưới ngưỡng tối thiểu`,
+            html: htmlEmail,
+          });
+          sentViaSmtp = true;
+          emailAlertStatus = 'EMAIL_SENT_AND_LOGGED';
+        } catch (mailErr) {
+          console.error('Lỗi gửi Email cảnh báo tồn kho:', mailErr);
+          emailAlertStatus = 'EMAIL_FAILED_LOGGED';
+        }
+      } else {
+        emailAlertStatus = 'LOGGED_NO_SMTP_CONFIG';
+      }
 
       const logContent = `
 ========================================================================
@@ -223,14 +246,11 @@ TOTAL LOW STOCK ITEMS: ${lowStockItems.length}
 ITEMS DETAILS:
 ${itemsListText}
 ------------------------------------------------------------------------
-MOCK EMAIL STATUS: SUCCESS (Sent to director@nhatmy.edu.vn)
-HTML EMAIL CONTENT:
-${htmlEmail}
+EMAIL STATUS: ${sentViaSmtp ? `SENT TO ${targetEmail}` : 'LOGGED ONLY (Configure SMTP_USER/SMTP_PASS to send email)'}
 ========================================================================
 \n`;
 
       fs.appendFileSync(logFilePath, logContent, 'utf8');
-      emailAlertStatus = 'MOCKED_AND_LOGGED';
     }
 
     return NextResponse.json({

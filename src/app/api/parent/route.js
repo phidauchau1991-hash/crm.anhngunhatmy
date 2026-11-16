@@ -163,9 +163,46 @@ export async function GET(request) {
       createdAt: log.createdAt ? new Date(log.createdAt).toISOString().split('T')[0] : '',
     }));
 
+    // Truy vấn tiến độ Học liệu số tại nhà từ StudySession & Student
+    let courseware = {
+      url: `/hoclieu?token=${encodeURIComponent(token)}`,
+      studyMinutes14d: 0,
+      totalStudyMinutes: 0,
+      lastLesson: null,
+      lastActiveAt: null,
+      activated: false,
+    };
+    try {
+      const cwStats = await prisma.$queryRaw`
+        SELECT
+          COALESCE(SUM(CASE WHEN createdAt >= datetime('now', '-14 days') THEN durationSeconds ELSE 0 END), 0) AS sec14d,
+          COALESCE(SUM(durationSeconds), 0) AS totalSec,
+          MAX(createdAt) AS lastAt
+        FROM StudySession
+        WHERE studentId = ${student.id}
+      `;
+      const row = cwStats?.[0] || {};
+      const lastLessonRow = await prisma.$queryRaw`
+        SELECT lessonTitle FROM StudySession
+        WHERE studentId = ${student.id} AND lessonTitle IS NOT NULL AND lessonTitle != ''
+        ORDER BY id DESC LIMIT 1
+      `;
+      const mins14 = Math.round(Number(row.sec14d || 0) / 60.0);
+      const minsTotal = Math.round(Number(row.totalSec || 0) / 60.0);
+      courseware = {
+        url: `/hoclieu?token=${encodeURIComponent(token)}`,
+        studyMinutes14d: mins14,
+        totalStudyMinutes: minsTotal,
+        lastLesson: lastLessonRow?.[0]?.lessonTitle || null,
+        lastActiveAt: row.lastAt || null,
+        activated: Boolean(row.lastAt || minsTotal > 0),
+      };
+    } catch (_) {}
+
     return NextResponse.json({
       success: true,
       data: {
+        courseware,
         student: {
           id: student.id,
           name: student.name,

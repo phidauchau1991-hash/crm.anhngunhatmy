@@ -601,6 +601,38 @@ export async function POST(request) {
         });
         console.log(`[Lead→HV] Gộp ${migratedAssessments.count} bài test & đánh giá từ Lead #${leadIdInt} sang HV ${studentId}`);
         
+        // 3.5.3 Chuyển lịch sử Học liệu số (StudySession, phân quyền sách & trạng thái giữ quyền) từ Lead sang HV mới
+        const leadCwKey = `LEAD_${leadIdInt}`;
+        try {
+          const leadRecord = await prisma.lead.findUnique({ where: { id: leadIdInt } });
+          if (leadRecord) {
+            await prisma.$executeRaw`UPDATE StudySession SET studentId = ${studentId} WHERE studentId = ${leadCwKey} OR studentId = ${String(leadIdInt)}`;
+            const sessStats = await prisma.$queryRaw`SELECT COALESCE(SUM(durationSeconds), 0) AS totalSec, MIN(createdAt) AS firstAt, MAX(createdAt) AS lastAt FROM StudySession WHERE studentId = ${studentId}`;
+            const totalMin = Math.round(Number(sessStats?.[0]?.totalSec || 0) / 60.0);
+
+            if (leadRecord.customBookCodes || leadRecord.retainCoursewareAccess) {
+              await prisma.student.update({
+                where: { id: studentId },
+                data: {
+                  ...(leadRecord.customBookCodes ? { customBookCodes: leadRecord.customBookCodes } : {}),
+                  ...(leadRecord.retainCoursewareAccess ? { retainCoursewareAccess: true } : {}),
+                },
+              });
+            }
+            if (totalMin > 0 || sessStats?.[0]?.firstAt) {
+              await prisma.$executeRaw`
+                UPDATE Student
+                SET coursewareStudyMinutes = ${totalMin},
+                    coursewareActivatedAt = COALESCE(coursewareActivatedAt, ${sessStats[0].firstAt}),
+                    coursewareLastActiveAt = COALESCE(${sessStats[0].lastAt}, coursewareLastActiveAt)
+                WHERE id = ${studentId}
+              `;
+            }
+          }
+        } catch (cwErr) {
+          console.warn('[Lead→HV] Lỗi chuyển dữ liệu học liệu số:', cwErr?.message);
+        }
+
         // Cập nhật trạng thái Lead thành "Đã chốt"
         await prisma.lead.update({
           where: { id: leadIdInt },

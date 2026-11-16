@@ -42,9 +42,15 @@ export default function MonthlyReportTab({ classes }) {
         setStudentsData(data.students);
         setClassDiaries(data.diaries);
         
-        // Reset inputs
-        setTeacherKeywords({});
-        setAiComments({});
+        // Khôi phục từ khóa & nhận xét AI đã lưu trong CSDL (nếu có)
+        const kwMap = {};
+        const cmtMap = {};
+        (data.students || []).forEach((s) => {
+          if (s.teacherKeywords) kwMap[s.id] = s.teacherKeywords;
+          if (s.aiComment) cmtMap[s.id] = s.aiComment;
+        });
+        setTeacherKeywords(kwMap);
+        setAiComments(cmtMap);
       } else {
         alert(data.error || 'Lỗi lấy dữ liệu');
       }
@@ -56,9 +62,28 @@ export default function MonthlyReportTab({ classes }) {
     }
   };
 
-  const handleGenerateAi = async (student) => {
+  const saveCommentToDb = async (studentId, keywordsVal, commentVal) => {
+    if (!selectedClass || !selectedMonth) return;
+    try {
+      await fetch('/api/reports/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          classCode: selectedClass,
+          monthYear: selectedMonth,
+          teacherKeywords: keywordsVal,
+          aiComment: commentVal,
+        }),
+      });
+    } catch (e) {
+      console.warn('Auto-save monthly report warning:', e);
+    }
+  };
+
+  const handleGenerateAi = async (student, skipConfirm = false) => {
     const keywords = teacherKeywords[student.id] || '';
-    if (!keywords.trim()) {
+    if (!skipConfirm && !keywords.trim()) {
       const confirmRun = window.confirm('Bạn chưa nhập từ khóa nhận xét cho học viên này. AI sẽ tự viết nhận xét chung chung. Bạn có muốn tiếp tục?');
       if (!confirmRun) return;
     }
@@ -78,14 +103,27 @@ export default function MonthlyReportTab({ classes }) {
       
       if (data.success) {
         setAiComments(prev => ({ ...prev, [student.id]: data.data }));
+        saveCommentToDb(student.id, keywords, data.data);
       } else {
-        alert(data.error || 'Lỗi gọi AI');
+        if (!skipConfirm) alert(data.error || 'Lỗi gọi AI');
       }
     } catch (error) {
       console.error(error);
-      alert('Lỗi kết nối AI');
+      if (!skipConfirm) alert('Lỗi kết nối AI');
     } finally {
       setIsGeneratingAi(prev => ({ ...prev, [student.id]: false }));
+    }
+  };
+
+  const handleBatchGenerateAi = async () => {
+    const targets = studentsData.filter((s) => !(aiComments[s.id] || '').trim());
+    if (targets.length === 0) {
+      alert('Tất cả học viên trong lớp đã có nhận xét!');
+      return;
+    }
+    if (!confirm(`Tự động viết nhận xét AI cho ${targets.length} học viên chưa có nhận xét?`)) return;
+    for (const s of targets) {
+      await handleGenerateAi(s, true);
     }
   };
 
@@ -149,9 +187,20 @@ export default function MonthlyReportTab({ classes }) {
 
   return (
     <div className="card" style={{ padding: '2rem', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#1e293b' }}>
-        Tạo Phiếu Báo Cáo Học Tập (Học Viên Tháng)
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>
+          Tạo Phiếu Báo Cáo Học Tập Tháng (Tất Cả Các Lớp)
+        </h2>
+        {studentsData.length > 0 && (
+          <button
+            type="button"
+            onClick={handleBatchGenerateAi}
+            style={{ padding: '0.55rem 1.1rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+          >
+            🤖 AI Viết Nhận Xét Cả Lớp
+          </button>
+        )}
+      </div>
 
       {/* FILTER SECTION */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end' }}>
@@ -229,6 +278,7 @@ export default function MonthlyReportTab({ classes }) {
                       placeholder="Kết quả AI sẽ hiện ở đây..."
                       value={aiComments[student.id] || ''}
                       onChange={e => setAiComments(prev => ({ ...prev, [student.id]: e.target.value }))}
+                      onBlur={() => saveCommentToDb(student.id, teacherKeywords[student.id] || '', aiComments[student.id] || '')}
                       style={{ width: '100%', minHeight: '120px', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'vertical', background: '#f0f9ff' }}
                     />
                   </td>

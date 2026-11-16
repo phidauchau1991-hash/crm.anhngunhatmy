@@ -70,9 +70,11 @@ export async function POST(request) {
         unitPrice: parseFloat(String(unitPrice || 0).replace(/[^0-9.-]/g, '')) || 0,
         threshold: parseInt(threshold) || 5,
         currentStock: 0,
-        branchId: branchFilter.branchId || process.env.DEFAULT_BRANCH_ID || "CN1_BinhDuong"
+        branchId: branchFilter.branchId || 'CN1_BinhDuong'
       },
     });
+
+    try { await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)'); } catch (_) {}
 
     return NextResponse.json({ success: true, message: 'Thêm vật tư thành công', data: item });
   } catch (error) {
@@ -80,8 +82,18 @@ export async function POST(request) {
   }
 }
 
+function canManageInventoryCatalog(roleStr) {
+  const roles = (roleStr || '').split(',').map(r => r.trim());
+  return ['DIRECTOR', 'REGIONAL_MANAGER', 'CHIEF_ACCOUNTANT', 'MANAGER', 'ACADEMIC_MANAGER'].some(r => roles.includes(r));
+}
+
 export async function PUT(request) {
   try {
+    const userRole = request.headers.get('x-user-role');
+    if (!canManageInventoryCatalog(userRole)) {
+      return NextResponse.json({ success: false, error: 'Bạn không có quyền chỉnh sửa danh mục vật tư' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, name, category, threshold, unit, unitCost, unitPrice } = body;
 
@@ -101,6 +113,8 @@ export async function PUT(request) {
       },
     });
 
+    try { await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)'); } catch (_) {}
+
     return NextResponse.json({ success: true, message: 'Cập nhật thành công', data: item });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -109,6 +123,11 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
+    const userRole = request.headers.get('x-user-role');
+    if (!canManageInventoryCatalog(userRole)) {
+      return NextResponse.json({ success: false, error: 'Bạn không có quyền xóa mã vật tư' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -120,6 +139,7 @@ export async function DELETE(request) {
     }
 
     await prisma.inventory.delete({ where: { id } });
+    try { await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)'); } catch (_) {}
     return NextResponse.json({ success: true, message: 'Xóa vật tư thành công' });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

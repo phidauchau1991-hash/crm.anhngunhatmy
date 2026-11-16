@@ -259,6 +259,70 @@ export default function ParentPortalPage() {
           </div>
         </section>
 
+        {/* Courseware Quick Launch & Study Telemetry Card */}
+        {data.courseware && (
+          <section style={{
+            background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)',
+            border: '1px solid rgba(56, 189, 248, 0.45)',
+            borderRadius: '14px',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.85rem',
+            color: '#fff',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                background: 'rgba(255, 202, 41, 0.18)',
+                border: '1px solid #FFCA29',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.35rem',
+                color: '#FFCA29',
+                flexShrink: 0,
+              }}>
+                <i className="fa-solid fa-book-open-reader"></i>
+              </div>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '0.98rem', color: '#FFCA29' }}>
+                  Học Liệu Tương Tác Số Tại Nhà
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#e0f2fe', marginTop: '2px' }}>
+                  14 ngày qua: <strong>{data.courseware.studyMinutes14d || 0} phút</strong> · Tổng cộng: <strong>{data.courseware.totalStudyMinutes || 0} phút</strong>
+                  {data.courseware.lastLesson ? ` · Bài gần nhất: ${data.courseware.lastLesson}` : ''}
+                </div>
+              </div>
+            </div>
+            <a
+              href={data.courseware.url || `/hoclieu?token=${encodeURIComponent(token)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: '#FFCA29',
+                color: '#085E8A',
+                fontWeight: '800',
+                fontSize: '0.85rem',
+                padding: '0.6rem 1.1rem',
+                borderRadius: '10px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              }}
+            >
+              <i className="fa-solid fa-tablet-screen-button"></i> Mở Tủ Sách Học Liệu
+            </a>
+          </section>
+        )}
+
         {/* Main Sections Tabs */}
         <div className="tabs-nav-bar">
           <button 

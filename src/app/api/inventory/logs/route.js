@@ -46,27 +46,52 @@ export async function POST(request) {
     const receiptCode = `${prefix}-${timestamp}-${randomStr}`;
 
     const isExport = type.startsWith('XUAT');
-    const collectedAmt = parseFloat(amountCollected) || 0;
+    const isAudit = type === 'KIEM_KE';
+    const collectedAmt = Math.round(parseFloat(amountCollected) || 0);
 
     const result = await prisma.$transaction(async (tx) => {
       let createdLogs = [];
       let itemNames = [];
       
       for (const item of items) {
-        if (!item.inventoryId || !item.quantity || item.quantity <= 0) {
-          throw new Error('Thiếu ID vật tư hoặc số lượng không hợp lệ');
+        if (!item.inventoryId) {
+          throw new Error('Thiếu ID vật tư');
         }
 
-        const actualQuantity = isExport ? -item.quantity : item.quantity;
         const inv = await tx.inventory.findUnique({ where: { id: item.inventoryId } });
         if (!inv) throw new Error(`Không tìm thấy vật tư có mã ${item.inventoryId}`);
 
-        // 1. Kiểm tra tồn kho trước khi xuất
-        if (isExport) {
-          if (inv.currentStock < item.quantity) {
-            throw new Error(`Vật tư [${inv.name}] không đủ tồn kho (Còn: ${inv.currentStock}, Yêu cầu: ${item.quantity})`);
+        let actualQuantity = 0;
+        if (isAudit) {
+          if (item.actualStock !== undefined && item.actualStock !== null && item.actualStock !== '') {
+            const targetStock = parseInt(item.actualStock, 10);
+            if (isNaN(targetStock) || targetStock < 0) {
+              throw new Error('Số lượng tồn thực tế kiểm kê phải >= 0');
+            }
+            actualQuantity = targetStock - inv.currentStock;
+          } else {
+            actualQuantity = parseInt(item.quantity, 10) || 0;
           }
-          itemNames.push(`${inv.name} (x${item.quantity})`);
+          if (actualQuantity === 0) {
+            throw new Error(`Số lượng tồn thực tế của [${inv.name}] không thay đổi so với hệ thống (${inv.currentStock})`);
+          }
+          if (inv.currentStock + actualQuantity < 0) {
+            throw new Error(`Tồn kho sau điều chỉnh của [${inv.name}] không thể âm`);
+          }
+        } else {
+          const qty = parseInt(item.quantity, 10);
+          if (!qty || qty <= 0) {
+            throw new Error('Số lượng giao dịch phải lớn hơn 0');
+          }
+          actualQuantity = isExport ? -qty : qty;
+
+          // 1. Kiểm tra tồn kho trước khi xuất
+          if (isExport) {
+            if (inv.currentStock < qty) {
+              throw new Error(`Vật tư [${inv.name}] không đủ tồn kho (Còn: ${inv.currentStock}, Yêu cầu: ${qty})`);
+            }
+            itemNames.push(`${inv.name} (x${qty})`);
+          }
         }
 
         const logUnitCost = item.unitCost !== undefined && item.unitCost !== null && item.unitCost !== ''
@@ -87,7 +112,7 @@ export async function POST(request) {
             targetType: targetType || 'SYSTEM',
             targetName: targetName || null,
             studentId: studentId || null,
-            notes: notes || null,
+            notes: notes || (isAudit ? `Kiểm kê cân bằng tồn thực tế -> ${inv.currentStock + actualQuantity}` : null),
           }
         });
         createdLogs.push(log);
@@ -108,7 +133,7 @@ export async function POST(request) {
         });
       }
 
-      // 4. Nếu có thu tiền mua vật tư/giáo trình từ học viên, tự động ghi nhận Hóa đơn Thu tiền vào Hệ thống Tài chính
+      // 4. Nếu có thu tiền mua vật tư/giáo trình từ học viên, tự động ghi nhận Hóa đơn + PaymentLog vào Tài chính
       if (collectedAmt > 0 && studentId) {
         const student = await tx.student.findUnique({ where: { id: studentId }, include: { enrollments: { where: { status: 'Đang học' } } } });
         const classCode = student?.enrollments[0]?.classCode || 'XUAT_KHO';
@@ -116,26 +141,39 @@ export async function POST(request) {
         const year = String(now.getFullYear()).substring(2);
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const orderId = `ORD_ITEM_${year}${month}_${randomStr}`;
+        const payMethod = paymentMethod || 'Chuyển khoản';
 
         await tx.orderFinance.create({
           data: {
             id: orderId,
             studentId,
             classCode,
-            promoType: `Thu tiền Xuất kho / Bán vật tư (${itemNames.join(', ')}) [Qua ${paymentMethod || 'Chuyển khoản'}${notes ? `. Ghi chú: ${notes}` : ''}]`,
+            promoType: `Thu tiền Xuất kho / Bán vật tư (${itemNames.join(', ')}) [Qua ${payMethod}${notes ? `. Ghi chú: ${notes}` : ''}]`,
             promoDiscount: 0,
             feeToPay: collectedAmt,
             amountPaid: collectedAmt,
             paymentStatus: 'Đã đóng',
             paymentPolicy: 'Đóng trước',
             paymentDeadline: now,
-            giftName: itemNames.join(', ')
+            giftName: itemNames.join(', '),
+            branchId: student?.branchId || 'CN1_BinhDuong',
+          }
+        });
+
+        await tx.paymentLog.create({
+          data: {
+            orderId,
+            amount: collectedAmt,
+            paymentMethod: payMethod,
+            notes: `Thu bán vật tư từ Kho (${receiptCode})`,
           }
         });
       }
 
       return { receiptCode, logsCount: createdLogs.length, amountCollected: collectedAmt };
     });
+
+    try { await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)'); } catch (_) {}
 
     return NextResponse.json({ success: true, message: 'Thực hiện giao dịch kho thành công', data: result });
   } catch (error) {

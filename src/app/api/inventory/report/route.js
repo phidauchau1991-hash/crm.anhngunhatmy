@@ -9,17 +9,19 @@ export async function GET(request) {
     
     const month = parseInt(searchParams.get('month')) || (now.getMonth() + 1);
     const year = parseInt(searchParams.get('year')) || now.getFullYear();
-    const branchId = searchParams.get('branchId') || 'ALL';
     const category = searchParams.get('category') || 'ALL';
 
-    const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    const userRole = request.headers.get('x-user-role');
+    const userBranchId = request.headers.get('x-user-branch');
+    const selectedBranch = request.headers.get('x-selected-branch');
+    const branchFilter = getBranchFilter(userRole, userBranchId, selectedBranch, 'all');
 
-    // Filter điều kiện kho
-    const invWhere = {};
-    if (branchId !== 'ALL') {
-      invWhere.branchId = branchId;
-    }
+    // Mốc đầu tháng - cuối tháng chuẩn theo giờ Việt Nam (+07:00)
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - 7 * 3600 * 1000);
+    const endOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0) - 7 * 3600 * 1000 - 1);
+
+    // Filter điều kiện kho theo chi nhánh & danh mục
+    const invWhere = { ...branchFilter };
     if (category !== 'ALL') {
       invWhere.category = category;
     }
@@ -142,7 +144,7 @@ export async function GET(request) {
       where: {
         type: 'XUAT_TANG',
         createdAt: { gte: startOfMonth, lte: endOfMonth },
-        ...(category !== 'ALL' ? { inventory: { category } } : {})
+        ...(Object.keys(invWhere).length > 0 ? { inventory: invWhere } : {}),
       },
       include: {
         inventory: {
@@ -208,9 +210,10 @@ export async function GET(request) {
       items: Object.values(c.items)
     })).sort((a, b) => b.totalCost - a.totalCost);
 
-    // 4. Số lượng Học viên mới nhập học trong tháng (dùng tính CAC Quà Tặng)
+    // 4. Số lượng Học viên mới nhập học trong tháng (lọc theo chi nhánh, dùng tính CAC Quà Tặng)
     const newStudentsCount = await prisma.student.count({
       where: {
+        ...branchFilter,
         createdAt: { gte: startOfMonth, lte: endOfMonth }
       }
     });

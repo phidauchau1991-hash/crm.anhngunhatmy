@@ -20,14 +20,20 @@ const MonthlyAcademicReportTemplate = forwardRef(({ data }, ref) => {
   );
 
   return (
-    <div ref={ref} id="monthly-academic-report-template" style={{ width: '800px', backgroundColor: '#ffffff', padding: '0', fontFamily: 'Arial, sans-serif', position: 'relative', overflow: 'hidden', fontVariantLigatures: 'none', letterSpacing: 'normal' }}>
+    <div ref={ref} id="monthly-academic-report-template" style={{ width: '800px', backgroundColor: '#ffffff', padding: '0', fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif", position: 'relative', overflow: 'hidden', fontVariantLigatures: 'none', letterSpacing: 'normal' }}>
       
       {/* HEADER BANNER */}
-      <div style={{ background: '#0D88C4', padding: '30px 40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <img src="/logo.png" alt="Logo" crossOrigin="anonymous" style={{ width: '80px', height: '80px', objectFit: 'contain', background: 'white', padding: '5px', borderRadius: '50%' }} />
-        <div style={{ color: 'white' }}>
-          <h1 style={{ margin: '0 0 5px 0', fontSize: '26px', fontWeight: '800', letterSpacing: '1px' }}>PHIẾU BÁO CÁO HỌC TẬP THÁNG</h1>
-          <div style={{ fontSize: '16px', opacity: 0.9 }}>Tháng {monthYear} | Hệ thống Đào tạo Nhật Mỹ</div>
+      <div style={{ background: '#ffffff', borderBottom: '4px solid #0D88C4', padding: '26px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <img src="/logo.png" alt="ANH NGỮ NHẬT MỸ" crossOrigin="anonymous" style={{ width: '76px', height: '76px', objectFit: 'contain', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: '20px', fontWeight: '900', color: '#085E8A', letterSpacing: '0.5px', lineHeight: '1.2' }}>ANH NGỮ NHẬT MỸ</div>
+            <div style={{ fontSize: '13px', fontStyle: 'italic', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>Dedicated to Excellence</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '23px', fontWeight: '900', color: '#0D88C4', letterSpacing: '0.5px' }}>PHIẾU BÁO CÁO HỌC TẬP THÁNG</h1>
+          <div style={{ fontSize: '14px', color: '#475569', fontWeight: '700' }}>Tháng {monthYear}</div>
         </div>
       </div>
 

@@ -19,40 +19,42 @@ export function getBookCodesFromClass(classInfo) {
   if (!classInfo) return [];
   const level = (classInfo.level || '').toUpperCase().trim();
   const code = (classInfo.code || classInfo.classCode || '').toUpperCase().trim();
+  const tokens = new Set(code.split(/[_\-\s/|]+/).filter(Boolean));
+  const hasToken = (...keys) => keys.some((k) => tokens.has(k));
 
   const books = [];
 
   // 0. Lớp S4: Ôn tổng hợp S1+S2+S3 và Luyện thi Cambridge Pre A1 Starters
-  if (level === 'S4' || code.includes('_S4_') || code === 'S4' || code.startsWith('S4 ')) {
+  if (level === 'S4' || hasToken('S4')) {
     return ['s4_starters', 'beehive_1', 'beehive_2', 'beehive_3'];
   }
 
   // 1. Đối soát Beehive Starter (Mầm non / Pre-Starters)
-  if (level.includes('STARTER') || level.includes('BEEHIVE_START') || code.includes('STARTER')) {
+  if (level.includes('STARTER') || level.includes('BEEHIVE_START') || hasToken('STARTER', 'STARTERS')) {
     books.push('beehive_starter');
   }
   // 2. Đối soát Beehive 1 (Tiểu học / Starters 1: S1)
-  if (level.includes('BEEHIVE_1') || level === 'BH1' || level === 'S1' || code.includes('BH1') || code.includes('S1')) {
+  if (level.includes('BEEHIVE_1') || level === 'BH1' || level === 'S1' || hasToken('BH1', 'S1')) {
     books.push('beehive_1');
   }
   // 3. Đối soát Beehive 2 (Tiểu học / Starters 2 / Movers 1: S2 / M1)
-  if (level.includes('BEEHIVE_2') || level === 'BH2' || level === 'S2' || level === 'M1' || code.includes('BH2') || code.includes('S2') || code.includes('M1')) {
+  if (level.includes('BEEHIVE_2') || level === 'BH2' || level === 'S2' || level === 'M1' || hasToken('BH2', 'S2', 'M1')) {
     books.push('beehive_2');
   }
   // 4. Đối soát Beehive 3 (Tiểu học / Starters 3 / Movers 2-3: S3 / M2 / M3)
-  if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M2' || level === 'M3' || code.includes('BH3') || code.includes('S3') || code.includes('M2') || code.includes('M3')) {
+  if (level.includes('BEEHIVE_3') || level === 'BH3' || level === 'S3' || level === 'M2' || level === 'M3' || hasToken('BH3', 'S3', 'M2', 'M3')) {
     books.push('beehive_3');
   }
   // 5. Đối soát Beehive 4 (Tiểu học / Flyers: F1 / F2 / Flyers)
-  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'F1' || level === 'F2' || level.includes('FLYER') || code.includes('BH4') || code.includes('F1') || code.includes('F2') || code.includes('FLYER')) {
+  if (level.includes('BEEHIVE_4') || level === 'BH4' || level === 'F1' || level === 'F2' || level.includes('FLYER') || hasToken('BH4', 'F1', 'F2', 'FLYER', 'FLYERS')) {
     books.push('beehive_4');
   }
   // 6. Đối soát Think Starters (Trung học cơ sở)
-  if (level.includes('THINK') || code.includes('THINK')) {
+  if (level.includes('THINK') || hasToken('THINK')) {
     books.push('think_starters');
   }
   // 7. Đối soát KET / B1 Preliminary (PET)
-  if (level.includes('KET') || level.includes('PET') || level.includes('B1') || code.includes('KET') || code.includes('PET')) {
+  if (level.includes('KET') || level.includes('PET') || level.includes('B1') || hasToken('KET', 'PET', 'B1')) {
     books.push('ket_b1');
   }
 
@@ -61,7 +63,7 @@ export function getBookCodesFromClass(classInfo) {
     books.push('beehive_1');
   }
 
-  return books;
+  return [...new Set(books)];
 }
 
 /**
