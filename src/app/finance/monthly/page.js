@@ -369,7 +369,8 @@ export default function MonthlyBillingPage() {
     setFormDob('');
     setFormAddress('');
     setFormNationalId('');
-    setFormClassCode(allClasses.length > 0 ? allClasses[0].code : '');
+    const monthlyOnlyClasses = allClasses.filter((c) => c.level === 'MONTHLY');
+    setFormClassCode(monthlyOnlyClasses.length > 0 ? monthlyOnlyClasses[0].code : '');
     setFormStartDate(new Date().toISOString().split('T')[0]);
     setFormBillingType('MONTHLY_PREPAID');
     setFormMonthlyRate('1200000');
@@ -407,22 +408,28 @@ export default function MonthlyBillingPage() {
 
   // Xác nhận xóa: permanent = true (xóa vĩnh viễn khỏi toàn bộ hệ thống - dành cho học viên demo)
   // permanent = false (chỉ rút khỏi danh sách học phí tháng)
-  const handleConfirmDelete = async (enrollmentId, permanent) => {
+  const handleConfirmDelete = async (enrollmentId, permanent, force = false) => {
     setDeletingStudent(true);
     try {
       const res = await fetch(
-        `/api/finance/monthly/config?enrollmentId=${enrollmentId}&permanent=${permanent ? 'true' : 'false'}`,
+        `/api/finance/monthly/config?enrollmentId=${enrollmentId}&permanent=${permanent ? 'true' : 'false'}${force ? '&force=true' : ''}`,
         {
           method: 'DELETE',
         }
       );
       const json = await res.json();
+      if (res.status === 409 && json.requiresConfirm && !force) {
+        if (window.confirm(json.error)) {
+          await handleConfirmDelete(enrollmentId, permanent, true);
+        }
+        return;
+      }
       if (res.ok && json.success) {
         setMessage({
           type: 'success',
-          text: permanent
+          text: json.message || (permanent
             ? 'Đã xóa vĩnh viễn học viên và toàn bộ dữ liệu liên quan khỏi hệ thống hoàn toàn.'
-            : 'Đã xóa học viên khỏi danh sách lớp học phí tháng.',
+            : 'Đã xóa học viên khỏi danh sách lớp học phí tháng.'),
         });
         setDeleteTarget(null);
         fetchConfigData();
@@ -2217,12 +2224,14 @@ export default function MonthlyBillingPage() {
                     onChange={(e) => setFormClassCode(e.target.value)}
                     style={{ padding: '0.45rem 0.75rem', fontSize: '0.9rem', fontWeight: '600', width: '100%', boxSizing: 'border-box' }}
                   >
-                    <option value="">-- Chọn lớp học --</option>
-                    {allClasses.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.code} {c.teacherName ? `(${c.teacherName})` : ''}
-                      </option>
-                    ))}
+                    <option value="">-- Chọn lớp học tháng / học kèm --</option>
+                    {allClasses
+                      .filter((c) => c.level === 'MONTHLY' || c.code === formClassCode)
+                      .map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} {c.teacherName ? `(${c.teacherName})` : ''} {c.level !== 'MONTHLY' ? '[Cảnh báo: Lớp Khóa]' : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
 

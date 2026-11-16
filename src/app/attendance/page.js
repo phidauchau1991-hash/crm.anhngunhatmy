@@ -159,21 +159,22 @@ export default function AttendancePage() {
     targetDate.setHours(0,0,0,0);
     const dayOfWeek = targetDate.getDay();
 
-    // 1. Kiểm tra Lịch học (scheduleRaw: "24", "35"...)
-    const schedule = clsInfo.scheduleRaw || '';
+    // 1. Kiểm tra Lịch học (chỉ đọc phần thứ trước dấu '|', tránh đọc nhầm giờ học như 13:30 / 15:00 / 20:30)
+    const scheduleRaw = String(clsInfo.scheduleRaw || clsInfo.schedule || '');
+    const scheduleBase = scheduleRaw.split('|')[0].toUpperCase();
     const allowedDays = [];
     const vietnameseDays = [];
 
-    if (schedule.includes('2')) { allowedDays.push(1); vietnameseDays.push('Thứ 2'); }
-    if (schedule.includes('3')) { allowedDays.push(2); vietnameseDays.push('Thứ 3'); }
-    if (schedule.includes('4')) { allowedDays.push(3); vietnameseDays.push('Thứ 4'); }
-    if (schedule.includes('5')) { allowedDays.push(4); vietnameseDays.push('Thứ 5'); }
-    if (schedule.includes('6')) { allowedDays.push(5); vietnameseDays.push('Thứ 6'); }
-    if (schedule.includes('7')) { allowedDays.push(6); vietnameseDays.push('Thứ 7'); }
-    if (schedule.includes('8') || schedule.includes('CN') || schedule.toUpperCase().includes('C')) { allowedDays.push(0); vietnameseDays.push('Chủ Nhật'); }
+    if (scheduleBase.includes('2')) { allowedDays.push(1); vietnameseDays.push('Thứ 2'); }
+    if (scheduleBase.includes('3')) { allowedDays.push(2); vietnameseDays.push('Thứ 3'); }
+    if (scheduleBase.includes('4')) { allowedDays.push(3); vietnameseDays.push('Thứ 4'); }
+    if (scheduleBase.includes('5')) { allowedDays.push(4); vietnameseDays.push('Thứ 5'); }
+    if (scheduleBase.includes('6')) { allowedDays.push(5); vietnameseDays.push('Thứ 6'); }
+    if (scheduleBase.includes('7')) { allowedDays.push(6); vietnameseDays.push('Thứ 7'); }
+    if (scheduleBase.includes('8') || scheduleBase.includes('CN') || scheduleBase.includes('CHỦ NHẬT') || scheduleBase.includes('CHU NHAT')) { allowedDays.push(0); vietnameseDays.push('Chủ Nhật'); }
 
-    // Kiểm tra xem ngày chọn có rơi đúng lịch học tuần không
-    const matchesSchedule = allowedDays.includes(dayOfWeek);
+    // Nếu lớp không ghi lịch cố định (vd '—') thì cho phép linh hoạt; ngược lại kiểm tra đúng thứ học
+    const matchesSchedule = allowedDays.length === 0 || allowedDays.includes(dayOfWeek);
 
     // 2. Kiểm tra khoảng thời gian (startDate -> expectedEndDate)
     // Chuyển đổi định dạng ngày DD/MM/YYYY từ API thành Date

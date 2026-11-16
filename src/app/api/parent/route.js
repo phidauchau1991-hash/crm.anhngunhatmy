@@ -53,6 +53,12 @@ export async function GET(request) {
           },
           orderBy: { examDate: 'desc' },
         },
+        monthlyInvoices: {
+          orderBy: { id: 'desc' },
+        },
+        monthlyAcademicReports: {
+          orderBy: { id: 'desc' },
+        },
       },
     });
 
@@ -139,16 +145,33 @@ export async function GET(request) {
     let outstanding = 0;
     let historicalDebt = 0;
 
-    if (currentOrder) {
+    const monthlyPaidTotal = (student.monthlyInvoices || []).reduce((sum, m) => sum + (m.amountPaid || 0), 0);
+    const monthlyOutstandingTotal = (student.monthlyInvoices || []).reduce(
+      (sum, m) => sum + Math.max(0, (m.totalToPay || 0) - (m.amountPaid || 0)),
+      0
+    );
+    const isMonthlyActive = Boolean(
+      activeEnrollment &&
+      (activeEnrollment.billingType === 'MONTHLY_PREPAID' ||
+       activeEnrollment.billingType === 'MONTHLY_POSTPAID' ||
+       activeEnrollment.class?.level === 'MONTHLY')
+    );
+
+    if (currentOrder && !isMonthlyActive) {
       totalToPay = currentOrder.feeToPay;
       totalPaid = currentOrder.amountPaid;
       outstanding = Math.max(0, currentOrder.feeToPay - currentOrder.amountPaid);
+    } else if (isMonthlyActive) {
+      const latestMonthly = (student.monthlyInvoices || [])[0];
+      totalToPay = latestMonthly ? latestMonthly.totalToPay : (activeEnrollment?.monthlyRate || 0);
+      totalPaid = monthlyPaidTotal;
+      outstanding = monthlyOutstandingTotal;
     }
     historicalDebt = tuitionOrders
-      .filter(o => currentOrder ? o.id !== currentOrder.id : true)
+      .filter(o => (currentOrder && !isMonthlyActive) ? o.id !== currentOrder.id : true)
       .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
 
-    const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0);
+    const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0) + monthlyPaidTotal;
 
     // 4. Format inventory logs
     const inventoryLogs = student.inventoryLogs.map(log => ({
@@ -330,6 +353,25 @@ export async function GET(request) {
             scores,
           };
         }),
+        monthlyInvoices: (student.monthlyInvoices || []).map(inv => ({
+          id: inv.id,
+          classCode: inv.classCode,
+          monthYear: inv.monthYear,
+          billingType: inv.billingType,
+          actualSessions: inv.actualSessions,
+          committedSessions: inv.committedSessions,
+          totalToPay: inv.totalToPay,
+          amountPaid: inv.amountPaid,
+          status: inv.status,
+          paymentCode: inv.paymentCode,
+        })),
+        monthlyReports: (student.monthlyAcademicReports || []).map(rep => ({
+          id: rep.id,
+          classCode: rep.classCode,
+          monthYear: rep.monthYear,
+          teacherKeywords: rep.teacherKeywords || '',
+          aiComment: rep.aiComment || '',
+        })),
       },
     });
   } catch (error) {

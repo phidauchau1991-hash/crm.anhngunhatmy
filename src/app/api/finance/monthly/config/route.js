@@ -54,6 +54,15 @@ export async function POST(request) {
 
     // 1. Trường hợp cập nhật Enrollment đã có (Chỉnh sửa học viên)
     if (enrollmentId) {
+      if (classCode) {
+        const targetCls = await prisma.class.findUnique({ where: { code: classCode } });
+        if (!targetCls || targetCls.level !== 'MONTHLY') {
+          return NextResponse.json(
+            { error: `Lớp "${classCode}" thuộc hệ theo Khóa, không thể gán làm Học phí Tháng!` },
+            { status: 400 }
+          );
+        }
+      }
       const updated = await prisma.enrollment.update({
         where: { id: enrollmentId },
         data: {
@@ -155,6 +164,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Chưa chọn lớp học' }, { status: 400 });
     }
 
+    const classInfo = await prisma.class.findUnique({ where: { code: classCode } });
+    if (!classInfo || classInfo.level !== 'MONTHLY') {
+      return NextResponse.json(
+        { error: `Lớp "${classCode}" là lớp theo Khóa cố định, không thể đưa vào danh sách Học phí Tháng!` },
+        { status: 400 }
+      );
+    }
+
     // 3. Xếp lớp / Cập nhật Enrollment cho học viên này
     const existingEnrollment = await prisma.enrollment.findFirst({
       where: {
@@ -213,6 +230,7 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     const enrollmentId = parseInt(searchParams.get('enrollmentId'), 10);
     const permanent = searchParams.get('permanent') === 'true';
+    const force = searchParams.get('force') === 'true';
 
     if (!enrollmentId) {
       return NextResponse.json({ error: 'Thiếu enrollmentId' }, { status: 400 });
@@ -220,6 +238,7 @@ export async function DELETE(request) {
 
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
+      include: { class: true },
     });
 
     if (!enrollment) {
@@ -263,14 +282,46 @@ export async function DELETE(request) {
       });
     }
 
-    // Xóa học viên khỏi danh sách tháng (Xóa enrollment lớp tháng này, độc lập 100%, không dính líu đến học theo khóa)
+    // Bảo vệ lớp Khóa: Không bao giờ cho phép "Xóa khỏi tháng" nếu enrollment thuộc lớp Khóa
+    if (enrollment.class && enrollment.class.level !== 'MONTHLY') {
+      return NextResponse.json(
+        { error: `Lớp "${enrollment.classCode}" là lớp theo Khóa, không thể xóa bằng thao tác "Xóa khỏi tháng"! Hãy chuyển học viên về hệ Khóa thay vì xóa.` },
+        { status: 400 }
+      );
+    }
+
+    // Kiểm tra công nợ hóa đơn tháng chưa thu của học viên ở lớp này
+    const unpaidMonthlyCount = await prisma.monthlyInvoice.count({
+      where: {
+        studentId,
+        classCode: enrollment.classCode,
+        status: { in: ['UNPAID', 'PARTIAL'] },
+      },
+    });
+    if (unpaidMonthlyCount > 0 && !force) {
+      return NextResponse.json(
+        {
+          requiresConfirm: true,
+          error: `Học viên này vẫn còn ${unpaidMonthlyCount} hóa đơn học phí tháng chưa thu ở lớp "${enrollment.classCode}". Nếu rút khỏi lớp tháng, hóa đơn cũ vẫn lưu để đối soát. Bạn có chắc muốn tiếp tục?`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Xóa học viên khỏi danh sách tháng (chỉ xóa enrollment lớp tháng này)
     await prisma.enrollment.delete({
       where: { id: enrollmentId },
     });
 
+    const remainingActive = await prisma.enrollment.count({
+      where: { studentId, status: 'Đang học' },
+    });
+
     return NextResponse.json({ 
       success: true, 
-      message: 'Đã xóa học viên khỏi danh sách học phí tháng.' 
+      message: remainingActive > 0
+        ? `Đã rút học viên khỏi lớp tháng "${enrollment.classCode}" (Hồ sơ và lớp học khác của học viên vẫn được giữ nguyên).`
+        : `Đã rút học viên khỏi danh sách lớp tháng "${enrollment.classCode}".`
     });
   } catch (error) {
     console.error('Lỗi khi xóa học viên khỏi danh sách tháng:', error);

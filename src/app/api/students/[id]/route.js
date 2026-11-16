@@ -33,6 +33,12 @@ export async function GET(request, { params }) {
           },
           orderBy: { createdAt: 'desc' },
         },
+        monthlyInvoices: {
+          include: {
+            paymentLogs: { orderBy: { createdAt: 'desc' } },
+          },
+          orderBy: { id: 'desc' },
+        },
       },
     });
 
@@ -153,6 +159,17 @@ export async function GET(request, { params }) {
           paymentDeadline: o.paymentDeadline ? o.paymentDeadline.toISOString().split('T')[0] : null,
           paymentLogs: o.paymentLogs || [],
         })),
+        monthlyInvoices: (student.monthlyInvoices || []).map(m => ({
+          id: m.id,
+          classCode: m.classCode,
+          monthYear: m.monthYear,
+          billingType: m.billingType,
+          totalToPay: m.totalToPay,
+          amountPaid: m.amountPaid,
+          status: m.status,
+          paymentCode: m.paymentCode,
+          notes: m.notes || '',
+        })),
       },
     });
   } catch (error) {
@@ -174,6 +191,7 @@ export async function PUT(request, { params }) {
       include: {
         enrollments: {
           where: { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } },
+          include: { class: true },
           orderBy: { id: 'desc' },
         },
         orders: {
@@ -181,6 +199,12 @@ export async function PUT(request, { params }) {
             paymentLogs: { orderBy: { createdAt: 'desc' } },
           },
           orderBy: { createdAt: 'desc' },
+        },
+        monthlyInvoices: {
+          include: {
+            paymentLogs: { orderBy: { createdAt: 'desc' } },
+          },
+          orderBy: { id: 'desc' },
         },
       },
     });
@@ -663,6 +687,15 @@ export async function PUT(request, { params }) {
       }
 
       const currentEnrollment = student.enrollments[0];
+      if (billingType && billingType !== 'COURSE' && currentEnrollment.class?.level !== 'MONTHLY') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Lớp "${currentEnrollment.classCode}" là lớp theo Khóa cố định, không thể đổi sang Học phí Tháng! Nếu học viên chuyển hoặc học thêm lớp Tháng, vui lòng dùng Tab "Chuyển lớp / Xếp lớp".`
+          },
+          { status: 400 }
+        );
+      }
       
       const updated = await prisma.enrollment.update({
         where: { id: currentEnrollment.id },
@@ -751,28 +784,53 @@ export async function PUT(request, { params }) {
 
       // Nếu lớp mới là Lớp Học Kèm / Đóng Theo Tháng (level === 'MONTHLY')
       if (newClass.level === 'MONTHLY') {
+        const keepCourseEnrollment = Boolean(body.keepCourseEnrollment);
+        const monthlyBillingType = body.billingType === 'MONTHLY_POSTPAID' ? 'MONTHLY_POSTPAID' : 'MONTHLY_PREPAID';
+        const monthlyRateVal = Number(body.monthlyRate) > 0 ? Number(body.monthlyRate) : (currentEnrollment?.monthlyRate || 1200000);
+        const monthlySessionsVal = Number(body.monthlySessions) > 0 ? Number(body.monthlySessions) : (currentEnrollment?.monthlySessions || 8);
+
         await prisma.$transaction(async (tx) => {
-          if (currentEnrollment && currentEnrollment.classCode !== newClassCode) {
+          if (!keepCourseEnrollment && currentEnrollment && currentEnrollment.classCode !== newClassCode) {
             await tx.enrollment.update({
               where: { id: currentEnrollment.id },
               data: { status: 'Đã chuyển lớp' },
             });
           }
-          await tx.enrollment.create({
-            data: {
-              studentId: id,
-              classCode: newClassCode,
-              status: 'Đang học',
-              billingType: 'MONTHLY_PREPAID',
-              monthlyRate: currentEnrollment?.monthlyRate || 1200000,
-              monthlySessions: currentEnrollment?.monthlySessions || 8,
-            },
+
+          const existingTargetEnr = await tx.enrollment.findFirst({
+            where: { studentId: id, classCode: newClassCode },
+            orderBy: { id: 'desc' },
           });
+
+          if (existingTargetEnr) {
+            await tx.enrollment.update({
+              where: { id: existingTargetEnr.id },
+              data: {
+                status: 'Đang học',
+                billingType: monthlyBillingType,
+                monthlyRate: monthlyRateVal,
+                monthlySessions: monthlySessionsVal,
+              },
+            });
+          } else {
+            await tx.enrollment.create({
+              data: {
+                studentId: id,
+                classCode: newClassCode,
+                status: 'Đang học',
+                billingType: monthlyBillingType,
+                monthlyRate: monthlyRateVal,
+                monthlySessions: monthlySessionsVal,
+              },
+            });
+          }
         });
 
         return NextResponse.json({
           success: true,
-          message: `Đã xếp học viên vào lớp học theo tháng "${newClassCode}" thành công!`,
+          message: keepCourseEnrollment
+            ? `Đã ghi danh thêm lớp học theo tháng "${newClassCode}" song song với lớp hiện tại!`
+            : `Đã xếp học viên vào lớp học theo tháng "${newClassCode}" thành công!`,
           data: { newClassCode },
         });
       }
@@ -920,11 +978,13 @@ export async function PUT(request, { params }) {
         return NextResponse.json({ success: false, error: 'Lý do điều chỉnh là bắt buộc khi có điền số tiền điều chỉnh thủ công' }, { status: 400 });
       }
 
+      const isOldMonthly = oldClass?.level === 'MONTHLY' || (currentEnrollment.billingType && currentEnrollment.billingType !== 'COURSE');
+
       // Tính chi phí buổi đã học ở lớp cũ: (Học phí của lớp / Tổng số buổi) * Số buổi đã học
       const oldTotalSessions = oldConfig?.totalSessions || 32;
       let costUsedOld = 0;
-      if (transferType === 'lateral') {
-        // Chuyển ngang trọn gói: Không trừ tiền số buổi đã học ở lớp cũ
+      if (isOldMonthly || transferType === 'lateral') {
+        // Lớp tháng đóng theo từng tháng hoặc chuyển ngang trọn gói: Không cấn trừ ngược buổi lớp cũ
         costUsedOld = 0;
       } else {
         const baseOldFee = feeToPayOld > 0 ? feeToPayOld : (oldConfig?.price || 0);

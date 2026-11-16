@@ -29,7 +29,10 @@ export default function StudentsPage() {
   const [datePreset, setDatePreset] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [classFilter, setClassFilter] = useState('all');
+  const [selectedClassCodes, setSelectedClassCodes] = useState([]); // Mảng mã lớp đang lọc ([] = Tất cả)
+  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
+  const [classSearchQuery, setClassSearchQuery] = useState('');
+  const classDropdownRef = useRef(null);
   const [birthdayMonth, setBirthdayMonth] = useState('all');
   const [statusSummary, setStatusSummary] = useState({ total: 0, studying: 0, paused: 0, reserved: 0, dropout: 0 });
 
@@ -121,7 +124,7 @@ export default function StudentsPage() {
     manualReason: '',
   });
 
-  // Form Thu học phí (Tích hợp bán/tặng giáo trình & quà tặng ghi danh)
+    // Form Thu học phí (Tích hợp bán/tặng giáo trình & quà tặng ghi danh)
   const [paymentForm, setPaymentForm] = useState({
     collectAmount: '',
     paymentMethod: 'Chuyển khoản',
@@ -129,12 +132,31 @@ export default function StudentsPage() {
     includeItem: false,
     itemId: '',
     itemDistributionType: 'TANG_KEM_KHOA', // 'TANG_KEM_KHOA' | 'BAN'
-    itemPrice: '0',
+    itemPrice: '250.000',
     itemQuantity: 1,
     includeGift: false,
     giftId: '',
     giftQuantity: 1,
   });
+
+  // Helper xác định đơn giá giáo trình mặc định (ưu tiên giá niêm yết -> cấu hình khóa học -> mặc định 250.000đ)
+  const resolveDefaultBookPrice = (item, currentLevel) => {
+    if (item?.unitPrice && Number(item.unitPrice) > 0) return Number(item.unitPrice);
+    const itemNameLower = (item?.name || '').trim().toLowerCase();
+    const exactCfg = itemNameLower
+      ? courseConfigs.find(c => (c.bookName || '').trim().toLowerCase() === itemNameLower)
+      : null;
+    if (exactCfg?.bookPrice && Number(exactCfg.bookPrice) > 0) return Number(exactCfg.bookPrice);
+    const levelCfg = currentLevel
+      ? courseConfigs.find(c => c.level === currentLevel)
+      : null;
+    if (levelCfg?.bookPrice && Number(levelCfg.bookPrice) > 0) return Number(levelCfg.bookPrice);
+    const partialCfg = itemNameLower
+      ? courseConfigs.find(c => (c.bookName || '').toLowerCase().includes(itemNameLower))
+      : null;
+    if (partialCfg?.bookPrice && Number(partialCfg.bookPrice) > 0) return Number(partialCfg.bookPrice);
+    return 250000;
+  };
 
   // Form Cấp phát vật tư / Bán mới / Mua lại
   const [giftForm, setGiftForm] = useState({
@@ -152,7 +174,8 @@ export default function StudentsPage() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      let url = `/api/students?search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&studentStatus=${encodeURIComponent(opStatusFilter)}&preset=${datePreset}&classCode=${encodeURIComponent(classFilter)}&birthdayMonth=${birthdayMonth}`;
+      const classQueryParam = selectedClassCodes.length > 0 ? selectedClassCodes.join(',') : 'all';
+      let url = `/api/students?search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&studentStatus=${encodeURIComponent(opStatusFilter)}&preset=${datePreset}&classCodes=${encodeURIComponent(classQueryParam)}&birthdayMonth=${birthdayMonth}`;
       if (datePreset === 'custom') {
         if (startDate) url += `&startDate=${startDate}`;
         if (endDate) url += `&endDate=${endDate}`;
@@ -247,7 +270,17 @@ export default function StudentsPage() {
 
   useEffect(() => {
     fetchStudents();
-  }, [searchTerm, statusFilter, opStatusFilter, datePreset, startDate, endDate, classFilter, birthdayMonth]);
+  }, [searchTerm, statusFilter, opStatusFilter, datePreset, startDate, endDate, selectedClassCodes, birthdayMonth]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (classDropdownRef.current && !classDropdownRef.current.contains(e.target)) {
+        setIsClassDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchConfigsAndClasses();
@@ -346,7 +379,7 @@ export default function StudentsPage() {
     setTransferPreview(null);
 
     try {
-      const classQuery = classFilter && classFilter !== 'all' ? `?classCode=${encodeURIComponent(classFilter)}` : '';
+      const classQuery = selectedClassCodes.length === 1 ? `?classCode=${encodeURIComponent(selectedClassCodes[0])}` : '';
       const res = await fetch(`/api/students/${studentId}${classQuery}`);
       const result = await res.json();
       if (result.success) {
@@ -368,7 +401,7 @@ export default function StudentsPage() {
           includeItem: false,
           itemId: '',
           itemDistributionType: 'TANG_KEM_KHOA',
-          itemPrice: '0',
+          itemPrice: '250.000',
           itemQuantity: 1,
           includeGift: false,
           giftId: '',
@@ -399,6 +432,7 @@ export default function StudentsPage() {
           repeatDiscountPercent: '',
           overrideAmountPaidOld: formatNumber(currentClassPaid),
           useWalletBalance: (std.walletBalance || 0) > 0,
+          keepCourseEnrollment: false,
           manualAdjustment: '',
           manualReason: '',
         });
@@ -641,6 +675,7 @@ export default function StudentsPage() {
           ? parseNumber(editForm.overrideAmountPaidOld)
           : undefined,
         useWalletBalance: Boolean(editForm.useWalletBalance),
+        keepCourseEnrollment: Boolean(editForm.keepCourseEnrollment),
       };
     } else if (actionType === 'reserve') {
       payload = {
@@ -711,7 +746,7 @@ export default function StudentsPage() {
   const refreshEditData = async () => {
     if (!selectedStudentId) return;
     try {
-      const classQuery = classFilter && classFilter !== 'all' ? `?classCode=${encodeURIComponent(classFilter)}` : '';
+      const classQuery = selectedClassCodes.length === 1 ? `?classCode=${encodeURIComponent(selectedClassCodes[0])}` : '';
       const res = await fetch(`/api/students/${selectedStudentId}${classQuery}`);
       const result = await res.json();
       if (result.success) {
@@ -836,8 +871,7 @@ export default function StudentsPage() {
         let bookName = '';
         if (paymentForm.includeItem && paymentForm.itemId) {
           const selectedItem = inventoryItems.find(i => i.id === paymentForm.itemId);
-          const cfg = courseConfigs.find(c => c.bookName === selectedItem?.name);
-          const originalPrice = cfg?.bookPrice || 250000;
+          const originalPrice = resolveDefaultBookPrice(selectedItem, editStudentData?.currentClass?.level);
           const isGift = paymentForm.itemDistributionType === 'TANG_KEM_KHOA';
           const qty = parseInt(paymentForm.itemQuantity, 10) || 1;
           const price = isGift ? 0 : (parsedItemPrice * qty);
@@ -909,7 +943,7 @@ export default function StudentsPage() {
           includeItem: false,
           itemId: '',
           itemDistributionType: 'TANG_KEM_KHOA',
-          itemPrice: '0',
+          itemPrice: '250.000',
           itemQuantity: 1,
           includeGift: false,
           giftId: '',
@@ -1367,15 +1401,136 @@ export default function StudentsPage() {
           </div>
         )}
 
-        <div className="filter-group">
-          <label htmlFor="filter-class"><i className="fa-solid fa-chalkboard-user"></i> Lớp học:</label>
-          <ClassSelect 
-            id="filter-class" 
-            classes={[...classes, ...monthlyClasses]}
-            value={classFilter} 
-            onChange={(e) => setClassFilter(e.target.value)} 
-            placeholder="Tất cả lớp học"
-          />
+        <div className="filter-group" ref={classDropdownRef} style={{ position: 'relative' }}>
+          <label><i className="fa-solid fa-chalkboard-user"></i> Lớp học:</label>
+          <button
+            type="button"
+            onClick={() => setIsClassDropdownOpen(prev => !prev)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+              padding: '0.45rem 0.75rem',
+              borderRadius: '8px',
+              border: selectedClassCodes.length > 0 ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)',
+              background: selectedClassCodes.length > 0 ? '#EFF6FF' : 'var(--color-bg)',
+              color: selectedClassCodes.length > 0 ? '#085E8A' : 'var(--color-text)',
+              fontWeight: selectedClassCodes.length > 0 ? '700' : '500',
+              fontSize: '0.85rem',
+              minWidth: '210px',
+              maxWidth: '270px',
+              cursor: 'pointer',
+            }}
+            title={selectedClassCodes.length > 0 ? selectedClassCodes.join(', ') : 'Chọn 1 hoặc nhiều lớp học'}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedClassCodes.length === 0
+                ? 'Tất cả lớp (Toàn trung tâm)'
+                : selectedClassCodes.length === 1
+                  ? selectedClassCodes[0]
+                  : `Đã chọn ${selectedClassCodes.length} lớp`}
+            </span>
+            <i className={`fa-solid fa-chevron-${isClassDropdownOpen ? 'up' : 'down'}`} style={{ fontSize: '0.72rem' }}></i>
+          </button>
+
+          {isClassDropdownOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '6px',
+                width: '340px',
+                maxHeight: '380px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16)',
+                zIndex: 80,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <input
+                  type="text"
+                  value={classSearchQuery}
+                  onChange={(e) => setClassSearchQuery(e.target.value)}
+                  placeholder="Tìm mã lớp, giáo viên..."
+                  style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClassCodes([])}
+                    style={{ background: 'none', border: 'none', color: '#0D88C4', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                  >
+                    Tất cả (Bỏ lọc)
+                  </button>
+                  <span style={{ color: '#64748b' }}>
+                    Đang chọn: <strong>{selectedClassCodes.length || 'Tất cả'}</strong>
+                  </span>
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', padding: '0.4rem 0.6rem', maxHeight: '280px' }}>
+                {[
+                  { title: '--- Lớp theo Khóa ---', items: classes },
+                  { title: '--- Lớp Học kèm / Theo Tháng ---', items: monthlyClasses },
+                ].map(grp => {
+                  const q = classSearchQuery.trim().toLowerCase();
+                  const filteredGrp = grp.items.filter(c =>
+                    !q || c.code.toLowerCase().includes(q) || (c.teacherName || '').toLowerCase().includes(q)
+                  );
+                  if (filteredGrp.length === 0) return null;
+                  return (
+                    <div key={grp.title} style={{ marginBottom: '0.5rem' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', padding: '0.25rem 0', textTransform: 'uppercase' }}>
+                        {grp.title}
+                      </div>
+                      {filteredGrp.map(c => {
+                        const checked = selectedClassCodes.includes(c.code);
+                        return (
+                          <label
+                            key={c.code}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.32rem 0.35rem',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              background: checked ? '#eff6ff' : 'transparent',
+                              fontWeight: checked ? '700' : '500',
+                              color: checked ? '#085E8A' : '#1e293b',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setSelectedClassCodes(prev =>
+                                  prev.includes(c.code) ? prev.filter(x => x !== c.code) : [...prev, c.code]
+                                );
+                              }}
+                            />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.code} {c.teacherName ? `(${c.teacherName})` : ''}
+                            </span>
+                            {c.sessionsRemaining <= 0 && c.level !== 'MONTHLY' && (
+                              <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Đã đóng</span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="filter-group">
@@ -1392,9 +1547,10 @@ export default function StudentsPage() {
           <label htmlFor="filter-status"><i className="fa-solid fa-filter"></i> Lọc Học phí:</label>
           <select id="filter-status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">Tất cả học phí</option>
-            <option value="paid">Đã đóng đủ</option>
-            <option value="partial">Chưa đóng đủ</option>
+            <option value="unsettled">⚠️ Còn công nợ (Chưa đóng + Đóng thiếu)</option>
             <option value="unpaid">Chưa đóng</option>
+            <option value="partial">Chưa đóng đủ</option>
+            <option value="paid">Đã đóng đủ</option>
           </select>
         </div>
       </div>
@@ -1406,8 +1562,67 @@ export default function StudentsPage() {
           return true;
         });
 
+        const totalFilteredDebt = displayedStudents.reduce((s, st) => s + (st.debt || 0), 0);
+        const totalFilteredHistoricalDebt = displayedStudents.reduce((s, st) => s + (st.historicalDebt || 0), 0);
+        const totalFilteredPaid = displayedStudents.reduce((s, st) => s + (st.totalPaid || 0), 0);
+        const totalFilteredWallet = displayedStudents.reduce((s, st) => s + (st.walletBalance || 0), 0);
+        const debtorsCount = displayedStudents.filter(st => (st.debt || 0) > 0 || (st.historicalDebt || 0) > 0).length;
+
         return (
           <>
+            {/* THANH TỔNG HỢP CÔNG NỢ & THỐNG KÊ THEO BỘ LỌC */}
+            <div
+              className="glass-panel"
+              style={{
+                padding: '0.9rem 1.25rem',
+                marginBottom: '1.15rem',
+                borderRadius: '12px',
+                border: '1px solid #bfdbfe',
+                background: 'linear-gradient(90deg, rgba(239,246,255,0.9) 0%, rgba(255,255,255,0.95) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#085E8A' }}>
+                  <i className="fa-solid fa-chart-pie"></i> Tổng hợp theo bộ lọc ({selectedClassCodes.length > 0 ? `${selectedClassCodes.length} lớp đã chọn` : 'Toàn trung tâm'}):
+                </span>
+                <span style={{ background: '#e0f2fe', color: '#0369a1', fontWeight: '700', fontSize: '0.82rem', padding: '0.25rem 0.65rem', borderRadius: '999px' }}>
+                  {displayedStudents.length} học viên
+                </span>
+                <span style={{ background: debtorsCount > 0 ? '#fee2e2' : '#dcfce7', color: debtorsCount > 0 ? '#b91c1c' : '#166534', fontWeight: '700', fontSize: '0.82rem', padding: '0.25rem 0.65rem', borderRadius: '999px' }}>
+                  {debtorsCount} HV đang nợ học phí
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.35rem', flexWrap: 'wrap', fontSize: '0.9rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Tổng còn nợ: </span>
+                  <strong style={{ color: totalFilteredDebt > 0 ? '#dc2626' : '#059669', fontSize: '1.05rem' }}>
+                    {totalFilteredDebt.toLocaleString('vi-VN')}đ
+                  </strong>
+                  {totalFilteredHistoricalDebt > 0 && (
+                    <span style={{ fontSize: '0.76rem', color: '#c05621', marginLeft: '4px', fontWeight: '600' }}>
+                      (+Nợ cũ: {totalFilteredHistoricalDebt.toLocaleString('vi-VN')}đ)
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Tổng đã đóng: </span>
+                  <strong style={{ color: '#059669', fontSize: '1rem' }}>
+                    {totalFilteredPaid.toLocaleString('vi-VN')}đ
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Tổng Ví HV: </span>
+                  <strong style={{ color: '#0284c7', fontSize: '0.95rem' }}>
+                    {totalFilteredWallet.toLocaleString('vi-VN')}đ
+                  </strong>
+                </div>
+              </div>
+            </div>
             {opStatusFilter === 'Nghỉ luôn' && (
               <div className="dropout-stats-banner glass-panel animated-scale" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -1520,9 +1735,21 @@ export default function StudentsPage() {
                               <i className="fa-solid fa-clock"></i> Tạm nghỉ {student.callbackDate ? `(Hẹn: ${new Date(student.callbackDate).toLocaleDateString('vi-VN')})` : ''}
                             </span>
                           ) : (
-                            <span className="badge-class">
-                              <i className="fa-solid fa-school-flag"></i> {student.classCode}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                              <span className="badge-class">
+                                <i className="fa-solid fa-school-flag"></i> {student.classCode}
+                              </span>
+                              {student.isMonthlyStudent && (
+                                <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '4px', padding: '1px 5px' }}>
+                                  Hệ Tháng ({student.paymentStatus})
+                                </span>
+                              )}
+                              {student.activeClasses && student.activeClasses.length > 1 && (
+                                <span style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: '600' }} title={student.activeClasses.map(a => a.classCode).join(', ')}>
+                                  + {student.activeClasses.length - 1} lớp song song
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="policy-cell">{student.specialPolicy}</td>
@@ -1590,6 +1817,28 @@ export default function StudentsPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#EFF6FF', borderTop: '2px solid #93C5FD', fontWeight: '800', fontSize: '0.9rem' }}>
+                      <td colSpan={9} style={{ padding: '0.85rem 0.75rem', color: '#085E8A', textAlign: 'right' }}>
+                        TỔNG CỘNG ({displayedStudents.length} học viên):
+                      </td>
+                      <td style={{ padding: '0.85rem 0.75rem', textAlign: 'right', color: totalFilteredDebt > 0 ? '#dc2626' : '#059669' }}>
+                        {totalFilteredDebt.toLocaleString('vi-VN')}đ
+                        {totalFilteredHistoricalDebt > 0 && (
+                          <div style={{ fontSize: '0.72rem', color: '#c05621', fontWeight: '600' }}>
+                            (+Nợ cũ: {totalFilteredHistoricalDebt.toLocaleString('vi-VN')}đ)
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem 0.75rem', textAlign: 'right', color: '#059669' }}>
+                        {totalFilteredPaid.toLocaleString('vi-VN')}đ
+                      </td>
+                      <td style={{ padding: '0.85rem 0.75rem', textAlign: 'right', color: '#0284c7' }}>
+                        {totalFilteredWallet.toLocaleString('vi-VN')}đ
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               )}
             </div>
@@ -2068,6 +2317,24 @@ export default function StudentsPage() {
                                 </p>
                               </div>
 
+                              {editStudentData?.currentClass?.billingType && editStudentData.currentClass.billingType !== 'COURSE' && (
+                                <div className="alert-box" style={{ marginTop: '1rem', background: '#ecfdf5', border: '1px solid #86efac', color: '#065f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                  <div>
+                                    <strong><i className="fa-solid fa-calendar-check"></i> Học viên đang học theo Hệ Tháng ({editStudentData.currentClass.classCode})</strong>
+                                    {editStudentData.monthlyInvoices && editStudentData.monthlyInvoices.length > 0 ? (
+                                      <div style={{ fontSize: '0.82rem', marginTop: '0.3rem' }}>
+                                        Hóa đơn gần nhất: <strong>Tháng {editStudentData.monthlyInvoices[0].monthYear}</strong> — Tổng: <strong>{Number(editStudentData.monthlyInvoices[0].totalToPay || 0).toLocaleString('vi-VN')}đ</strong> — Đã đóng: <strong>{Number(editStudentData.monthlyInvoices[0].amountPaid || 0).toLocaleString('vi-VN')}đ</strong>
+                                      </div>
+                                    ) : (
+                                      <div style={{ fontSize: '0.82rem', marginTop: '0.3rem' }}>Học phí tháng được chốt sổ và thu trực tiếp tại phân hệ Quản lý Học phí Tháng.</div>
+                                    )}
+                                  </div>
+                                  <Link href="/finance/monthly" className="btn btn-sm" style={{ background: '#059669', color: '#fff', fontWeight: '700', textDecoration: 'none' }}>
+                                    Đi tới Học phí Tháng →
+                                  </Link>
+                                </div>
+                              )}
+
                               {unpaidOrders.length > 0 ? (
                                 <div style={{ marginTop: '1rem' }}>
                                   <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Danh sách hóa đơn chưa hoàn thành:</h4>
@@ -2086,10 +2353,10 @@ export default function StudentsPage() {
                                     ))}
                                   </div>
                                 </div>
-                              ) : (
+                              ) : (!editStudentData?.currentClass?.billingType || editStudentData.currentClass.billingType === 'COURSE') && (
                                 <div className="alert-box alert-success" style={{ marginTop: '1rem' }}>
                                   <i className="fa-solid fa-circle-check"></i>
-                                  <span>Học viên đã hoàn thành tất cả các khoản học phí!</span>
+                                  <span>Học viên đã hoàn thành tất cả các khoản học phí khóa!</span>
                                 </div>
                               )}
 
@@ -2131,10 +2398,10 @@ export default function StudentsPage() {
                                          onChange={(e) => {
                                            const checked = e.target.checked;
                                            setPaymentForm(prev => {
-                                             const oldBookCost = (prev.includeItem && prev.itemDistributionType === 'BAN')
+                                             const oldBookCost = (prev.includeItem && prev.itemDistributionType === 'BAN' && prev.itemId)
                                                ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
                                                : 0;
-                                             const newBookCost = (checked && prev.itemDistributionType === 'BAN')
+                                             const newBookCost = (checked && prev.itemDistributionType === 'BAN' && prev.itemId)
                                                ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
                                                : 0;
                                              const currentTotal = parseNumber(prev.collectAmount);
@@ -2161,7 +2428,7 @@ export default function StudentsPage() {
                                              type="button"
                                              onClick={() => {
                                                setPaymentForm(prev => {
-                                                 const oldBookCost = prev.itemDistributionType === 'BAN'
+                                                 const oldBookCost = (prev.itemDistributionType === 'BAN' && prev.itemId)
                                                    ? parseNumber(prev.itemPrice) * (parseInt(prev.itemQuantity, 10) || 1)
                                                    : 0;
                                                  const currentTotal = parseNumber(prev.collectAmount);
@@ -2197,10 +2464,10 @@ export default function StudentsPage() {
                                              onClick={() => {
                                                setPaymentForm(prev => {
                                                  const item = inventoryItems.find(i => i.id === prev.itemId);
-                                                 const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                                 const defaultPrice = cfg?.bookPrice || (item?.id === 'GT_STARTERS_1234' ? 250000 : 200000);
+                                                 
+                                                 const defaultPrice = resolveDefaultBookPrice(item, editStudentData?.currentClass?.level);
                                                  const qty = parseInt(prev.itemQuantity, 10) || 1;
-                                                 const oldBookCost = prev.itemDistributionType === 'BAN'
+                                                 const oldBookCost = (prev.itemDistributionType === 'BAN' && prev.itemId)
                                                    ? parseNumber(prev.itemPrice) * qty
                                                    : 0;
                                                  const newBookCost = prev.itemId ? (defaultPrice * qty) : 0;
@@ -2242,8 +2509,8 @@ export default function StudentsPage() {
                                                onChange={(e) => {
                                                  const selectedId = e.target.value;
                                                  const item = inventoryItems.find(i => i.id === selectedId);
-                                                 const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                                 const defaultPrice = cfg?.bookPrice || (selectedId === 'GT_STARTERS_1234' ? 250000 : 200000);
+                                                 
+                                                 const defaultPrice = resolveDefaultBookPrice(item, editStudentData?.currentClass?.level);
                                                  setPaymentForm(prev => {
                                                    const qty = parseInt(prev.itemQuantity, 10) || 1;
                                                    const oldBookCost = (prev.itemDistributionType === 'BAN' && prev.itemId)
@@ -2274,13 +2541,13 @@ export default function StudentsPage() {
 
                                            <div className="form-group">
                                              <label style={{ fontSize: '0.82rem', fontWeight: '600' }}>
-                                               {paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? 'Giá trị thu (0đ Miễn phí)' : 'Đơn giá bán (VND)'}
+                                               {paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? 'Giá trị thu (0đ Miễn phí)' : 'Đơn giá bán (Mặc định 250.000đ)'}
                                              </label>
                                              <input 
                                                type="text" 
                                                value={paymentForm.itemPrice} 
                                                disabled={paymentForm.itemDistributionType === 'TANG_KEM_KHOA'}
-                                               onChange={(e) => setPaymentForm(prev => ({ ...prev, itemPrice: formatNumber(e.target.value) }))} 
+                                               onChange={(e) => { const formattedNew = formatNumber(e.target.value); setPaymentForm(prev => { const qty = parseInt(prev.itemQuantity, 10) || 1; const oldBookCost = (prev.includeItem && prev.itemDistributionType === 'BAN' && prev.itemId) ? parseNumber(prev.itemPrice) * qty : 0; const newPriceNum = parseNumber(formattedNew); const newBookCost = (prev.includeItem && prev.itemDistributionType === 'BAN' && prev.itemId) ? newPriceNum * qty : 0; const currentTotal = parseNumber(prev.collectAmount); const nextTotal = Math.max(0, currentTotal - oldBookCost + newBookCost); return { ...prev, itemPrice: formattedNew, collectAmount: nextTotal > 0 ? formatNumber(nextTotal) : prev.collectAmount }; }); }} 
                                                style={{ background: paymentForm.itemDistributionType === 'TANG_KEM_KHOA' ? '#F1F5F9' : '#FFFFFF' }}
                                              />
                                            </div>
@@ -2557,6 +2824,16 @@ export default function StudentsPage() {
                             <p className="field-note" style={{ color: 'var(--color-primary-dark)', fontWeight: '600', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                               <i className="fa-solid fa-circle-info"></i> Lớp học mới đã dạy {transferPreview.selectedClassInfo.sessionsTaught} buổi - Còn lại {transferPreview.selectedClassInfo.sessionsRemaining} buổi - Tổng {transferPreview.selectedClassInfo.totalSessions} buổi.
                             </p>
+                          )}
+                          {editStudentData?.currentClass && monthlyClasses.some(c => c.code === editForm.newClassCode) && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#ecfdf5', border: '1px solid #86efac', color: '#065f46', fontWeight: '700', fontSize: '0.84rem', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.keepCourseEnrollment}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, keepCourseEnrollment: e.target.checked }))}
+                              />
+                              <span>Học kèm song song (Vẫn giữ nguyên lớp {editStudentData.currentClass.classCode} hiện tại)</span>
+                            </label>
                           )}
                         </div>
 
@@ -2915,8 +3192,8 @@ export default function StudentsPage() {
                               onChange={(e) => {
                                 const id = e.target.value;
                                 const item = inventoryItems.find(i => i.id === id);
-                                const cfg = courseConfigs.find(c => c.bookName === item?.name);
-                                const price = cfg?.bookPrice || 0;
+                                
+                                const price = item ? resolveDefaultBookPrice(item, editStudentData?.currentClass?.level) : 0;
                                 setGiftForm(prev => ({
                                   ...prev,
                                   inventoryId: id,
@@ -3047,10 +3324,17 @@ export default function StudentsPage() {
                   <form onSubmit={(e) => handleEditSubmit(e, 'finance')} className="modal-form" style={{ border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '12px', background: 'var(--color-bg)', position: 'relative', marginTop: '1rem' }}>
                     <div className="form-section">
                       <h3>Luồng Nghiệp vụ: Cấu hình Thu phí Tháng (Đặc biệt)</h3>
-                      <div className="alert-box alert-warning" style={{ margin: '0 0 1rem 0' }}>
-                        <i className="fa-solid fa-triangle-exclamation"></i>
-                        <span>Chỉ dùng cho học viên có Lớp hiện tại và đóng học phí hàng tháng (TOEIC, Kèm). Nếu học viên đang học nhiều lớp, hãy dùng Tab "Chuyển lớp" để cấu hình cho từng lớp cụ thể. Tab này áp dụng cho lớp hiển thị ở trên.</span>
-                      </div>
+                      {editStudentData?.currentClass?.level && editStudentData.currentClass.level !== 'MONTHLY' ? (
+                        <div className="alert-box" style={{ margin: '0 0 1rem 0', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+                          <i className="fa-solid fa-ban"></i>
+                          <span>Lớp hiện tại (<strong>{editStudentData.currentClass.classCode}</strong>) là <strong>Lớp theo Khóa</strong>, hệ thống đã khóa không cho đổi trực tiếp sang Học phí Tháng tại đây để tránh lẫn công nợ. Nếu học viên chuyển hoặc học thêm lớp Tháng, vui lòng dùng Tab <strong>&quot;Chuyển lớp&quot;</strong> ở trên.</span>
+                        </div>
+                      ) : (
+                        <div className="alert-box alert-warning" style={{ margin: '0 0 1rem 0' }}>
+                          <i className="fa-solid fa-triangle-exclamation"></i>
+                          <span>Áp dụng cấu hình mức thu hàng tháng cho lớp <strong>{editStudentData?.currentClass?.classCode || 'Hệ Tháng'}</strong>.</span>
+                        </div>
+                      )}
                       
                       <div className="form-row">
                         <div className="form-group">

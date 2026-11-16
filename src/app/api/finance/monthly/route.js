@@ -102,7 +102,7 @@ export async function GET(request) {
       const datesAbsent = [];
       attendances.forEach((att) => {
         const dateStr = toVnDateStr(att.date);
-        if (att.status === 'Có mặt') {
+        if (att.status === 'Có mặt' || att.status === 'Đi trễ') {
           datesPresent.push(dateStr);
         } else if (
           att.status === 'Vắng' ||

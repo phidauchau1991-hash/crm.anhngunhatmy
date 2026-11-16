@@ -71,15 +71,33 @@ export async function POST(request) {
     const dateObj = new Date(`${date}T00:00:00.000Z`);
 
     if (status === 'Trống' || status === '') {
-      await prisma.attendance.deleteMany({
+      const existingAtt = await prisma.attendance.findUnique({
         where: {
-          studentId,
-          classCode,
-          date: dateObj,
-        }
+          studentId_classCode_date: { studentId, classCode, date: dateObj },
+        },
       });
+      if (existingAtt) {
+        const hasNotesOrHomework =
+          Boolean(existingAtt.teacherNotes && existingAtt.teacherNotes.trim()) ||
+          Boolean(existingAtt.adjustmentNotes && existingAtt.adjustmentNotes.trim()) ||
+          existingAtt.missingWb ||
+          existingAtt.missingVideo ||
+          existingAtt.copyError;
+
+        if (hasNotesOrHomework) {
+          // Bảo toàn nhận xét / bài tập giáo viên đã chấm bên /attendance
+          await prisma.attendance.update({
+            where: { id: existingAtt.id },
+            data: { status: 'Chưa điểm danh' },
+          });
+        } else {
+          await prisma.attendance.delete({ where: { id: existingAtt.id } });
+        }
+      }
       return NextResponse.json({ success: true, status: 'Trống' });
     }
+
+    const classInfo = await prisma.class.findUnique({ where: { code: classCode } });
 
     const attendance = await prisma.attendance.upsert({
       where: {
@@ -98,6 +116,22 @@ export async function POST(request) {
         date: dateObj,
         status,
       }
+    });
+
+    // Đồng bộ tạo/giữ AttendanceSummary cho buổi học để khớp Bảng lương GV & Nhật ký Báo cáo tháng
+    await prisma.attendanceSummary.upsert({
+      where: {
+        classCode_date: {
+          classCode,
+          date: dateObj,
+        },
+      },
+      update: {},
+      create: {
+        classCode,
+        date: dateObj,
+        teacherId: classInfo?.teacherId || null,
+      },
     });
 
     return NextResponse.json({ success: true, attendance });

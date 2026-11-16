@@ -565,7 +565,8 @@ export default function ClassesPage() {
   };
 
   const filteredClasses = classes.filter(cls => {
-    if (cls.level === 'MONTHLY') return false; // Hide monthly classes from this view
+    if (statusFilter === 'monthly') return cls.level === 'MONTHLY';
+    if (cls.level === 'MONTHLY') return false; // Hide monthly classes from course views
     if (statusFilter === 'active') return cls.sessionsRemaining > 0;
     if (statusFilter === 'completed') return cls.sessionsRemaining <= 0;
     return true;
@@ -592,9 +593,10 @@ export default function ClassesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontWeight: '600', color: 'var(--color-text)', background: 'var(--color-bg)' }}
           >
-            <option value="all">Tất cả lớp học</option>
+            <option value="all">Tất cả lớp theo Khóa</option>
             <option value="active">Đang hoạt động</option>
             <option value="completed">Đã kết thúc (Đủ số buổi)</option>
+            <option value="monthly">📅 Lớp Tháng (Học kèm / Luyện thi)</option>
           </select>
           {!userRole?.includes('TEACHER') && (
             <button className="btn btn-primary animated-scale" onClick={() => setIsModalOpen(true)}>

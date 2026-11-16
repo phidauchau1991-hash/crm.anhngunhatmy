@@ -23,6 +23,10 @@ export async function GET(request) {
     const birthdayMonth = searchParams.get('birthdayMonth') || 'all';
 
     const classCode = searchParams.get('classCode') || '';
+    const classCodesParam = searchParams.get('classCodes') || '';
+    const selectedClassCodes = classCodesParam && classCodesParam !== 'all'
+      ? classCodesParam.split(',').map(s => s.trim()).filter(Boolean)
+      : (classCode && classCode !== 'all' ? [classCode] : []);
     const includeHistorical = searchParams.get('includeHistorical') === 'true' || searchParams.get('includeTransferred') === 'true';
 
     const { startDate, endDate } = getDateRangeFromPreset(preset, customStart, customEnd);
@@ -36,7 +40,7 @@ export async function GET(request) {
       ...branchFilter,
     };
 
-    if (classCode && classCode !== 'all') {
+    if (selectedClassCodes.length > 0) {
       const allowedStatuses = includeHistorical 
         ? ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã hoàn thành', 'Tạm nghỉ']
         : ['Đang học', 'Bảo lưu'];
@@ -46,7 +50,7 @@ export async function GET(request) {
         {
           enrollments: { 
             some: { 
-              classCode: classCode,
+              classCode: { in: selectedClassCodes },
               status: { in: allowedStatuses }
             } 
           }
@@ -118,6 +122,7 @@ export async function GET(request) {
           },
         },
         orders: true,
+        monthlyInvoices: true,
         tutoringPlans: {
           where: { status: 'ACTIVE' },
           orderBy: { id: 'desc' },
@@ -130,13 +135,25 @@ export async function GET(request) {
 
     // Tính toán trạng thái thanh toán và thông tin hiển thị cho từng học viên theo ngữ cảnh lớp học
     const formattedStudents = students.map((student) => {
-      // Xác định lớp học mục tiêu theo ngữ cảnh: Nếu có lọc classCode cụ thể thì dùng classCode đó,
+      // Xác định lớp học mục tiêu theo ngữ cảnh: Nếu có lọc classCode(s) thì ưu tiên lớp khớp bộ lọc,
       // ngược lại ưu tiên lớp đang học (status = 'Đang học'), sau đó tới lớp Bảo lưu/Tạm nghỉ hoặc lớp đầu tiên
+      const matchingFilterEnrollment = selectedClassCodes.length > 0
+        ? (student.enrollments.find(e => selectedClassCodes.includes(e.classCode) && e.status === 'Đang học') ||
+           student.enrollments.find(e => selectedClassCodes.includes(e.classCode)))
+        : null;
       const activeEnrollment =
+        matchingFilterEnrollment ||
         student.enrollments.find(e => e.status === 'Đang học') ||
         student.enrollments.find(e => e.status === 'Bảo lưu' || e.status === 'Tạm nghỉ') ||
         student.enrollments[0];
-      const targetClassCode = (classCode && classCode !== 'all') ? classCode : activeEnrollment?.classCode;
+      const targetClassCode = matchingFilterEnrollment?.classCode || (selectedClassCodes.length === 1 ? selectedClassCodes[0] : activeEnrollment?.classCode);
+
+      const isMonthlyEnrollment = Boolean(
+        activeEnrollment &&
+        (activeEnrollment.billingType === 'MONTHLY_PREPAID' ||
+         activeEnrollment.billingType === 'MONTHLY_POSTPAID' ||
+         activeEnrollment.class?.level === 'MONTHLY')
+      );
 
       // Tách bạch hoàn toàn Đơn học phí và Đơn giáo trình/vật tư
       const tuitionOrders = student.orders.filter(o => !o.id.startsWith('ORD_BK'));
@@ -152,8 +169,8 @@ export async function GET(request) {
         }
       }
 
-      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn học phí khác (chỉ fallback sang đơn chưa gắn mã lớp hoặc khi xem tất cả lớp)
-      if (!targetOrder && tuitionOrders.length > 0) {
+      // Nếu không có hóa đơn trùng lớp nhưng học viên có đơn học phí khác (chỉ fallback khi xem toàn bộ lớp và không phải học viên tháng)
+      if (!targetOrder && !isMonthlyEnrollment && tuitionOrders.length > 0) {
         const fallbackOrders = targetClassCode
           ? tuitionOrders.filter(o => !o.classCode)
           : tuitionOrders;
@@ -167,7 +184,28 @@ export async function GET(request) {
       let debt = 0;
       let paymentStatus = 'Chưa đóng';
 
-      if (targetOrder) {
+      if (isMonthlyEnrollment) {
+        const classMonthlyInvoices = (student.monthlyInvoices || []).filter(
+          inv => !targetClassCode || inv.classCode === targetClassCode
+        );
+        const monthlyPaid = classMonthlyInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+        const monthlyDebt = classMonthlyInvoices.reduce(
+          (sum, inv) => sum + Math.max(0, (inv.totalToPay || 0) - (inv.amountPaid || 0)),
+          0
+        );
+        totalToPay = monthlyPaid + monthlyDebt;
+        totalPaid = monthlyPaid;
+        debt = monthlyDebt;
+        if (classMonthlyInvoices.length === 0) {
+          paymentStatus = 'Chưa chốt tháng';
+        } else if (monthlyDebt <= 0) {
+          paymentStatus = 'Đã đóng đủ';
+        } else if (monthlyPaid > 0) {
+          paymentStatus = 'Chưa đóng đủ';
+        } else {
+          paymentStatus = 'Chưa đóng';
+        }
+      } else if (targetOrder) {
         totalToPay = targetOrder.feeToPay;
         totalPaid = targetOrder.amountPaid;
         debt = Math.max(0, targetOrder.feeToPay - targetOrder.amountPaid);
@@ -190,10 +228,11 @@ export async function GET(request) {
         .filter(o => targetOrder ? o.id !== targetOrder.id : true)
         .reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
 
-      // Tích lũy toàn khóa học (toàn bộ lịch sử đóng tại trung tâm)
-      const allTimeTuitionPaid = tuitionOrders.reduce((sum, o) => sum + o.amountPaid, 0);
+      // Tích lũy toàn khóa học (toàn bộ lịch sử đóng tại trung tâm, gồm cả hóa đơn tháng)
+      const allMonthlyPaid = (student.monthlyInvoices || []).reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+      const allTimeTuitionPaid = tuitionOrders.reduce((sum, o) => sum + o.amountPaid, 0) + allMonthlyPaid;
       const allTimeBookPaid = bookOrders.reduce((sum, o) => sum + o.amountPaid, 0);
-      const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0);
+      const allTimeTotalPaid = student.orders.reduce((sum, o) => sum + o.amountPaid, 0) + allMonthlyPaid;
       const allTimeTotalToPay = student.orders.reduce((sum, o) => sum + o.feeToPay, 0);
 
       // Format hiển thị chính sách miễn giảm
@@ -255,6 +294,11 @@ export async function GET(request) {
         retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
         coursewareLetterExportedAt: student.coursewareLetterExportedAt ? student.coursewareLetterExportedAt.toISOString() : null,
         portalToken: encryptStudentId(student.id),
+        isMonthlyStudent: isMonthlyEnrollment,
+        billingType: activeEnrollment?.billingType || 'COURSE',
+        activeClasses: student.enrollments
+          .filter(e => e.status === 'Đang học')
+          .map(e => ({ classCode: e.classCode, billingType: e.billingType || 'COURSE', level: e.class?.level || '' })),
         createdAt: student.createdAt,
       };
     });
@@ -264,8 +308,9 @@ export async function GET(request) {
       // 1. Lọc thanh toán
       if (status && status !== 'all') {
         if (status === 'paid' && student.paymentStatus !== 'Đã đóng đủ') return false;
-        if (status === 'unpaid' && student.paymentStatus !== 'Chưa đóng') return false;
+        if (status === 'unpaid' && student.paymentStatus !== 'Chưa đóng' && student.paymentStatus !== 'Chưa chốt tháng') return false;
         if (status === 'partial' && student.paymentStatus !== 'Chưa đóng đủ') return false;
+        if (status === 'unsettled' && (student.debt || 0) <= 0 && (student.historicalDebt || 0) <= 0) return false;
       }
 
       // 2. Lọc tháng sinh
@@ -298,9 +343,9 @@ export async function GET(request) {
         ],
       });
     }
-    if (classCode && classCode !== 'all') {
+    if (selectedClassCodes.length > 0) {
       summaryAnd.push({
-        enrollments: { some: { classCode: classCode, status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } } },
+        enrollments: { some: { classCode: { in: selectedClassCodes }, status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } } },
       });
     }
     if (summaryAnd.length > 0) summaryWhere.AND = summaryAnd;

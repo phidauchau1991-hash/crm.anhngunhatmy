@@ -133,7 +133,7 @@ export default function ParentPortalPage() {
     );
   }
 
-  const { student, stats, enrollments = [], attendanceHistory = [], inventoryLogs = [], assessments = [], examResults = [] } = data;
+  const { student, stats, enrollments = [], attendanceHistory = [], inventoryLogs = [], assessments = [], examResults = [], monthlyInvoices = [], monthlyReports = [] } = data;
   const currentEnrollment = enrollments.find(e => e.status === 'Đang học') || enrollments[0]; // Active class enrollment
 
   return (
@@ -258,6 +258,47 @@ export default function ParentPortalPage() {
             </div>
           </div>
         </section>
+
+        {/* Chi tiết Học phí theo Tháng (nếu có) */}
+        {monthlyInvoices.length > 0 && (
+          <section style={{
+            background: 'rgba(15, 23, 42, 0.7)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '14px',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.25rem',
+          }}>
+            <div style={{ fontWeight: '800', fontSize: '0.92rem', color: '#38bdf8', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fa-solid fa-calendar-check"></i> Chi tiết Học phí theo Tháng
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              {monthlyInvoices.slice(0, 6).map(inv => {
+                const remain = Math.max(0, (inv.totalToPay || 0) - (inv.amountPaid || 0));
+                return (
+                  <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.82rem', padding: '0.45rem 0.65rem', background: 'rgba(30, 41, 59, 0.65)', borderRadius: '8px' }}>
+                    <div>
+                      <strong style={{ color: '#f8fafc' }}>Tháng {inv.monthYear}</strong>
+                      <span style={{ color: '#94a3b8', marginLeft: '0.4rem' }}>({inv.classCode} • {inv.actualSessions} buổi)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <span style={{ color: '#e2e8f0' }}>Tổng: <strong>{Number(inv.totalToPay || 0).toLocaleString('vi-VN')}đ</strong></span>
+                      <span style={{
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '999px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        background: remain <= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: remain <= 0 ? '#34d399' : '#fca5a5',
+                      }}>
+                        {remain <= 0 ? 'Đã đóng đủ' : `Còn: ${remain.toLocaleString('vi-VN')}đ`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Courseware Quick Launch & Study Telemetry Card */}
         {data.courseware && (
@@ -663,6 +704,29 @@ export default function ParentPortalPage() {
                   })}
                 </div>
               )}
+
+              {/* NHẬN XÉT HỌC TẬP HÀNG THÁNG */}
+              {monthlyReports && monthlyReports.length > 0 && (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem 0' }}>
+                    <i className="fa-solid fa-book-open"></i> Nhận Xét Học Tập Hàng Tháng ({monthlyReports.length})
+                  </h3>
+                  {monthlyReports.map((rep) => (
+                    <div key={rep.id} className="class-grade-card" style={{ borderLeft: '4px solid #10b981' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: '#fff' }}>
+                          Tháng {rep.monthYear} — Lớp {rep.classCode}
+                        </h4>
+                      </div>
+                      {rep.aiComment && (
+                        <div className="teacher-remarks-box" style={{ marginTop: 0 }}>
+                          <p className="remark-text" style={{ whiteSpace: 'pre-line', color: '#e2e8f0' }}>{rep.aiComment}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -713,6 +777,29 @@ export default function ParentPortalPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* NHẬN XÉT HỌC TẬP HÀNG THÁNG */}
+              {monthlyReports && monthlyReports.length > 0 && (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem 0' }}>
+                    <i className="fa-solid fa-book-open"></i> Nhận Xét Học Tập Hàng Tháng ({monthlyReports.length})
+                  </h3>
+                  {monthlyReports.map((rep) => (
+                    <div key={rep.id} className="class-grade-card" style={{ borderLeft: '4px solid #10b981' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: '#fff' }}>
+                          Tháng {rep.monthYear} — Lớp {rep.classCode}
+                        </h4>
+                      </div>
+                      {rep.aiComment && (
+                        <div className="teacher-remarks-box" style={{ marginTop: 0 }}>
+                          <p className="remark-text" style={{ whiteSpace: 'pre-line', color: '#e2e8f0' }}>{rep.aiComment}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
