@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
+import MultiClassSelect from '@/app/components/MultiClassSelect';
 import PaidStamp from '@/components/PaidStamp';
 import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
@@ -113,7 +114,7 @@ export default function MonthlyBillingPage() {
 
   const [activeTab, setActiveTab] = useState('config'); // 'config' | 'attendance' | 'notices'
   const [monthYear, setMonthYear] = useState(currentMonthYear);
-  const [classFilter, setClassFilter] = useState('all');
+  const [selectedClassCodes, setSelectedClassCodes] = useState([]);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Danh sách lớp học toàn hệ thống
@@ -1080,13 +1081,36 @@ export default function MonthlyBillingPage() {
   };
   const daysList = getDaysInMonth(monthYear);
 
-  // Lọc dữ liệu theo lớp
-  const classOptions = [...new Set(configData.map((e) => e.classCode))];
-  const getFilteredConfig = () => (classFilter === 'all' ? configData : configData.filter((e) => e.classCode === classFilter));
+  // Lọc dữ liệu theo lớp (hỗ trợ chọn 1 hoặc nhiều lớp)
+  const monthlyClassCodesFromData = Array.from(
+    new Set([
+      ...configData.map((e) => e.classCode),
+      ...(attendanceData?.enrollments || []).map((e) => e.classCode),
+      ...noticesData.map((e) => e.classCode),
+    ].filter(Boolean))
+  );
+  const monthlyClassesFromAll = allClasses.filter((c) => c.level === 'MONTHLY');
+  const monthlyFilterClasses = [
+    ...monthlyClassesFromAll,
+    ...monthlyClassCodesFromData
+      .filter((code) => !monthlyClassesFromAll.some((c) => c.code === code))
+      .map((code) => {
+        const matched = allClasses.find((c) => c.code === code);
+        return matched ? { ...matched, level: 'MONTHLY' } : { code, level: 'MONTHLY' };
+      }),
+  ];
+
+  const getFilteredConfig = () =>
+    selectedClassCodes.length === 0 ? configData : configData.filter((e) => selectedClassCodes.includes(e.classCode));
   const getFilteredEnrollments = () =>
-    classFilter === 'all' ? attendanceData.enrollments : attendanceData.enrollments.filter((e) => e.classCode === classFilter);
+    selectedClassCodes.length === 0
+      ? attendanceData.enrollments
+      : attendanceData.enrollments.filter((e) => selectedClassCodes.includes(e.classCode));
   const getFilteredNotices = () => {
-    let list = classFilter === 'all' ? noticesData : noticesData.filter((e) => e.classCode === classFilter);
+    let list =
+      selectedClassCodes.length === 0
+        ? noticesData
+        : noticesData.filter((e) => selectedClassCodes.includes(e.classCode));
     if (noticeStatusFilter !== 'all') {
       list = list.filter((e) => e.status === noticeStatusFilter);
     }
@@ -1262,23 +1286,22 @@ export default function MonthlyBillingPage() {
           )}
         </div>
 
-        {/* Lọc theo lớp */}
+        {/* Lọc theo lớp (chọn 1 hoặc nhiều lớp) */}
         <div className="filter-group">
           <label style={{ fontWeight: '600' }}>
             <i className="fa-solid fa-filter"></i> Lọc theo lớp:
           </label>
-          <select
-            value={classFilter}
-            onChange={(e) => setClassFilter(e.target.value)}
-            style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)', minWidth: '220px' }}
-          >
-            <option value="all">Tất cả các lớp</option>
-            {classOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <MultiClassSelect
+            classes={monthlyFilterClasses}
+            selectedCodes={selectedClassCodes}
+            onChange={setSelectedClassCodes}
+            placeholder="Tất cả các lớp"
+            hideEnded={true}
+            align="right"
+            minWidth="230px"
+            maxWidth="280px"
+            popoverWidth="340px"
+          />
         </div>
       </div>
 
@@ -1726,6 +1749,54 @@ export default function MonthlyBillingPage() {
             </div>
           ) : (
             <>
+              {(() => {
+                const filteredList = getFilteredNotices();
+                const totalRequired = filteredList.reduce((sum, r) => sum + Number(r.totalToPay || 0), 0);
+                const totalCollected = filteredList.reduce((sum, r) => sum + Number(r.amountPaid || 0), 0);
+                const totalRemaining = filteredList.reduce((sum, r) => sum + Math.max(0, Number(r.totalToPay || 0) - Number(r.amountPaid || 0)), 0);
+                const incompleteCount = filteredList.filter((r) => r.status !== 'PAID').length;
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      padding: '0.7rem 1rem',
+                      marginBottom: '0.85rem',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '0.88rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem' }}>
+                      <span style={{ fontWeight: '700', color: '#0f172a' }}>
+                        <i className="fa-solid fa-chart-pie" style={{ color: '#0284c7', marginRight: '0.35rem' }}></i>
+                        Tổng hợp theo bộ lọc ({selectedClassCodes.length === 0 ? 'Tất cả lớp tháng' : `${selectedClassCodes.length} lớp đã chọn`}):
+                      </span>
+                      <span style={{ background: '#e0f2fe', color: '#0369a1', fontWeight: '700', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
+                        {filteredList.length} học viên
+                      </span>
+                      <span style={{ background: '#fee2e2', color: '#b91c1c', fontWeight: '700', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
+                        {incompleteCount} HV chưa hoàn tất
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1.1rem' }}>
+                      <span>
+                        Tổng phải đóng: <strong style={{ color: '#085E8A' }}>{totalRequired.toLocaleString('vi-VN')}đ</strong>
+                      </span>
+                      <span>
+                        Đã thu: <strong style={{ color: '#15803d' }}>{totalCollected.toLocaleString('vi-VN')}đ</strong>
+                      </span>
+                      <span>
+                        Còn chưa thu: <strong style={{ color: '#dc2626', fontSize: '0.96rem' }}>{totalRemaining.toLocaleString('vi-VN')}đ</strong>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
 <table className="custom-table">
                 <thead>

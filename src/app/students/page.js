@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
+import MultiClassSelect from '../components/MultiClassSelect';
 import PaidStamp from '@/components/PaidStamp';
 import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
 import CourseWelcomeModal from '@/components/CourseWelcomeModal';
@@ -30,9 +31,6 @@ export default function StudentsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedClassCodes, setSelectedClassCodes] = useState([]); // Mảng mã lớp đang lọc ([] = Tất cả)
-  const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
-  const [classSearchQuery, setClassSearchQuery] = useState('');
-  const classDropdownRef = useRef(null);
   const [birthdayMonth, setBirthdayMonth] = useState('all');
   const [statusSummary, setStatusSummary] = useState({ total: 0, studying: 0, paused: 0, reserved: 0, dropout: 0 });
 
@@ -271,16 +269,6 @@ export default function StudentsPage() {
   useEffect(() => {
     fetchStudents();
   }, [searchTerm, statusFilter, opStatusFilter, datePreset, startDate, endDate, selectedClassCodes, birthdayMonth]);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (classDropdownRef.current && !classDropdownRef.current.contains(e.target)) {
-        setIsClassDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     fetchConfigsAndClasses();
@@ -1401,136 +1389,17 @@ export default function StudentsPage() {
           </div>
         )}
 
-        <div className="filter-group" ref={classDropdownRef} style={{ position: 'relative' }}>
+        <div className="filter-group">
           <label><i className="fa-solid fa-chalkboard-user"></i> Lớp học:</label>
-          <button
-            type="button"
-            onClick={() => setIsClassDropdownOpen(prev => !prev)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.5rem',
-              padding: '0.45rem 0.75rem',
-              borderRadius: '8px',
-              border: selectedClassCodes.length > 0 ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)',
-              background: selectedClassCodes.length > 0 ? '#EFF6FF' : 'var(--color-bg)',
-              color: selectedClassCodes.length > 0 ? '#085E8A' : 'var(--color-text)',
-              fontWeight: selectedClassCodes.length > 0 ? '700' : '500',
-              fontSize: '0.85rem',
-              minWidth: '210px',
-              maxWidth: '270px',
-              cursor: 'pointer',
-            }}
-            title={selectedClassCodes.length > 0 ? selectedClassCodes.join(', ') : 'Chọn 1 hoặc nhiều lớp học'}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {selectedClassCodes.length === 0
-                ? 'Tất cả lớp (Toàn trung tâm)'
-                : selectedClassCodes.length === 1
-                  ? selectedClassCodes[0]
-                  : `Đã chọn ${selectedClassCodes.length} lớp`}
-            </span>
-            <i className={`fa-solid fa-chevron-${isClassDropdownOpen ? 'up' : 'down'}`} style={{ fontSize: '0.72rem' }}></i>
-          </button>
-
-          {isClassDropdownOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '6px',
-                width: '340px',
-                maxHeight: '380px',
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16)',
-                zIndex: 80,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
-            >
-              <div style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                <input
-                  type="text"
-                  value={classSearchQuery}
-                  onChange={(e) => setClassSearchQuery(e.target.value)}
-                  placeholder="Tìm mã lớp, giáo viên..."
-                  style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedClassCodes([])}
-                    style={{ background: 'none', border: 'none', color: '#0D88C4', fontWeight: '700', cursor: 'pointer', padding: 0 }}
-                  >
-                    Tất cả (Bỏ lọc)
-                  </button>
-                  <span style={{ color: '#64748b' }}>
-                    Đang chọn: <strong>{selectedClassCodes.length || 'Tất cả'}</strong>
-                  </span>
-                </div>
-              </div>
-              <div style={{ overflowY: 'auto', padding: '0.4rem 0.6rem', maxHeight: '280px' }}>
-                {[
-                  { title: '--- Lớp theo Khóa ---', items: classes },
-                  { title: '--- Lớp Học kèm / Theo Tháng ---', items: monthlyClasses },
-                ].map(grp => {
-                  const q = classSearchQuery.trim().toLowerCase();
-                  const filteredGrp = grp.items.filter(c =>
-                    !q || c.code.toLowerCase().includes(q) || (c.teacherName || '').toLowerCase().includes(q)
-                  );
-                  if (filteredGrp.length === 0) return null;
-                  return (
-                    <div key={grp.title} style={{ marginBottom: '0.5rem' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', padding: '0.25rem 0', textTransform: 'uppercase' }}>
-                        {grp.title}
-                      </div>
-                      {filteredGrp.map(c => {
-                        const checked = selectedClassCodes.includes(c.code);
-                        return (
-                          <label
-                            key={c.code}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              padding: '0.32rem 0.35rem',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.82rem',
-                              background: checked ? '#eff6ff' : 'transparent',
-                              fontWeight: checked ? '700' : '500',
-                              color: checked ? '#085E8A' : '#1e293b',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setSelectedClassCodes(prev =>
-                                  prev.includes(c.code) ? prev.filter(x => x !== c.code) : [...prev, c.code]
-                                );
-                              }}
-                            />
-                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {c.code} {c.teacherName ? `(${c.teacherName})` : ''}
-                            </span>
-                            {c.sessionsRemaining <= 0 && c.level !== 'MONTHLY' && (
-                              <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Đã đóng</span>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <MultiClassSelect
+            classes={[...classes, ...monthlyClasses]}
+            selectedCodes={selectedClassCodes}
+            onChange={setSelectedClassCodes}
+            placeholder="Tất cả lớp (Toàn trung tâm)"
+            minWidth="220px"
+            maxWidth="280px"
+            popoverWidth="350px"
+          />
         </div>
 
         <div className="filter-group">

@@ -191,3 +191,84 @@ export function formatClassCode(classCode) {
   }
   return `${level} - ${displaySchedule}`;
 }
+
+/**
+ * Kiểm tra một lớp có đã kết thúc hay chưa.
+ * Lớp đóng theo tháng (MONTHLY) chạy liên tục nên không bao giờ bị xếp vào nhóm đã kết thúc.
+ */
+export function isClassEnded(cls, now = new Date()) {
+  if (!cls || cls.level === 'MONTHLY') return false;
+  if (cls.sessionsRemaining !== undefined) {
+    return cls.sessionsRemaining <= 0;
+  }
+  if (cls.status === 'Kết thúc' || cls.status === 'Đã kết thúc' || cls.status === 'Đã hoàn thành') {
+    return true;
+  }
+  if (cls.expectedEndDate) {
+    return new Date(cls.expectedEndDate) < now;
+  }
+  return false;
+}
+
+/**
+ * Tên hiển thị ngắn gọn chuẩn của lớp học (VD: "M1 - T7CN - Ca 1 - Ms My", hoặc "[Đã đóng] ...").
+ */
+export function getClassDisplayLabel(cls, isEnded = false) {
+  if (!cls) return '';
+  const code = cls.code || '';
+  const shortName = formatClassCode(code);
+  const teacherSuffix = cls.teacherName ? ` - ${cls.teacherName}` : '';
+  return `${isEnded ? '[Đã đóng] ' : ''}${shortName}${teacherSuffix}`;
+}
+
+/**
+ * Phân nhóm và sắp xếp danh sách lớp theo đúng 3 tầng chuẩn UX:
+ * 1. Các nhóm lớp theo khóa đang hoạt động (gom theo `Cấp độ ...`, sort A->Z)
+ * 2. Lớp Học Kèm / Đóng Theo Tháng (`level === 'MONTHLY'`)
+ * 3. Lớp đã kết thúc (`[Đã đóng] ...`) ở dưới cùng (dưới cả lớp tháng)
+ */
+export function groupAndSortClasses(classes, { hideEnded = false } = {}) {
+  const courseGroups = {};
+  const monthlyClasses = [];
+  const endedClasses = [];
+
+  if (!Array.isArray(classes)) {
+    return { courseGroups: [], monthlyClasses, endedClasses };
+  }
+
+  const now = new Date();
+  const sortByShortLabel = (a, b) =>
+    formatClassCode(a.code).localeCompare(formatClassCode(b.code), 'vi', { numeric: true, sensitivity: 'base' });
+
+  classes.forEach((cls) => {
+    if (!cls || !cls.code) return;
+    if (cls.level === 'MONTHLY') {
+      monthlyClasses.push(cls);
+      return;
+    }
+    if (isClassEnded(cls, now)) {
+      if (!hideEnded) endedClasses.push(cls);
+      return;
+    }
+    const groupKey = cls.capDo || 'Khác';
+    if (!courseGroups[groupKey]) courseGroups[groupKey] = [];
+    courseGroups[groupKey].push(cls);
+  });
+
+  const sortedCourseGroups = Object.keys(courseGroups)
+    .sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }))
+    .map((capDo) => ({
+      key: capDo,
+      label: `--- Cấp độ ${capDo} ---`,
+      items: courseGroups[capDo].sort(sortByShortLabel),
+    }));
+
+  monthlyClasses.sort(sortByShortLabel);
+  endedClasses.sort(sortByShortLabel);
+
+  return {
+    courseGroups: sortedCourseGroups,
+    monthlyClasses,
+    endedClasses,
+  };
+}
