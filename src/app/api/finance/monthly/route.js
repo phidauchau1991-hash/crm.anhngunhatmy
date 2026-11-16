@@ -1,5 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getBranchFilter } from '@/lib/rbac';
+
+function toVnDateStr(d) {
+  const vn = new Date(new Date(d).getTime() + 7 * 3600 * 1000);
+  return `${String(vn.getUTCDate()).padStart(2, '0')}/${String(vn.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function computeMonthlyStatus(totalToPay, amountPaid) {
+  const due = Number(totalToPay || 0);
+  const paid = Number(amountPaid || 0);
+  if (due <= 0 || paid >= due - 0.0001) return 'PAID';
+  if (paid > 0) return 'PARTIAL';
+  return 'UNPAID';
+}
 
 export async function GET(request) {
   try {
@@ -11,20 +25,48 @@ export async function GET(request) {
     }
 
     const [month, year] = monthYear.split('/');
-    if (!month || !year) {
+    const monthNum = parseInt(month, 10);
+    const yearNum = parseInt(year, 10);
+    if (!month || !year || isNaN(monthNum) || isNaN(yearNum)) {
       return NextResponse.json({ error: 'Định dạng monthYear không hợp lệ (MM/YYYY)' }, { status: 400 });
     }
 
-    // Xác định khoảng thời gian của tháng được chọn
-    const startDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-    const endDate = new Date(parseInt(year, 10), parseInt(month, 10), 1);
+    const userRole = request.headers.get('x-user-role');
+    const branchId = request.headers.get('x-user-branch');
+    const selectedBranch = request.headers.get('x-selected-branch');
+    const branchFilter = getBranchFilter(userRole, branchId, selectedBranch, 'finance');
 
-    // Lấy tất cả học viên có billingType là MONTHLY_PREPAID hoặc MONTHLY_POSTPAID
+    // Khoảng thời gian chuẩn theo VN (00:00 ngày 1 VN -> trước 00:00 ngày 1 tháng sau VN)
+    const startDate = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0) - 7 * 3600 * 1000);
+    const endDate = new Date(Date.UTC(yearNum, monthNum, 1, 0, 0, 0) - 7 * 3600 * 1000);
+
+    // Lấy học viên học phí tháng (đang học tại chi nhánh hoặc đã có hóa đơn tháng này)
+    const existingMonthInvoices = await prisma.monthlyInvoice.findMany({
+      where: {
+        monthYear,
+        ...(Object.keys(branchFilter).length > 0 ? { student: branchFilter } : {}),
+      },
+      include: {
+        paymentLogs: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    const invoiceMap = new Map(
+      existingMonthInvoices.map((inv) => [`${inv.studentId}|${inv.classCode}`, inv])
+    );
+
     const enrollments = await prisma.enrollment.findMany({
       where: {
         billingType: {
           in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'],
         },
+        ...(Object.keys(branchFilter).length > 0 ? { student: branchFilter } : {}),
+        OR: [
+          { status: 'Đang học', student: { status: 'Đang học' } },
+          ...existingMonthInvoices.map((inv) => ({
+            studentId: inv.studentId,
+            classCode: inv.classCode,
+          })),
+        ],
       },
       include: {
         student: true,
@@ -35,8 +77,8 @@ export async function GET(request) {
     const data = [];
 
     // Tìm tháng trước để kế thừa nợ cũ
-    let prevM = parseInt(month, 10) - 1;
-    let prevY = parseInt(year, 10);
+    let prevM = monthNum - 1;
+    let prevY = yearNum;
     if (prevM === 0) {
       prevM = 12;
       prevY -= 1;
@@ -58,12 +100,15 @@ export async function GET(request) {
 
       const datesPresent = [];
       const datesAbsent = [];
-      attendances.forEach(att => {
-        const d = new Date(att.date);
-        const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+      attendances.forEach((att) => {
+        const dateStr = toVnDateStr(att.date);
         if (att.status === 'Có mặt') {
           datesPresent.push(dateStr);
-        } else if (att.status === 'Vắng') {
+        } else if (
+          att.status === 'Vắng' ||
+          att.status === 'Vắng có phép' ||
+          att.status === 'Vắng không phép'
+        ) {
           datesAbsent.push(dateStr);
         }
       });
@@ -83,46 +128,33 @@ export async function GET(request) {
 
       let autoCarryDebt = 0;
       if (prevInvoice) {
-        // Nợ còn lại của tháng trước:
-        // Nếu hóa đơn tháng trước đã đánh dấu PAID hoặc đã đóng đủ tiền thì công nợ = 0
-        if (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0)) {
+        if (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0) - 0.0001) {
           autoCarryDebt = 0;
         } else {
-          // Ngược lại, nợ còn lại của tháng trước = totalToPay - amountPaid
           const remaining = Math.max(0, (prevInvoice.totalToPay || 0) - (prevInvoice.amountPaid || 0));
           autoCarryDebt += remaining;
         }
       }
 
       // 2. TÌM HÓA ĐƠN THÁNG HIỆN TẠI TRONG DB
-      const currentInvoice = await prisma.monthlyInvoice.findUnique({
-        where: {
-          studentId_classCode_monthYear: {
-            studentId: enr.studentId,
-            classCode: enr.classCode,
-            monthYear: monthYear,
-          },
-        },
-      });
+      const currentInvoice = invoiceMap.get(`${enr.studentId}|${enr.classCode}`) || null;
 
       const monthlySessions = enr.monthlySessions || 0;
       const monthlyRate = enr.monthlyRate || 0;
-      const feePerSession = (monthlyRate && monthlySessions) ? monthlyRate / monthlySessions : 0;
+      const feePerSession = (monthlyRate && monthlySessions) ? Math.round(monthlyRate / monthlySessions) : 0;
 
-      // 🔒 NGUYÊN TẮC BẢO VỆ NỢ CŨ (ANTI-OVERWRITE):
-      // Nếu hóa đơn tháng trước đã thanh toán đủ (PAID), mà hóa đơn hiện tại chưa thanh toán (UNPAID và amountPaid === 0),
-      // thì nợ cũ tự động kết chuyển phải là 0đ (loại trừ nợ cũ ảo do dữ liệu cũ).
-      let effectivePreviousDebt = autoCarryDebt;
+      // 🔒 NGUYÊN TẮC BẢO VỆ NỢ CŨ (ANTI-OVERWRITE)
+      let effectivePreviousDebt = Math.round(autoCarryDebt);
       if (currentInvoice) {
         if (
           prevInvoice &&
-          (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0)) &&
+          (prevInvoice.status === 'PAID' || (prevInvoice.amountPaid || 0) >= (prevInvoice.totalToPay || 0) - 0.0001) &&
           currentInvoice.status === 'UNPAID' &&
           (currentInvoice.amountPaid || 0) === 0
         ) {
           effectivePreviousDebt = 0;
         } else if (currentInvoice.previousDebtLocked || (currentInvoice.previousDebt > 0 && !prevInvoice)) {
-          effectivePreviousDebt = currentInvoice.previousDebt;
+          effectivePreviousDebt = Math.round(currentInvoice.previousDebt);
         }
       }
 
@@ -132,20 +164,18 @@ export async function GET(request) {
       let liveTotalToPay = 0;
 
       if (enr.billingType === 'MONTHLY_PREPAID') {
-        liveCurrentFee = monthlyRate;
-        // Nếu học viên mới vào (chưa từng có hóa đơn tháng trước) và số buổi học thực tế ít hơn số buổi chuẩn:
-        // Đây là trường hợp học viên mới vào học thử cuối tháng, KHÔNG được cấn trừ âm (hoàn tiền) các buổi chưa học!
+        liveCurrentFee = Math.round(monthlyRate);
         if (!prevInvoice && actualSessions < monthlySessions) {
           liveExcessMissing = 0;
         } else {
-          liveExcessMissing = (actualSessions - monthlySessions) * feePerSession;
+          liveExcessMissing = Math.round((actualSessions - monthlySessions) * (monthlyRate && monthlySessions ? monthlyRate / monthlySessions : 0));
         }
-        liveTotalToPay = liveCurrentFee + effectivePreviousDebt + liveExcessMissing;
+        liveTotalToPay = Math.max(0, Math.round(liveCurrentFee + effectivePreviousDebt + liveExcessMissing));
       } else {
         // POSTPAID (Đóng sau)
-        liveCurrentFee = actualSessions * feePerSession;
+        liveCurrentFee = Math.round(actualSessions * (monthlyRate && monthlySessions ? monthlyRate / monthlySessions : 0));
         liveExcessMissing = 0;
-        liveTotalToPay = liveCurrentFee + effectivePreviousDebt;
+        liveTotalToPay = Math.max(0, Math.round(liveCurrentFee + effectivePreviousDebt));
       }
 
       let currentFee = 0;
@@ -162,17 +192,13 @@ export async function GET(request) {
         previousDebt = currentInvoice.previousDebt;
         totalToPay = currentInvoice.totalToPay;
         amountPaid = currentInvoice.amountPaid || 0;
-        status = currentInvoice.status;
+        status = computeMonthlyStatus(totalToPay, amountPaid);
 
-        // CHỈ KIỂM TRA LỆCH VÀ BÁO CẬP NHẬT KHI:
-        // - Hóa đơn chưa khóa (isLocked = false)
-        // - Chưa từng đóng tiền (amountPaid === 0)
-        // - Trạng thái UNPAID
-        if (currentInvoice.status === 'UNPAID' && amountPaid === 0 && !currentInvoice.isLocked) {
+        if (status === 'UNPAID' && amountPaid === 0 && !currentInvoice.isLocked) {
           if (
             currentInvoice.actualSessions !== actualSessions ||
-            currentInvoice.totalToPay !== liveTotalToPay ||
-            currentInvoice.previousDebt !== effectivePreviousDebt
+            Math.round(currentInvoice.totalToPay) !== Math.round(liveTotalToPay) ||
+            Math.round(currentInvoice.previousDebt) !== Math.round(effectivePreviousDebt)
           ) {
             needsUpdate = true;
             currentFee = liveCurrentFee;
@@ -182,7 +208,6 @@ export async function GET(request) {
           }
         }
       } else {
-        // Chưa chốt sổ -> Dùng luôn thông số live
         currentFee = liveCurrentFee;
         excessMissing = liveExcessMissing;
         totalToPay = liveTotalToPay;
@@ -195,6 +220,7 @@ export async function GET(request) {
         studentName: enr.student.name,
         studentPhone: enr.student.phone,
         studentNationalId: enr.student.nationalId,
+        studentStatus: enr.student.status,
         classCode: enr.classCode,
         billingType: enr.billingType,
         committedSessions: monthlySessions,
@@ -214,6 +240,7 @@ export async function GET(request) {
         status,
         invoiceId: currentInvoice?.id || null,
         notes: currentInvoice?.notes || null,
+        paymentLogs: currentInvoice?.paymentLogs || [],
         needsUpdate,
       });
     }
@@ -225,93 +252,125 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
-  try {
-    const body = await request.json();
-    const {
-      studentId,
-      classCode,
-      monthYear,
-      billingType,
-      committedSessions,
-      actualSessions,
-      feePerSession,
-      previousDebt,
-      currentFee,
-      excessMissing,
-      totalToPay,
-      amountPaid,
-      previousDebtLocked,
-      isLocked,
-      notes,
-    } = body;
+async function upsertSingleMonthlyInvoice(item) {
+  const {
+    studentId,
+    classCode,
+    monthYear,
+    billingType,
+    committedSessions,
+    actualSessions,
+    feePerSession,
+    previousDebt,
+    currentFee,
+    excessMissing,
+    totalToPay,
+    amountPaid,
+    previousDebtLocked,
+    isLocked,
+    notes,
+  } = item;
 
-    const existing = await prisma.monthlyInvoice.findUnique({
-      where: {
-        studentId_classCode_monthYear: {
-          studentId,
-          classCode,
-          monthYear,
-        },
-      },
-    });
-
-    const pDebt = parseFloat(previousDebt) || 0;
-    const cFee = parseFloat(currentFee) || 0;
-    const eMissing = parseFloat(excessMissing) || 0;
-    const calculatedTotal = cFee + pDebt + eMissing;
-    const finalTotalToPay = (totalToPay !== undefined && totalToPay !== null) ? parseFloat(totalToPay) : calculatedTotal;
-
-    // Tự động khóa nợ cũ nếu có nhập nợ cũ > 0 hoặc yêu cầu khóa
-    const shouldLockDebt = (previousDebtLocked !== undefined) ? !!previousDebtLocked : (pDebt > 0);
-
-    // Nếu đã có hóa đơn -> Cho phép cập nhật số tiền / nợ cũ
-    if (existing) {
-      const updated = await prisma.monthlyInvoice.update({
-        where: { id: existing.id },
-        data: {
-          committedSessions: committedSessions !== undefined && committedSessions !== null ? parseInt(committedSessions, 10) : existing.committedSessions,
-          actualSessions: actualSessions !== undefined && actualSessions !== null ? parseInt(actualSessions, 10) : existing.actualSessions,
-          feePerSession: feePerSession !== undefined && feePerSession !== null ? parseFloat(feePerSession) : existing.feePerSession,
-          previousDebt: pDebt,
-          currentFee: cFee,
-          excessMissing: eMissing,
-          totalToPay: finalTotalToPay,
-          amountPaid: amountPaid !== undefined && amountPaid !== null ? parseFloat(amountPaid) : existing.amountPaid,
-          previousDebtLocked: shouldLockDebt,
-          isLocked: isLocked !== undefined ? !!isLocked : existing.isLocked,
-          notes: notes !== undefined ? notes : existing.notes,
-        },
-      });
-      return NextResponse.json({ success: true, invoice: updated });
-    }
-
-    // Nếu chưa có -> Tạo mới
-    const uniqueId = Math.floor(Math.random() * 10000);
-    const paymentCode = `HP${monthYear.replace('/', '')}${studentId}${uniqueId}`;
-
-    const invoice = await prisma.monthlyInvoice.create({
-      data: {
+  const existing = await prisma.monthlyInvoice.findUnique({
+    where: {
+      studentId_classCode_monthYear: {
         studentId,
         classCode,
         monthYear,
-        billingType,
-        committedSessions: parseInt(committedSessions, 10) || 0,
-        actualSessions: parseInt(actualSessions, 10) || 0,
-        feePerSession: parseFloat(feePerSession) || 0,
+      },
+    },
+  });
+
+  const pDebt = Math.round(parseFloat(previousDebt) || 0);
+  const cFee = Math.round(parseFloat(currentFee) || 0);
+  const eMissing = Math.round(parseFloat(excessMissing) || 0);
+  const calculatedTotal = Math.max(0, cFee + pDebt + eMissing);
+  const finalTotalToPay =
+    totalToPay !== undefined && totalToPay !== null
+      ? Math.max(0, Math.round(parseFloat(totalToPay) || 0))
+      : calculatedTotal;
+
+  const shouldLockDebt = previousDebtLocked !== undefined ? !!previousDebtLocked : pDebt > 0;
+
+  if (existing) {
+    const nextAmountPaid =
+      amountPaid !== undefined && amountPaid !== null ? Math.round(parseFloat(amountPaid) || 0) : existing.amountPaid;
+    const nextStatus = computeMonthlyStatus(finalTotalToPay, nextAmountPaid);
+    return await prisma.monthlyInvoice.update({
+      where: { id: existing.id },
+      data: {
+        committedSessions:
+          committedSessions !== undefined && committedSessions !== null ? parseInt(committedSessions, 10) : existing.committedSessions,
+        actualSessions:
+          actualSessions !== undefined && actualSessions !== null ? parseInt(actualSessions, 10) : existing.actualSessions,
+        feePerSession:
+          feePerSession !== undefined && feePerSession !== null ? Math.round(parseFloat(feePerSession) || 0) : existing.feePerSession,
         previousDebt: pDebt,
         currentFee: cFee,
         excessMissing: eMissing,
         totalToPay: finalTotalToPay,
-        amountPaid: parseFloat(amountPaid) || 0,
+        amountPaid: nextAmountPaid,
+        status: nextStatus,
         previousDebtLocked: shouldLockDebt,
-        isLocked: !!isLocked,
-        paymentCode,
-        status: 'UNPAID',
-        notes: notes || null,
+        isLocked: isLocked !== undefined ? !!isLocked : existing.isLocked,
+        notes: notes !== undefined ? notes : existing.notes,
       },
     });
+  }
 
+  const uniqueId = Math.floor(Math.random() * 10000);
+  const paymentCode = `HP${monthYear.replace('/', '')}${studentId}${uniqueId}`;
+  const initialPaid = Math.round(parseFloat(amountPaid) || 0);
+  const initialStatus = computeMonthlyStatus(finalTotalToPay, initialPaid);
+
+  return await prisma.monthlyInvoice.create({
+    data: {
+      studentId,
+      classCode,
+      monthYear,
+      billingType,
+      committedSessions: parseInt(committedSessions, 10) || 0,
+      actualSessions: parseInt(actualSessions, 10) || 0,
+      feePerSession: Math.round(parseFloat(feePerSession) || 0),
+      previousDebt: pDebt,
+      currentFee: cFee,
+      excessMissing: eMissing,
+      totalToPay: finalTotalToPay,
+      amountPaid: initialPaid,
+      previousDebtLocked: shouldLockDebt,
+      isLocked: !!isLocked,
+      paymentCode,
+      status: initialStatus,
+      notes: notes || null,
+    },
+  });
+}
+
+export async function POST(request) {
+  try {
+    const body = await request.json();
+
+    // Hỗ trợ chốt sổ hàng loạt nhiều hóa đơn
+    if (body.action === 'batchGenerate' && Array.isArray(body.items)) {
+      const results = [];
+      for (const item of body.items) {
+        const inv = await upsertSingleMonthlyInvoice(item);
+        results.push(inv);
+      }
+      try {
+        await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+      } catch (_) {}
+      return NextResponse.json({
+        success: true,
+        count: results.length,
+        invoices: results,
+      });
+    }
+
+    const invoice = await upsertSingleMonthlyInvoice(body);
+    try {
+      await prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(PASSIVE)');
+    } catch (_) {}
     return NextResponse.json({ success: true, invoice });
   } catch (error) {
     console.error('Lỗi khi chốt/cập nhật hóa đơn tháng:', error);

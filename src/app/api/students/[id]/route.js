@@ -27,7 +27,12 @@ export async function GET(request, { params }) {
             id: 'desc',
           },
         },
-        orders: true,
+        orders: {
+          include: {
+            paymentLogs: { orderBy: { createdAt: 'desc' } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -145,6 +150,7 @@ export async function GET(request, { params }) {
           amountPaid: o.amountPaid,
           paymentStatus: o.paymentStatus,
           paymentDeadline: o.paymentDeadline ? o.paymentDeadline.toISOString().split('T')[0] : null,
+          paymentLogs: o.paymentLogs || [],
         })),
       },
     });
@@ -169,7 +175,12 @@ export async function PUT(request, { params }) {
           where: { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } },
           orderBy: { id: 'desc' },
         },
-        orders: true,
+        orders: {
+          include: {
+            paymentLogs: { orderBy: { createdAt: 'desc' } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -312,8 +323,14 @@ export async function PUT(request, { params }) {
         return NextResponse.json({ success: false, error: 'Số tiền thu đợt này hoặc vật tư cấp phát phải hợp lệ' }, { status: 400 });
       }
 
-      const totalItemCost = (includeItem && itemId && !isBookGift) ? (itemPriceVal * itemQtyVal) : 0;
-      const tuitionPayment = Math.max(0, collectAmount - totalItemCost);
+      const totalItemCost = (includeItem && itemId && !isBookGift) ? Math.round(itemPriceVal * itemQtyVal) : 0;
+      if (totalItemCost > 0 && collectAmount < totalItemCost) {
+        return NextResponse.json({
+          success: false,
+          error: `Số tiền thu đợt này (${collectAmount.toLocaleString('vi-VN')}đ) nhỏ hơn tiền giáo trình (${totalItemCost.toLocaleString('vi-VN')}đ). Vui lòng nhập tối thiểu bằng tiền giáo trình!`
+        }, { status: 400 });
+      }
+      const tuitionPayment = Math.max(0, Math.round(collectAmount - totalItemCost));
 
       const updatedOrders = [];
       const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
@@ -355,7 +372,17 @@ export async function PUT(request, { params }) {
           }
 
           const primaryOrder = unpaidOrders[0];
-          oldDebtBeforePayment = Math.max(0, primaryOrder.feeToPay - primaryOrder.amountPaid);
+          oldDebtBeforePayment = Math.round(Math.max(0, primaryOrder.feeToPay - primaryOrder.amountPaid));
+          const totalOutstandingDebt = unpaidOrders.reduce(
+            (sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid),
+            0
+          );
+
+          if (tuitionPayment > Math.ceil(totalOutstandingDebt) + 1000) {
+            throw new Error(
+              `Số tiền học phí thu (${tuitionPayment.toLocaleString('vi-VN')}đ) vượt quá tổng công nợ còn lại (${Math.round(totalOutstandingDebt).toLocaleString('vi-VN')}đ). Vui lòng kiểm tra lại để tránh thu trùng!`
+            );
+          }
 
           let remainingPayment = tuitionPayment;
           for (const order of unpaidOrders) {
@@ -364,11 +391,14 @@ export async function PUT(request, { params }) {
             const currentDebt = order.feeToPay - order.amountPaid;
             if (currentDebt <= 0) continue;
 
-            const payForThisOrder = Math.min(remainingPayment, currentDebt);
-            const newAmountPaid = order.amountPaid + payForThisOrder;
-            const newPaymentStatus = newAmountPaid >= order.feeToPay ? 'Đã đóng' : 'Chưa đóng đủ';
+            // Tránh lẻ 0.5đ: nếu đủ trả hết nợ của hóa đơn (hoặc chỉ lệch <= 1đ), tất toán tròn đúng feeToPay
+            const roundedDebt = Math.round(currentDebt);
+            const clearsOrder = remainingPayment >= roundedDebt;
+            const payForThisOrder = clearsOrder ? currentDebt : remainingPayment;
+            const newAmountPaid = clearsOrder ? order.feeToPay : Math.round(order.amountPaid + payForThisOrder);
+            const newPaymentStatus = newAmountPaid >= order.feeToPay - 0.01 ? 'Đã đóng' : 'Chưa đóng đủ';
 
-            const noteSuffix = ` [Thu thêm: ${payForThisOrder.toLocaleString()}đ qua ${paymentMethod}${notes ? `. Ghi chú: ${notes}` : ''}]`;
+            const noteSuffix = ` [Thu thêm: ${Math.round(payForThisOrder).toLocaleString('vi-VN')}đ qua ${paymentMethod}${notes ? `. Ghi chú: ${notes}` : ''}]`;
 
             const updated = await tx.orderFinance.update({
               where: { id: order.id },
@@ -383,15 +413,15 @@ export async function PUT(request, { params }) {
             await tx.paymentLog.create({
               data: {
                 orderId: order.id,
-                amount: payForThisOrder,
+                amount: Math.round(payForThisOrder),
                 paymentMethod: paymentMethod || 'Tiền mặt',
                 notes: notes ? `${notes} (${receiptCode})` : `Thu học phí (${receiptCode})`
               }
             });
 
             updatedOrders.push(updated);
-            totalTuitionApplied += payForThisOrder;
-            remainingPayment -= payForThisOrder;
+            totalTuitionApplied += Math.round(payForThisOrder);
+            remainingPayment = Math.max(0, remainingPayment - roundedDebt);
           }
 
           if (totalTuitionApplied <= 0) {
@@ -456,7 +486,16 @@ export async function PUT(request, { params }) {
                 paymentStatus: 'Đã đóng',
                 paymentPolicy: 'Đóng trước',
                 paymentDeadline: now,
-                giftName: `${inv.name} (x${itemQtyVal})`
+                giftName: `${inv.name} (x${itemQtyVal})`,
+                branchId: student.branchId || 'CN1_BinhDuong',
+              }
+            });
+            await tx.paymentLog.create({
+              data: {
+                orderId: itemOrder.id,
+                amount: totalItemCost,
+                paymentMethod: paymentMethod || 'Tiền mặt',
+                notes: `Mua giáo trình ${inv.name} x${itemQtyVal} (${receiptCode})`,
               }
             });
             updatedOrders.push(itemOrder);
@@ -744,6 +783,7 @@ export async function PUT(request, { params }) {
               paymentStatus: feeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',
               paymentPolicy: 'Đóng trước',
               paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+              branchId: newClass.branchId || student.branchId || 'CN1_BinhDuong',
             },
           });
 
@@ -962,6 +1002,7 @@ export async function PUT(request, { params }) {
             paymentStatus: finalFeeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',
             paymentPolicy: 'Đóng trước',
             paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+            branchId: newClass.branchId || student.branchId || 'CN1_BinhDuong',
           },
         });
 
@@ -1001,7 +1042,9 @@ export async function PUT(request, { params }) {
     // LUỒNG 4: Bảo lưu khóa học (Status = Bảo lưu + Nhập số tiền + Hạn bảo lưu)
     if (action === 'reserve') {
       const { reservationAmount, reservationDeadline } = body;
-      const amount = parseFloat(reservationAmount) || 0;
+      const amount = Math.round(parseFloat(reservationAmount) || 0);
+      const prevReserved = student.status === 'Bảo lưu' ? Math.round(student.reservationAmount || 0) : 0;
+      const walletDelta = amount - prevReserved;
 
       await prisma.$transaction(async (tx) => {
         await tx.student.update({
@@ -1010,9 +1053,33 @@ export async function PUT(request, { params }) {
             status: 'Bảo lưu',
             reservationAmount: amount,
             reservationDeadline: reservationDeadline ? new Date(reservationDeadline) : null,
-            walletBalance: { increment: amount } // Tự động cộng vào ví học viên
+            ...(walletDelta !== 0 ? { walletBalance: { increment: walletDelta } } : {}),
           },
         });
+
+        // Chốt công nợ còn lại của các hóa đơn chưa đóng thuộc lớp đang bảo lưu về số tiền đã đóng (tránh báo nợ ảo khi đang bảo lưu)
+        if (body.settleOldDebt !== false) {
+          const activeClasses = student.enrollments.filter((e) => e.status === 'Đang học').map((e) => e.classCode);
+          if (activeClasses.length > 0) {
+            const unpaidReserveOrders = await tx.orderFinance.findMany({
+              where: {
+                studentId: id,
+                classCode: { in: activeClasses },
+                paymentStatus: { not: 'Đã đóng' },
+              },
+            });
+            for (const uo of unpaidReserveOrders) {
+              await tx.orderFinance.update({
+                where: { id: uo.id },
+                data: {
+                  feeToPay: uo.amountPaid,
+                  paymentStatus: 'Đã đóng',
+                  promoType: `${uo.promoType || ''} [Chốt công nợ khi Bảo lưu]`.trim(),
+                },
+              });
+            }
+          }
+        }
 
         // Rút tên khỏi sĩ số lớp học (Bảo toàn danh sách nhưng không đếm vào sĩ số)
         await tx.enrollment.updateMany({

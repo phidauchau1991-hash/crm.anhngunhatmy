@@ -17,10 +17,11 @@ model User {
   shortName String? // Tên hiển thị (Tên ngắn)
   phone     String?
   email     String?
-  role      String // DIRECTOR, ACCOUNTANT, ADVISOR, CSKH, TEACHER
-  branchId  String? // CN1, CN2... or null for system director
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  role       String   // DIRECTOR, ACCOUNTANT, ADVISOR, CSKH, TEACHER
+  branchId   String?  // CN1, CN2... or null for system director
+  isActive   Boolean  @default(true)
+  hourlyRate Float    @default(200000) // Đơn giá lương theo tiết dạy (VNĐ/buổi)
+  createdAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Quan há»‡
@@ -443,10 +444,24 @@ model MonthlyInvoice {
   previousDebtLocked Boolean @default(false)
   isLocked           Boolean @default(false)
 
+  paymentLogs MonthlyPaymentLog[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([studentId, classCode, monthYear])
+}
+
+model MonthlyPaymentLog {
+  id            Int            @id @default(autoincrement())
+  invoiceId     Int
+  invoice       MonthlyInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod String
+  receiptCode   String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  createdBy     String?
 }
 
 // ============================================

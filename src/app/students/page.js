@@ -2647,9 +2647,9 @@ export default function StudentsPage() {
                                 onChange={(e) => setEditForm(prev => ({ ...prev, useWalletBalance: e.target.checked }))}
                                 style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                               />
-                              <span>
-                                <i className="fa-solid fa-wallet"></i> Sử dụng số dư Ví học viên hiện có ({Math.ceil((editStudentData.student.walletBalance || 0) / 5000 * 5000).toLocaleString('vi-VN')}đ) để khấu trừ trực tiếp học phí lớp mới
-                              </span>
+                                <span>
+                                  <i className="fa-solid fa-wallet"></i> Sử dụng số dư Ví học viên hiện có ({(Math.ceil((editStudentData.student.walletBalance || 0) / 5000) * 5000).toLocaleString('vi-VN')}đ) để khấu trừ trực tiếp học phí lớp mới
+                                </span>
                             </label>
                           </div>
                         )}

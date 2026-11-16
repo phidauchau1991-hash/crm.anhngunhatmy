@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getBranchFilter } from '@/lib/rbac';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -11,15 +12,28 @@ export async function GET(request) {
   const [mm, yyyy] = monthYear.split('/');
   const month = parseInt(mm, 10);
   const year = parseInt(yyyy, 10);
+  if (isNaN(month) || isNaN(year)) {
+    return NextResponse.json({ error: 'Định dạng monthYear không hợp lệ' }, { status: 400 });
+  }
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 1);
+  const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - 7 * 3600 * 1000);
+  const endDate = new Date(Date.UTC(year, month, 1, 0, 0, 0) - 7 * 3600 * 1000);
+
+  const userRole = request.headers.get('x-user-role');
+  const branchId = request.headers.get('x-user-branch');
+  const selectedBranch = request.headers.get('x-selected-branch');
+  const branchFilter = getBranchFilter(userRole, branchId, selectedBranch, 'finance');
 
   try {
-    // Get all enrollments for monthly billing
+    // Get active enrollments for monthly billing
     const enrollments = await prisma.enrollment.findMany({
       where: {
+        status: 'Đang học',
         billingType: { in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'] },
+        student: {
+          status: 'Đang học',
+          ...branchFilter,
+        },
       },
       include: {
         student: true,
@@ -52,9 +66,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { studentId, classCode, date, status } = await request.json();
-    
-    // date is YYYY-MM-DD
-    const dateObj = new Date(date);
+
+    // date is YYYY-MM-DD -> normalize to UTC midnight consistently
+    const dateObj = new Date(`${date}T00:00:00.000Z`);
 
     if (status === 'Trống' || status === '') {
       await prisma.attendance.deleteMany({

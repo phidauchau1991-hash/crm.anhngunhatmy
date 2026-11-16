@@ -57,15 +57,57 @@ export async function GET(request) {
       where: studentDateWhere
     });
 
-    // 2. Thống kê Tài chính & Doanh thu trong mốc thời gian đã chọn
+    // 2. Thống kê Tài chính & Doanh thu thực thu theo ngày dòng tiền thật (PaymentLog & MonthlyPaymentLog)
     const periodOrders = await prisma.orderFinance.findMany({
       where: orderWhere
     });
 
+    const logDateWhere = (startDate || endDate)
+      ? {
+          createdAt: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
+          }
+        }
+      : {};
+
+    const periodCourseLogs = await prisma.paymentLog.findMany({
+      where: {
+        ...logDateWhere,
+        ...(Object.keys(branchFilter).length > 0 ? { order: branchFilter } : {}),
+      },
+      select: { amount: true },
+    });
+
+    const periodMonthlyLogs = await prisma.monthlyPaymentLog.findMany({
+      where: {
+        ...logDateWhere,
+        ...(Object.keys(branchFilter).length > 0 ? { invoice: { student: branchFilter } } : {}),
+      },
+      select: { amount: true },
+    });
+
+    const cashRevenue =
+      periodCourseLogs.reduce((sum, l) => sum + (l.amount || 0), 0) +
+      periodMonthlyLogs.reduce((sum, l) => sum + (l.amount || 0), 0);
+
+    // Công nợ hiện hành theo hóa đơn phát sinh trong kỳ + học phí tháng chưa thu đủ
+    const unpaidMonthly = await prisma.monthlyInvoice.findMany({
+      where: {
+        status: { in: ['UNPAID', 'PARTIAL'] },
+        ...(Object.keys(branchFilter).length > 0 ? { student: branchFilter } : {}),
+      },
+      select: { totalToPay: true, amountPaid: true },
+    });
+    const monthlyDebt = unpaidMonthly.reduce((sum, m) => sum + Math.max(0, (m.totalToPay || 0) - (m.amountPaid || 0)), 0);
+    const courseDebt = periodOrders.reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0);
+
     const financeStats = {
-      revenue: periodOrders.reduce((sum, o) => sum + o.amountPaid, 0),
-      debt: periodOrders.reduce((sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid), 0),
-      totalFeeToPay: periodOrders.reduce((sum, o) => sum + o.feeToPay, 0),
+      revenue: Math.round(cashRevenue),
+      debt: Math.round(courseDebt + (preset === 'all' ? monthlyDebt : 0)),
+      courseDebt: Math.round(courseDebt),
+      monthlyDebt: Math.round(monthlyDebt),
+      totalFeeToPay: Math.round(periodOrders.reduce((sum, o) => sum + o.feeToPay, 0)),
       ordersCount: periodOrders.length,
       unpaidOrdersCount: periodOrders.filter(o => o.amountPaid < o.feeToPay).length
     };

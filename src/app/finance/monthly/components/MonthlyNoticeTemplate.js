@@ -61,7 +61,7 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
         width: '800px',
         backgroundColor: 'white',
         color: '#1e293b',
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
         lineHeight: '1.6',
         fontSize: '15px',
         textAlign: 'left',
@@ -71,21 +71,30 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
       {/* Header Band */}
       <div style={{ height: '8px', width: '100%', backgroundColor: '#0d88c4' }}></div>
 
-      <div style={{ padding: '40px 50px', position: 'relative', zIndex: 1 }}>
+      <div style={{ padding: '36px 46px', position: 'relative', zIndex: 1 }}>
         {/* Header Content */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '35px' }}>
-          <div style={{ flex: '0 0 150px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', borderBottom: '2px solid #e2e8f0', paddingBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <img 
               src="/logo.png" 
-              alt="Logo" 
-              style={{ width: '110px', height: 'auto' }} 
+              alt="ANH NGỮ NHẬT MỸ" 
+              style={{ width: '76px', height: '76px', objectFit: 'contain', flexShrink: 0 }} 
+              crossOrigin="anonymous"
               loading="eager"
               decoding="sync"
             />
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#085E8A', letterSpacing: '0.5px', lineHeight: '1.2' }}>
+                ANH NGỮ NHẬT MỸ
+              </div>
+              <div style={{ fontSize: '13px', fontStyle: 'italic', color: '#64748b', fontWeight: '500', marginTop: '2px' }}>
+                Dedicated to Excellence
+              </div>
+            </div>
           </div>
-          <div style={{ flex: 1, textAlign: 'center', paddingRight: '150px' }}>
-            <h1 style={{ margin: 0, fontSize: '26px', textTransform: 'uppercase', color: '#0d88c4', letterSpacing: '1px' }}>THƯ THÔNG BÁO</h1>
-            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '18px', color: '#475569', marginTop: '4px' }}>
+          <div style={{ textAlign: 'right' }}>
+            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900', textTransform: 'uppercase', color: '#0d88c4', letterSpacing: '0.8px' }}>THƯ THÔNG BÁO</h1>
+            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '15px', color: '#475569', marginTop: '3px', fontWeight: '600' }}>
               V/v đóng học phí tháng {targetNoticeMonth}
             </p>
           </div>

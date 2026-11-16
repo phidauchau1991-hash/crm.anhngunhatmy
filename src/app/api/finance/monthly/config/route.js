@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getBranchFilter } from '@/lib/rbac';
 
 export async function GET(request) {
   try {
+    const userRole = request.headers.get('x-user-role');
+    const branchId = request.headers.get('x-user-branch');
+    const selectedBranch = request.headers.get('x-selected-branch');
+    const branchFilter = getBranchFilter(userRole, branchId, selectedBranch, 'finance');
+
     const enrollments = await prisma.enrollment.findMany({
       where: {
+        status: 'Đang học',
         billingType: { in: ['MONTHLY_PREPAID', 'MONTHLY_POSTPAID'] },
+        student: {
+          status: 'Đang học',
+          ...branchFilter,
+        },
       },
       include: {
         student: true,
@@ -104,6 +115,7 @@ export async function POST(request) {
       const formattedPhoneFinal = (formattedPhone && /^[1-9][0-9]*$/.test(formattedPhone)) ? '0' + formattedPhone : formattedPhone;
       const formattedCCCD = nationalId ? nationalId.toString().trim() : finalStudentId;
 
+      const userBranch = request.headers.get('x-user-branch');
       await prisma.student.create({
         data: {
           id: finalStudentId,
@@ -115,7 +127,7 @@ export async function POST(request) {
           specialPolicyType: 'Không giảm',
           specialPolicy: 'Không',
           referralCode: finalStudentId,
-          branchId: 'CN1',
+          branchId: userBranch || 'CN1_BinhDuong',
           status: 'Đang học',
         },
       });
@@ -217,8 +229,24 @@ export async function DELETE(request) {
     const studentId = enrollment.studentId;
 
     if (permanent && studentId) {
-      // Xóa vĩnh viễn học viên và mọi bản ghi liên quan trong CSDL
+      const userRole = request.headers.get('x-user-role') || '';
+      const roles = userRole.split(',').map((r) => r.trim());
+      if (!roles.includes('DIRECTOR') && !roles.includes('REGIONAL_MANAGER')) {
+        return NextResponse.json(
+          { error: 'Chỉ Giám đốc mới được phép xóa vĩnh viễn học viên khỏi hệ thống' },
+          { status: 403 }
+        );
+      }
+
+      // Xóa vĩnh viễn học viên và mọi bản ghi liên quan trong CSDL (bao gồm TutoringPlan để không vướng Restrict)
       await prisma.$transaction(async (tx) => {
+        const plans = await tx.tutoringPlan.findMany({ where: { studentId }, select: { id: true } });
+        if (plans.length > 0) {
+          await tx.tutoringSession.deleteMany({ where: { planId: { in: plans.map((p) => p.id) } } });
+          await tx.tutoringPlan.deleteMany({ where: { studentId } });
+        }
+        await tx.studentAssessment.deleteMany({ where: { studentId } });
+        await tx.cambridgeRegistration.deleteMany({ where: { studentId } });
         await tx.attendance.deleteMany({ where: { studentId } });
         await tx.monthlyInvoice.deleteMany({ where: { studentId } });
         await tx.orderFinance.deleteMany({ where: { studentId } });

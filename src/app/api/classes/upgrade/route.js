@@ -133,36 +133,53 @@ export async function POST(request) {
         const amountPaidOld = oldOrder ? oldOrder.amountPaid : 0;
         const oldDebt = Math.max(0, feeToPayOld - amountPaidOld);
 
-        // Lấy thông tin ưu đãi đặc biệt của học viên
+        // Lấy thông tin ưu đãi đặc biệt & ví học viên
         const student = await tx.student.findUnique({ where: { id: en.studentId } });
         const specialDiscount = student?.specialPolicyValue || 0;
-        const baseNewFee = Math.max(0, newConfig.price - specialDiscount);
-        
-        // KHÔNG cộng dồn nợ cũ vào học phí cần đóng của lớp mới (tránh làm sai lệch doanh thu và đơn giá khóa học)
-        // Nợ cũ được lưu giữ trên hóa đơn lớp cũ để thu đúng hóa đơn đó.
-        const finalFeeToPay = baseNewFee;
-        
-        let promoNote = `Lên khóa tự động từ lớp ${oldClassCode} (Khóa ${newLevel})`;
-        if (oldDebt > 0) {
-           promoNote += ` [Nợ cũ lớp trước: ${oldDebt.toLocaleString('vi-VN')}đ]`;
+        let finalFeeToPay = Math.round(Math.max(0, newConfig.price - specialDiscount));
+        let currentWallet = Math.ceil((student?.walletBalance || 0) / 5000) * 5000;
+        let walletUsed = 0;
+
+        // Tự động cấn trừ Ví bảo lưu/dư chuyển lớp nếu học viên có số dư ví dương
+        const shouldUseWallet = body.useWalletBalance !== false;
+        if (shouldUseWallet && currentWallet > 0 && finalFeeToPay > 0) {
+          walletUsed = Math.min(currentWallet, finalFeeToPay);
+          finalFeeToPay = Math.floor(Math.max(0, finalFeeToPay - walletUsed) / 5000) * 5000;
+          currentWallet = Math.max(0, currentWallet - walletUsed);
+          await tx.student.update({
+            where: { id: en.studentId },
+            data: { walletBalance: currentWallet },
+          });
         }
 
-        // Tạo hóa đơn học phí cho khóa mới
-        const orderId = `ORD_UP_${yearMonthPrefix}_${en.studentId}`;
-        await tx.orderFinance.upsert({
-          where: { id: orderId },
-          update: { feeToPay: finalFeeToPay, classCode: newClassCode, promoType: promoNote },
-          create: {
+        let promoNote = `Lên khóa tự động từ lớp ${oldClassCode} (Khóa ${newLevel})`;
+        if (walletUsed > 0) {
+          promoNote += ` [Cấn trừ Ví: -${walletUsed.toLocaleString('vi-VN')}đ]`;
+        }
+        if (oldDebt > 0) {
+          promoNote += ` [Nợ cũ lớp trước: ${oldDebt.toLocaleString('vi-VN')}đ]`;
+        }
+
+        // Tạo hóa đơn học phí cho khóa mới (chống trùng ID nếu lên khóa nhiều lớp cùng tháng)
+        let orderId = `ORD_UP_${yearMonthPrefix}_${en.studentId}`;
+        const existingOrder = await tx.orderFinance.findUnique({ where: { id: orderId } });
+        if (existingOrder) {
+          const randSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+          orderId = `${orderId}_${randSuffix}`;
+        }
+        await tx.orderFinance.create({
+          data: {
             id: orderId,
             studentId: en.studentId,
             classCode: newClassCode,
             promoType: promoNote,
-            promoDiscount: specialDiscount,
+            promoDiscount: specialDiscount + walletUsed,
             feeToPay: finalFeeToPay,
             amountPaid: 0,
-            paymentStatus: finalFeeToPay === 0 ? 'Đã đóng' : 'Chưa đóng',
+            paymentStatus: finalFeeToPay <= 0 ? 'Đã đóng' : 'Chưa đóng',
             paymentPolicy: 'Đóng trước',
             paymentDeadline: new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000),
+            branchId: createdClass.branchId || student?.branchId || 'CN1_BinhDuong',
           }
         });
 

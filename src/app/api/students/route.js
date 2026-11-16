@@ -465,7 +465,7 @@ export async function POST(request) {
         specialPolicyValue: policyVal,
         specialPolicy: policyVal > 0 ? `${specialPolicyType || 'Ưu đãi'} (-${policyVal.toLocaleString('vi-VN')}đ)` : 'Không',
         referralCode: studentId,
-        branchId: branchId || process.env.DEFAULT_BRANCH_ID || "CN1",
+        branchId: branchId || 'CN1_BinhDuong',
         status: 'Đang học',
       },
     });
@@ -556,6 +556,7 @@ export async function POST(request) {
               paymentStatus,
               paymentPolicy: paymentPolicy || 'Đóng trước',
               paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // Hạn 7 ngày
+              branchId: classInfo.branchId || branchId || 'CN1_BinhDuong',
             },
           });
 

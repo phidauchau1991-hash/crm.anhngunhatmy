@@ -155,6 +155,8 @@ export default function MonthlyBillingPage() {
   const [loadingNotices, setLoadingNotices] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
+  const [noticeStatusFilter, setNoticeStatusFilter] = useState('all'); // 'all' | 'NOT_GENERATED' | 'UNPAID' | 'PARTIAL' | 'PAID'
+  const [currentUserRole, setCurrentUserRole] = useState('');
 
   // Modal Xem Trước Thư Báo & Soạn Tin Nhắn Zalo
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -207,9 +209,15 @@ export default function MonthlyBillingPage() {
   const selectedMonthNum = parseInt(currentMStr, 10) || currentDate.getMonth() + 1;
   const selectedPeriod = selectedMonthNum <= 6 ? 'H1' : 'H2';
 
-  // Load danh sách lớp khi mount
+  // Load danh sách lớp & role hiện tại khi mount
   useEffect(() => {
     fetchClasses();
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.success) setCurrentUserRole(j.data?.role || '');
+      })
+      .catch(() => {});
   }, []);
 
   // Fetch dữ liệu theo Tab & Tháng
@@ -609,6 +617,75 @@ export default function MonthlyBillingPage() {
     }
   };
 
+  // Chốt sổ hàng loạt (chưa chốt hoặc cần cập nhật)
+  const handleBatchGenerateInvoices = async () => {
+    const targets = getFilteredNotices().filter((r) => r.status === 'NOT_GENERATED' || r.needsUpdate);
+    if (targets.length === 0) {
+      alert('Tất cả học viên đang hiển thị đã được chốt sổ và đồng bộ điểm danh rồi.');
+      return;
+    }
+    if (!confirm(`Bạn muốn chốt sổ / cập nhật hóa đơn tháng ${monthYear} cho ${targets.length} học viên?`)) return;
+    setIsProcessing(true);
+    setMessage({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/finance/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'batchGenerate',
+          items: targets.map((r) => ({
+            studentId: r.studentId,
+            classCode: r.classCode,
+            monthYear,
+            billingType: r.billingType,
+            committedSessions: r.committedSessions,
+            actualSessions: r.actualSessions,
+            feePerSession: r.feePerSession,
+            previousDebt: r.previousDebt,
+            currentFee: r.currentFee,
+            excessMissing: r.excessMissing,
+            totalToPay: r.totalToPay,
+          })),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setMessage({ type: 'success', text: `Đã chốt sổ hàng loạt thành công cho ${json.count} học viên!` });
+        fetchNoticesData();
+      } else {
+        setMessage({ type: 'error', text: json.error || 'Lỗi khi chốt sổ hàng loạt' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Lỗi kết nối máy chủ.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Hoàn tác lần thu nhầm (Chỉ Giám đốc)
+  const handleRollbackMonthlyPayment = async (invoiceId, logId) => {
+    if (!confirm('Xác nhận hoàn tác lần thu tiền này? Trạng thái hóa đơn sẽ được tính lại tương ứng.')) return;
+    setIsPaying(true);
+    try {
+      const res = await fetch(`/api/finance/monthly/pay?invoiceId=${invoiceId}&logId=${logId || ''}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setMessage({ type: 'success', text: json.message });
+        setShowPayModal(false);
+        setEReceiptData(null);
+        fetchNoticesData();
+      } else {
+        alert(json.error || 'Không thể hoàn tác');
+      }
+    } catch {
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   // Mở Modal Xem Trước Thư Báo & Soạn Tin Nhắn Zalo
   const handleOpenNoticeModal = (record) => {
     setActiveRecord(record);
@@ -895,6 +972,7 @@ export default function MonthlyBillingPage() {
         const snap = resJson.snapshot;
         const numThisTime = Number(payAmount || 0);
         setEReceiptData({
+          receiptCode: snap?.receiptCode || `PT-T${displayMonthYear.replace(/[^0-9]/g, '')}-${(payInvoice.studentName || 'HV').slice(0, 3).toUpperCase()}`,
           studentName: snap?.studentName || payInvoice.studentName,
           classCode: snap?.classCode || payInvoice.classCode,
           monthYear: displayMonthYear,
@@ -909,7 +987,7 @@ export default function MonthlyBillingPage() {
           remainingDebt: snap?.remainingAfter ?? Math.max(0, (payInvoice.totalToPay || 0) - ((payInvoice.amountPaid || 0) + numThisTime)),
           date: snap?.date || new Date().toLocaleDateString('vi-VN'),
           time: snap?.time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          cashier: 'Admin',
+          cashier: snap?.cashier || 'Thu ngân',
         });
         fetchNoticesData();
       } else {
@@ -1000,7 +1078,13 @@ export default function MonthlyBillingPage() {
   const getFilteredConfig = () => (classFilter === 'all' ? configData : configData.filter((e) => e.classCode === classFilter));
   const getFilteredEnrollments = () =>
     classFilter === 'all' ? attendanceData.enrollments : attendanceData.enrollments.filter((e) => e.classCode === classFilter);
-  const getFilteredNotices = () => (classFilter === 'all' ? noticesData : noticesData.filter((e) => e.classCode === classFilter));
+  const getFilteredNotices = () => {
+    let list = classFilter === 'all' ? noticesData : noticesData.filter((e) => e.classCode === classFilter);
+    if (noticeStatusFilter !== 'all') {
+      list = list.filter((e) => e.status === noticeStatusFilter);
+    }
+    return list;
+  };
 
   const calculatedFeePerSession =
     formMonthlyRate && formMonthlySessions
@@ -1594,6 +1678,36 @@ export default function MonthlyBillingPage() {
          ========================================================= */}
       {activeTab === 'notices' && (
         <div className="table-container glass-panel p-4">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {[
+                { id: 'all', label: 'Tất cả' },
+                { id: 'NOT_GENERATED', label: 'Chưa chốt' },
+                { id: 'UNPAID', label: 'Chưa đóng' },
+                { id: 'PARTIAL', label: 'Đóng một phần' },
+                { id: 'PAID', label: 'Đã đóng đủ' },
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setNoticeStatusFilter(st.id)}
+                  className={`btn btn-sm ${noticeStatusFilter === st.id ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontWeight: '700', padding: '0.35rem 0.75rem' }}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isProcessing}
+              onClick={handleBatchGenerateInvoices}
+              style={{ fontWeight: '700', background: '#085E8A' }}
+            >
+              <i className="fa-solid fa-layer-group"></i> Chốt sổ hàng loạt ({getFilteredNotices().filter(r => r.status === 'NOT_GENERATED' || r.needsUpdate).length})
+            </button>
+          </div>
           {loadingNotices ? (
             <div className="loading-state">
               <i className="fa-solid fa-spinner fa-spin"></i>
@@ -1681,6 +1795,15 @@ export default function MonthlyBillingPage() {
                             <span className="status-badge bg-danger-light" style={{ fontWeight: '700' }}>
                               Chưa đóng
                             </span>
+                          ) : row.status === 'PARTIAL' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                              <span className="status-badge bg-warning-light" style={{ fontWeight: '700', color: '#b45309', background: '#fef3c7' }}>
+                                Đóng một phần
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: '700' }}>
+                                Thiếu: {Math.max(0, (row.totalToPay || 0) - (row.amountPaid || 0)).toLocaleString('vi-VN')}đ
+                              </span>
+                            </div>
                           ) : (
                             <span className="status-badge bg-success-light" style={{ fontWeight: '700' }}>
                               Đã đóng
@@ -1688,7 +1811,7 @@ export default function MonthlyBillingPage() {
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                             {/* Nút mắt 👁️ xem trước realtime */}
                             <button
                               className="btn btn-sm btn-outline"
@@ -1729,19 +1852,36 @@ export default function MonthlyBillingPage() {
                               </button>
                             )}
 
-                            {/* Nút Thu tiền nếu chưa đóng */}
-                            {row.status === 'UNPAID' && (
+                            {/* Nút Thu tiền nếu chưa đóng hoặc đóng một phần */}
+                            {((row.status === 'UNPAID' || row.status === 'PARTIAL') && (row.totalToPay - (row.amountPaid || 0)) > 0) && (
                               <button
                                 className="btn btn-sm"
                                 style={{ backgroundColor: '#f59e0b', color: '#fff', fontWeight: '700' }}
                                 onClick={() => {
                                   setPayInvoice(row);
-                                  setPayAmount((row.totalToPay || 0) - (row.amountPaid || 0));
+                                  setPayAmount(Math.max(0, (row.totalToPay || 0) - (row.amountPaid || 0)));
                                   setEReceiptData(null);
                                   setShowPayModal(true);
                                 }}
                               >
                                 <i className="fa-solid fa-hand-holding-dollar"></i> Thu tiền
+                              </button>
+                            )}
+
+                            {/* Nút xem lịch sử thu / hoàn tác nếu đã phát sinh thu tiền */}
+                            {(row.amountPaid > 0 || (row.paymentLogs && row.paymentLogs.length > 0)) && (
+                              <button
+                                className="btn btn-sm btn-outline"
+                                title="Xem lịch sử thu tiền"
+                                style={{ padding: '5px 8px', color: '#475569', borderColor: '#cbd5e1' }}
+                                onClick={() => {
+                                  setPayInvoice(row);
+                                  setPayAmount(Math.max(0, (row.totalToPay || 0) - (row.amountPaid || 0)));
+                                  setEReceiptData(null);
+                                  setShowPayModal(true);
+                                }}
+                              >
+                                <i className="fa-solid fa-clock-rotate-left"></i>
                               </button>
                             )}
                           </div>
@@ -2976,6 +3116,34 @@ export default function MonthlyBillingPage() {
                       </>
                     )}
                   </button>
+
+                  {payInvoice.paymentLogs && payInvoice.paymentLogs.length > 0 && (
+                    <div style={{ marginTop: '1.15rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.85rem' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#085E8A', marginBottom: '0.45rem' }}>
+                        <i className="fa-solid fa-clock-rotate-left"></i> Lịch sử các đợt đã thu:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '140px', overflowY: 'auto' }}>
+                        {payInvoice.paymentLogs.map((lg) => (
+                          <div key={lg.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', background: '#f8fafc', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div>
+                              <strong style={{ color: '#16a34a' }}>+{Number(lg.amount || 0).toLocaleString('vi-VN')}đ</strong>
+                              <span style={{ color: '#64748b', marginLeft: '6px' }}>({lg.paymentMethod} · {new Date(lg.createdAt).toLocaleDateString('vi-VN')})</span>
+                            </div>
+                            {(currentUserRole.includes('DIRECTOR') || currentUserRole.includes('REGIONAL_MANAGER')) && payInvoice.invoiceId && (
+                              <button
+                                type="button"
+                                onClick={() => handleRollbackMonthlyPayment(payInvoice.invoiceId, lg.id)}
+                                style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700' }}
+                                title="Hoàn tác lần thu này"
+                              >
+                                <i className="fa-solid fa-rotate-left"></i> Hoàn tác
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center' }}>
@@ -3011,13 +3179,13 @@ export default function MonthlyBillingPage() {
                         <img
                           src="/logo.png"
                           alt="Anh ngữ Nhật Mỹ"
-                          style={{ height: '54px', width: 'auto', objectFit: 'contain' }}
+                          style={{ height: '54px', width: '54px', objectFit: 'contain' }}
                           crossOrigin="anonymous"
                         />
                         <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
                           <h2
                             style={{
-                              margin: '0 0 0.35rem 0',
+                              margin: '0 0 0.15rem 0',
                               color: '#085E8A',
                               fontSize: '1.25rem',
                               fontWeight: '900',
@@ -3026,6 +3194,9 @@ export default function MonthlyBillingPage() {
                           >
                             ANH NGỮ NHẬT MỸ
                           </h2>
+                          <div style={{ fontSize: '0.72rem', fontStyle: 'italic', color: '#64748b', marginBottom: '0.35rem' }}>
+                            Dedicated to Excellence
+                          </div>
                           <div
                             style={{
                               display: 'inline-block',
@@ -3041,7 +3212,7 @@ export default function MonthlyBillingPage() {
                             PHIẾU THU ĐIỆN TỬ
                           </div>
                           <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
-                            Số: PT-T{(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-{(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}
+                            Số: {eReceiptData.receiptCode || `PT-T${(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-${(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}`}
                           </div>
                         </div>
                       </div>

@@ -253,26 +253,43 @@ export async function POST(request) {
             const rawProRated = costPerSession * sessionsRemaining;
             const proRatedTuition = Math.floor(rawProRated / 10000) * 10000;
 
-            const feeToPay = customFee > 0 ? customFee : proRatedTuition;
-            const paymentStatus = amountPaid >= feeToPay ? 'Đã đóng' : (amountPaid > 0 ? 'Chưa đóng đủ' : 'Chưa đóng');
+            const feeToPay = Math.round(customFee > 0 ? customFee : proRatedTuition);
+            const roundedPaid = Math.round(amountPaid || 0);
+            const paymentStatus = feeToPay <= 0 || roundedPaid >= feeToPay ? 'Đã đóng' : (roundedPaid > 0 ? 'Chưa đóng đủ' : 'Chưa đóng');
 
-            // Tạo hóa đơn
-            const orderId = `ORD_IMP_${yearMonthPrefix}_${studentId.split('_')[1]}`;
-            await tx.orderFinance.upsert({
-              where: { id: orderId },
-              update: { feeToPay, amountPaid, paymentStatus },
-              create: {
+            // Tạo hóa đơn (chống đè nếu cùng học viên import thêm lớp trong tháng)
+            let orderId = `ORD_IMP_${yearMonthPrefix}_${studentId.split('_')[1]}`;
+            const existingOrder = await tx.orderFinance.findUnique({ where: { id: orderId } });
+            if (existingOrder) {
+              const randSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+              orderId = `${orderId}_${randSuffix}`;
+            }
+
+            await tx.orderFinance.create({
+              data: {
                 id: orderId,
                 studentId,
                 classCode,
                 promoType: customFee > 0 ? 'Giá thỏa thuận Import' : `Khấu trừ Import (${sessionsRemaining}/${totalSessions} buổi)`,
-                promoDiscount: courseConfig.price - feeToPay,
+                promoDiscount: Math.max(0, courseConfig.price - feeToPay),
                 feeToPay,
-                amountPaid,
+                amountPaid: roundedPaid,
                 paymentStatus,
                 paymentDeadline: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+                branchId: classInfo.branchId || 'CN1_BinhDuong',
               }
             });
+
+            if (roundedPaid > 0) {
+              await tx.paymentLog.create({
+                data: {
+                  orderId,
+                  amount: roundedPaid,
+                  paymentMethod: 'Chuyển khoản',
+                  notes: `Thu học phí khi import Excel (${orderId})`,
+                }
+              });
+            }
 
             // Sinh dữ liệu Lịch sử điểm danh (Placeholder) cho N buổi đã học
             if (classMeta.sessionsTaught > 0) {
