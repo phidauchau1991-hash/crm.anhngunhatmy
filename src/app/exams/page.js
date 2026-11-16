@@ -6,6 +6,7 @@ import ClassSelect from '../components/ClassSelect';
 import MonthlyReportTab from './components/MonthlyReportTab';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
 import { generateVietQRDataURL } from '@/lib/vietqr';
+import { computeExpectedEndDateVn } from '@/lib/classHelper';
 
 export default function ExamsPage() {
   const [activeTab, setActiveTab] = useState('config');
@@ -37,10 +38,13 @@ export default function ExamsPage() {
     notes: 'Ba mẹ nhắc bé mang đầy đủ bút chì, tẩy và sáp màu nhé ạ!',
     newCourseLevel: '',
     startDate: '',
+    endDate: '',
     schedule: '',
     discount: 0
   });
   const [courseConfigs, setCourseConfigs] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [isManualEndDate, setIsManualEndDate] = useState(false);
 
   // --- Result State ---
   const [selectedClass, setSelectedClass] = useState('');
@@ -67,9 +71,11 @@ export default function ExamsPage() {
     fetchClasses();
     fetchConfigs();
     fetchCourseConfigs();
+    fetchHolidays();
   }, []);
 
   useEffect(() => {
+    setIsManualEndDate(false);
     if (selectedClass) {
       fetch(`/api/students?classCode=${selectedClass}&includeHistorical=true`)
         .then(res => res.json())
@@ -116,6 +122,48 @@ export default function ExamsPage() {
       console.error('Error fetching classes:', error);
     }
   };
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetch('/api/holidays');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) setHolidays(data.data);
+    } catch (error) {
+      console.error('Error fetching holidays:', error);
+    }
+  };
+
+  const selectedClassObj = useMemo(
+    () => classes.find((c) => c.code === selectedClass) || null,
+    [classes, selectedClass]
+  );
+
+  const effectiveNoticeSchedule = useMemo(
+    () => selectedClassObj?.scheduleRaw || selectedClassObj?.schedule || (selectedClass ? selectedClass.split('_')[3] : '') || '',
+    [selectedClassObj, selectedClass]
+  );
+
+  const activeNewCourse = useMemo(
+    () => courseConfigs.find((c) => c.level === noticeForm.newCourseLevel) || null,
+    [courseConfigs, noticeForm.newCourseLevel]
+  );
+
+  const autoCalculatedEndDate = useMemo(() => {
+    if (!noticeForm.startDate || !activeNewCourse?.totalSessions) return '';
+    return computeExpectedEndDateVn({
+      startDate: noticeForm.startDate,
+      totalSessions: activeNewCourse.totalSessions,
+      classCode: selectedClassObj?.code || selectedClass || '',
+      schedule: effectiveNoticeSchedule,
+      holidays,
+    });
+  }, [noticeForm.startDate, activeNewCourse, selectedClassObj, selectedClass, effectiveNoticeSchedule, holidays]);
+
+  useEffect(() => {
+    if (!isManualEndDate) {
+      setNoticeForm((prev) => (prev.endDate === autoCalculatedEndDate ? prev : { ...prev, endDate: autoCalculatedEndDate }));
+    }
+  }, [autoCalculatedEndDate, isManualEndDate]);
 
   const fetchConfigs = async () => {
     try {
@@ -382,6 +430,8 @@ export default function ExamsPage() {
               newCourse={activeCourse}
               startDate={noticeForm.startDate}
               endDate={noticeForm.endDate}
+              schedule={effectiveNoticeSchedule}
+              holidays={holidays}
               discount={sn.discount || 0}
               isGiftBook={sn.isGiftBook || false}
               hasBook={sn.hasBook || false}
@@ -440,7 +490,6 @@ export default function ExamsPage() {
   };
 
   const activeConfig = configs.find(c => c.id === parseInt(selectedConfig));
-  const selectedClassObj = classes.find(c => c.code === selectedClass);
   const isLevelMismatch = activeConfig && selectedClassObj && activeConfig.level !== selectedClassObj.level;
   // Helper tính điểm quy đổi hệ 100 và xếp loại thời gian thực
   const calculateStudentScore = (r, config) => {
@@ -1346,7 +1395,42 @@ export default function ExamsPage() {
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Ngày kết thúc dự kiến</label>
-                    <input type="text" value={noticeForm.endDate || ''} onChange={e => setNoticeForm({...noticeForm, endDate: e.target.value})} placeholder="Tự động tính theo số buổi" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                    <input
+                      type="text"
+                      value={noticeForm.endDate || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setIsManualEndDate(val.trim().length > 0 && val.trim() !== autoCalculatedEndDate);
+                        setNoticeForm({ ...noticeForm, endDate: val });
+                      }}
+                      placeholder="Tự động tính theo số buổi"
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    />
+                    {autoCalculatedEndDate && (
+                      <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {isManualEndDate && noticeForm.endDate !== autoCalculatedEndDate ? (
+                          <>
+                            <span style={{ color: '#b45309', fontWeight: '600' }}>
+                              ⚠️ Đang dùng ngày nhập tay (Chuẩn hệ thống: {autoCalculatedEndDate})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsManualEndDate(false);
+                                setNoticeForm(prev => ({ ...prev, endDate: autoCalculatedEndDate }));
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#0284c7', fontWeight: '700', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                            >
+                              ↺ Khôi phục ngày chuẩn
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ color: '#059669', fontWeight: '600' }}>
+                            ✓ Tự động tịnh tiến {activeNewCourse?.totalSessions} buổi theo lịch {effectiveNoticeSchedule || 'lớp'} (đã trừ ngày nghỉ)
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1508,6 +1592,8 @@ export default function ExamsPage() {
                         newCourse={activeCourse}
                         startDate={noticeForm.startDate}
                         endDate={noticeForm.endDate}
+                        schedule={effectiveNoticeSchedule}
+                        holidays={holidays}
                         discount={noticeMode === 'personalized' ? (sn.discount || 0) : 0}
                         isGiftBook={noticeMode === 'personalized' ? (sn.isGiftBook || false) : false}
                         hasBook={noticeMode === 'personalized' ? (sn.hasBook || false) : false}

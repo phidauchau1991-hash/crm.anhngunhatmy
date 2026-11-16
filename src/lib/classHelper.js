@@ -272,3 +272,140 @@ export function groupAndSortClasses(classes, { hideEnded = false } = {}) {
     endedClasses,
   };
 }
+
+const vnDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * Chuẩn hóa mọi kiểu Date / timestamp / chuỗi ngày (YYYY-MM-DD hoặc DD/MM/YYYY) về YYYY-MM-DD (GMT+7)
+ */
+export function toVnDateKey(dateInput) {
+  if (!dateInput && dateInput !== 0) return '';
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const vnMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (vnMatch) {
+      const dd = vnMatch[1].padStart(2, '0');
+      const mm = vnMatch[2].padStart(2, '0');
+      const yyyy = vnMatch[3];
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  return vnDateFormatter.format(d);
+}
+
+/**
+ * Chuẩn hóa chuỗi lịch học (VD: "Thứ 7, Chủ Nhật", "T7CN", "7CN", "Thứ 3, Thứ 5") về mã chuẩn ("7CN", "35", "24"...)
+ */
+export function normalizeScheduleCode(str) {
+  if (!str) return '';
+  const base = String(str).split('|')[0].toUpperCase();
+  const days = [];
+  if (base.includes('2')) days.push('2');
+  if (base.includes('3')) days.push('3');
+  if (base.includes('4')) days.push('4');
+  if (base.includes('5')) days.push('5');
+  if (base.includes('6')) days.push('6');
+  if (base.includes('7')) days.push('7');
+  if (base.includes('8') || base.includes('CN') || base.includes('CHỦ NHẬT') || base.includes('CHU NHAT')) days.push('CN');
+  return days.length > 0 ? days.join('') : base.trim();
+}
+
+/**
+ * Lấy danh sách các thứ trong tuần (0 = Chủ Nhật, 1 = Thứ 2, ..., 6 = Thứ 7) từ chuỗi lịch học hoặc mã lớp
+ */
+export function extractTargetDays(schedule, classCode = '') {
+  const effectiveSchedule = schedule || (classCode && String(classCode).split('_')[3]) || '';
+  const norm = normalizeScheduleCode(effectiveSchedule);
+  const targetDays = [];
+  if (norm.includes('2')) targetDays.push(1);
+  if (norm.includes('3')) targetDays.push(2);
+  if (norm.includes('4')) targetDays.push(3);
+  if (norm.includes('5')) targetDays.push(4);
+  if (norm.includes('6')) targetDays.push(5);
+  if (norm.includes('7')) targetDays.push(6);
+  if (norm.includes('CN')) targetDays.push(0);
+  return targetDays;
+}
+
+/**
+ * Kiểm tra một ngày cụ thể có trùng ngày nghỉ áp dụng cho lớp/ca đó không
+ */
+export function getHolidayForDate(date, classCode, schedule, holidays) {
+  if (!holidays || !Array.isArray(holidays)) return null;
+  const dateKey = toVnDateKey(date);
+  if (!dateKey) return null;
+
+  const effectiveSchedule = schedule || (classCode && String(classCode).split('_')[3]) || '';
+  const normSchedule = normalizeScheduleCode(effectiveSchedule);
+
+  for (const h of holidays) {
+    const startKey = toVnDateKey(h.startDate);
+    const endKey = toVnDateKey(h.endDate);
+    if (!startKey || !endKey) continue;
+
+    if (dateKey >= startKey && dateKey <= endKey) {
+      if (h.scope === 'GLOBAL') return h;
+      if (h.scope === 'SHIFT') {
+        if (h.targetId === effectiveSchedule || (normSchedule && normalizeScheduleCode(h.targetId) === normSchedule)) {
+          return h;
+        }
+        if (classCode && h.targetId === classCode) return h;
+      }
+      if (h.scope === 'CLASS' && h.targetId === classCode) return h;
+    }
+  }
+  return null;
+}
+
+/**
+ * Tính toán ngày kết thúc dự kiến chuẩn (tịnh tiến đúng từng buổi theo lịch học & tự động tránh ngày nghỉ).
+ * Trả về Date chuẩn UTC 00:00 của ngày Việt Nam tương ứng.
+ */
+export function computeExpectedEndDate({ startDate, totalSessions, classCode = '', schedule = '', holidays = [] }) {
+  const effectiveSchedule = schedule || (classCode && String(classCode).split('_')[3]) || '';
+  const targetDays = extractTargetDays(effectiveSchedule, classCode);
+  if (targetDays.length === 0 || !totalSessions || totalSessions <= 0) return null;
+
+  const startKey = toVnDateKey(startDate);
+  if (!startKey) return null;
+
+  const cursor = new Date(`${startKey}T12:00:00.000Z`);
+  let sessionsCount = 0;
+  let guard = 0;
+
+  while (sessionsCount < totalSessions && guard < 1500) {
+    guard++;
+    const currentKey = cursor.toISOString().slice(0, 10);
+    const dayOfWeek = cursor.getUTCDay();
+    const isDayHoliday = getHolidayForDate(currentKey, classCode, effectiveSchedule, holidays);
+
+    if (targetDays.includes(dayOfWeek) && !isDayHoliday) {
+      sessionsCount++;
+      if (sessionsCount === totalSessions) {
+        return new Date(`${currentKey}T00:00:00.000Z`);
+      }
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return new Date(`${cursor.toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
+/**
+ * Phiên bản trả về chuỗi DD/MM/YYYY (VD: "28/02/2027") để hiển thị đồng nhất trên giao diện & thư báo
+ */
+export function computeExpectedEndDateVn({ startDate, totalSessions, classCode = '', schedule = '', holidays = [] }) {
+  const endDate = computeExpectedEndDate({ startDate, totalSessions, classCode, schedule, holidays });
+  if (!endDate) return '';
+  const isoKey = endDate.toISOString().slice(0, 10);
+  const [yyyy, mm, dd] = isoKey.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+}

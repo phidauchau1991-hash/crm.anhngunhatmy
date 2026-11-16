@@ -2,6 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import * as htmlToImage from 'html-to-image';
 import { generateVietQRDataURL } from '@/lib/vietqr';
+import { computeExpectedEndDateVn } from '@/lib/classHelper';
 
 // Thư viện hỗ trợ lưu file ảnh
 const downloadImage = (dataUrl, filename) => {
@@ -506,25 +507,21 @@ export const ExamNoticeTemplate = ({ className, examStage = 'final', examDates, 
 // ==========================================
 // ẢNH 4: THƯ THÔNG BÁO KHÓA MỚI & QR THANH TOÁN
 // ==========================================
-export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, discount, isGiftBook, hasBook, studentName, isPersonalized, qrDataUrl }) => {
+export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, schedule, holidays, discount, isGiftBook, hasBook, studentName, isPersonalized, qrDataUrl }) => {
   const displayClassCode = formatClassCodeForParent(className || "");
   const targetName = studentName ? studentName.toUpperCase() : `LỚP ${displayClassCode}`;
   const bankMemoName = studentName 
     ? studentName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toUpperCase() 
     : "[Ten be]";
 
-  // Compute end date if not provided
-  const computedEndDate = endDate || (() => {
-    if (!startDate) return "";
-    const parts = startDate.split('/');
-    if (parts.length === 3) {
-      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-      const weeks = Math.ceil((newCourse?.totalSessions || 24) / 2);
-      d.setDate(d.getDate() + (weeks * 7));
-      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    }
-    return "";
-  })();
+  // Tính ngày kết thúc dự kiến chuẩn xác theo đúng engine tịnh tiến từng buổi + trừ ngày nghỉ toàn hệ thống
+  const computedEndDate = endDate || computeExpectedEndDateVn({
+    startDate,
+    totalSessions: newCourse?.totalSessions || 32,
+    classCode: className || '',
+    schedule: schedule || '',
+    holidays: holidays || [],
+  });
 
   const basePrice = newCourse?.price || 0;
   const bookPrice = (isPersonalized && (isGiftBook || hasBook)) ? 0 : (newCourse?.bookPrice || 0);
