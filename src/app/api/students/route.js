@@ -477,10 +477,9 @@ export async function POST(request) {
       });
 
       const isMonthlyMode =
+        classInfo?.level === 'MONTHLY' ||
         enrollmentMode === 'MONTHLY' ||
-        billingType === 'MONTHLY_PREPAID' ||
-        billingType === 'MONTHLY_POSTPAID' ||
-        classInfo?.level === 'MONTHLY';
+        (enrollmentMode !== 'COURSE' && (billingType === 'MONTHLY_PREPAID' || billingType === 'MONTHLY_POSTPAID'));
 
       const finalBillingType = isMonthlyMode
         ? (billingType === 'MONTHLY_POSTPAID' ? 'MONTHLY_POSTPAID' : 'MONTHLY_PREPAID')
@@ -532,10 +531,14 @@ export async function POST(request) {
             const discountFixed = policyVal; // Trừ thẳng mức giảm cố định của học viên
             const discountSeasonal = parseFloat(promoDiscount) || 0; // Trừ giảm thêm mùa vụ
             feeToPay = roundDown5000(Math.max(0, proRatedTuitionNew - discountFixed - discountSeasonal));
-            finalPromoType = `Khấu trừ còn ${sessionsRemainingNew}/${totalSessionsNew} buổi` + (discountSeasonal > 0 
-              ? ` + ${promoType || 'Ưu đãi mùa vụ'}${promoReason ? ` (Lý do: ${promoReason})` : ''}` 
-              : '');
-            totalDiscount = (courseConfig.price - proRatedTuitionNew) + discountSeasonal;
+            const fixedNote = discountFixed > 0
+              ? ` + ${specialPolicyType && specialPolicyType !== 'Không giảm' ? specialPolicyType : 'Ưu đãi cố định'} (-${discountFixed.toLocaleString('vi-VN')}đ)`
+              : '';
+            const seasonalNote = discountSeasonal > 0
+              ? ` + ${promoType || 'Ưu đãi mùa vụ'}${promoReason ? ` (Lý do: ${promoReason})` : ''}`
+              : '';
+            finalPromoType = `Khấu trừ còn ${sessionsRemainingNew}/${totalSessionsNew} buổi${fixedNote}${seasonalNote}`;
+            totalDiscount = Math.max(0, courseConfig.price - feeToPay);
           }
 
           const paidAmount = parseFloat(amountPaid) || 0;

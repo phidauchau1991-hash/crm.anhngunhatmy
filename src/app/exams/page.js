@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ClassSelect from '../components/ClassSelect';
 import MonthlyReportTab from './components/MonthlyReportTab';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
+import { generateVietQRDataURL } from '@/lib/vietqr';
 
 export default function ExamsPage() {
   const [activeTab, setActiveTab] = useState('config');
@@ -77,7 +78,12 @@ export default function ExamsPage() {
             setStudents(data.data);
             const noticesObj = {};
             data.data.forEach(s => {
-              noticesObj[s.id] = { selected: true, discount: 0, isGiftBook: false };
+              noticesObj[s.id] = {
+                selected: true,
+                discount: Number(s.specialPolicyValue) || 0,
+                isGiftBook: false,
+                hasBook: false,
+              };
             });
             setStudentNotices(noticesObj);
             if (data.data.length > 0) setPreviewStudentId(data.data[0].id);
@@ -351,55 +357,23 @@ export default function ExamsPage() {
         document.body.appendChild(container);
         
         const root = createRoot(container);
-        const sn = studentNotices[s.id] || { discount: 0, isGiftBook: false, hasBook: false };
+        const fixedDiscountDefault = Number(s.specialPolicyValue) || 0;
+        const sn = studentNotices[s.id] || { discount: fixedDiscountDefault, isGiftBook: false, hasBook: false };
         const activeCourse = courseConfigs.find(c => c.level === noticeForm.newCourseLevel);
 
-        // Pre-fetch the QR image with retry logic to guarantee it loads
+        // Sinh mã VietQR chuẩn EMVCo / NAPAS 247 nội bộ 0ms (không phụ thuộc API ngoài, không bao giờ lỗi 429/CORS)
         const bankMemoName = s.name ? s.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toUpperCase() : "";
         const basePrice = activeCourse?.price || 0;
         const bookPrice = (sn.isGiftBook || sn.hasBook) ? 0 : (activeCourse?.bookPrice || 0);
         const discountVal = sn.discount || 0;
         const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
-        const qrUrl = `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + activeCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
-
-        let qrDataUrl = '';
-        let qrSuccess = false;
-        let qrAttempts = 0;
-        
-        while (!qrSuccess && qrAttempts < 10) {
-            qrAttempts++;
-            try {
-                // Thêm timestamp để ép VietQR bỏ qua cache, tránh trả về lỗi 429 cũ
-                const res = await fetch(qrUrl + `&t=${Date.now()}`); 
-                if (res.status === 429) {
-                    console.warn(`VietQR Rate limit (429) cho ${s.name}, đợi lâu hơn...`);
-                    await new Promise(r => setTimeout(r, 2000 + qrAttempts * 1000)); // Tăng dần thời gian đợi
-                    continue;
-                }
-                if (!res.ok) throw new Error(`Fetch QR failed with status: ${res.status}`);
-                
-                const blob = await res.blob();
-                qrDataUrl = await new Promise(r => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => r(reader.result);
-                    reader.readAsDataURL(blob);
-                });
-                qrSuccess = true; // Thành công
-            } catch(e) {
-                console.warn(`Lỗi fetch QR cho ${s.name} (lần ${qrAttempts}), đang thử lại...`, e);
-                await new Promise(r => setTimeout(r, 1500)); // Nghỉ 1.5s trước khi thử lại
-            }
-        }
-
-        // Bắt buộc phải có QR code mới cho phép render, tránh lỗi mất ảnh QR
-        if (!qrSuccess) {
-            alert(`Lỗi hệ thống tạo QR (VietQR) cho học viên ${s.name}. Quá trình tải hàng loạt bị hủy để tránh lỗi ảnh. Vui lòng thử lại sau ít phút!`);
-            setIsBatchExporting(false);
-            setBatchProgress('');
-            root.unmount();
-            document.body.removeChild(container);
-            return;
-        }
+        const qrDataUrl = finalPrice > 0
+          ? await generateVietQRDataURL({
+              amount: finalPrice,
+              addInfo: `${bankMemoName} dong hoc phi lop ${activeCourse?.level || ''}`.trim(),
+              width: 400,
+            })
+          : '';
 
         await new Promise(resolve => {
           root.render(
@@ -447,8 +421,8 @@ export default function ExamsPage() {
         root.unmount();
         document.body.removeChild(container);
 
-        // Đợi thêm 2000ms để tránh bị VietQR rate limit (Too Many Requests) khi gọi api liên tục
-        await new Promise(r => setTimeout(r, 2000));
+        // Nghỉ ngắn 80ms để trình duyệt giải phóng bộ nhớ canvas giữa các ảnh
+        await new Promise(r => setTimeout(r, 80));
       }
 
       setBatchProgress(`Đang tải file ZIP xuống...`);
@@ -1388,7 +1362,7 @@ export default function ExamsPage() {
                             const checked = e.target.checked;
                             const next = { ...studentNotices };
                             students.forEach(s => {
-                              next[s.id] = { ...(next[s.id] || { discount: 0, isGiftBook: false }), selected: checked };
+                              next[s.id] = { ...(next[s.id] || { discount: Number(s.specialPolicyValue) || 0, isGiftBook: false, hasBook: false }), selected: checked };
                             });
                             setStudentNotices(next);
                           }}
@@ -1401,7 +1375,7 @@ export default function ExamsPage() {
                           <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left' }}>
                             <th style={{ padding: '0.5rem', width: '40px', textAlign: 'center' }}>Chọn</th>
                             <th style={{ padding: '0.5rem' }}>Học viên</th>
-                            <th style={{ padding: '0.5rem', width: '120px' }}>Ưu đãi (đ)</th>
+                            <th style={{ padding: '0.5rem', width: '130px' }}>Ưu đãi (đ)</th>
                             <th style={{ padding: '0.5rem', width: '90px', textAlign: 'center' }}>Đã có sách</th>
                             <th style={{ padding: '0.5rem', width: '90px', textAlign: 'center' }}>Tặng sách</th>
                             <th style={{ padding: '0.5rem', width: '70px', textAlign: 'center' }}>Xem</th>
@@ -1409,8 +1383,10 @@ export default function ExamsPage() {
                         </thead>
                         <tbody>
                           {students.map(s => {
-                            const sn = studentNotices[s.id] || { selected: true, discount: 0, isGiftBook: false, hasBook: false };
+                            const fixedVal = Number(s.specialPolicyValue) || 0;
+                            const sn = studentNotices[s.id] || { selected: true, discount: fixedVal, isGiftBook: false, hasBook: false };
                             const isFocused = previewStudentId === s.id;
+                            const isModifiedFromFixed = fixedVal > 0 && Number(sn.discount || 0) !== fixedVal;
                             return (
                               <tr key={s.id} style={{ borderBottom: '1px solid #e2e8f0', background: isFocused ? '#f0f9ff' : 'white' }}>
                                 <td style={{ padding: '0.5rem', textAlign: 'center' }}>
@@ -1421,15 +1397,29 @@ export default function ExamsPage() {
                                   />
                                 </td>
                                 <td style={{ padding: '0.5rem', fontWeight: isFocused ? 'bold' : 'normal', color: isFocused ? '#0D88C4' : '#333' }}>
-                                  {s.name} <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({s.id})</span>
+                                  <div>{s.name} <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({s.id})</span></div>
+                                  {fixedVal > 0 && (
+                                    <div style={{ marginTop: '2px', display: 'inline-block', fontSize: '0.72rem', fontWeight: '700', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '4px', padding: '1px 6px' }}>
+                                      Cố định ({s.specialPolicyType && s.specialPolicyType !== 'Không giảm' ? s.specialPolicyType : 'Ưu đãi'}): -{fixedVal.toLocaleString('vi-VN')}đ
+                                    </div>
+                                  )}
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
                                   <input 
                                     type="number" 
                                     value={sn.discount || 0} 
                                     onChange={e => setStudentNotices({...studentNotices, [s.id]: { ...sn, discount: parseInt(e.target.value) || 0 }})} 
-                                    style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+                                    style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: fixedVal > 0 ? '1px solid #10b981' : '1px solid #cbd5e1', fontWeight: (sn.discount || 0) > 0 ? '700' : 'normal' }} 
                                   />
+                                  {isModifiedFromFixed && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setStudentNotices({...studentNotices, [s.id]: { ...sn, discount: fixedVal }})}
+                                      style={{ marginTop: '3px', fontSize: '0.7rem', color: '#0369a1', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                                    >
+                                      ↺ Mặc định (-{fixedVal.toLocaleString('vi-VN')}đ)
+                                    </button>
+                                  )}
                                 </td>
                                 <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                                   <input 

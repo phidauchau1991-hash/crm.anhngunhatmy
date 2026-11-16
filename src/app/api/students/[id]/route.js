@@ -146,6 +146,7 @@ export async function GET(request, { params }) {
           id: o.id,
           classCode: o.classCode,
           promoType: o.promoType || '',
+          promoDiscount: o.promoDiscount || 0,
           feeToPay: o.feeToPay,
           amountPaid: o.amountPaid,
           paymentStatus: o.paymentStatus,
@@ -341,6 +342,11 @@ export async function PUT(request, { params }) {
       let totalTuitionApplied = 0;
       let oldDebtBeforePayment = 0;
       let remainingDebtAfterPayment = 0;
+      let receiptOriginalFee = 0;
+      let receiptDiscountAmount = 0;
+      let receiptDiscountLabel = '';
+      let receiptFeeAfterDiscount = 0;
+      let receiptPreviouslyPaid = 0;
 
       await prisma.$transaction(async (tx) => {
         // 1. Thu tiền học phí (Ưu tiên đơn hàng chỉ định targetOrderId -> đơn lớp đang học -> FIFO theo công nợ thực tế)
@@ -373,6 +379,55 @@ export async function PUT(request, { params }) {
 
           const primaryOrder = unpaidOrders[0];
           oldDebtBeforePayment = Math.round(Math.max(0, primaryOrder.feeToPay - primaryOrder.amountPaid));
+          receiptFeeAfterDiscount = Math.round(primaryOrder.feeToPay || 0);
+          receiptPreviouslyPaid = Math.round(primaryOrder.amountPaid || 0);
+
+          // Đối chiếu Học phí gốc khóa học & Khoản ưu đãi/giảm trừ để hiển thị minh bạch trên Phiếu thu điện tử
+          let courseCfgPrice = 0;
+          if (primaryOrder.classCode) {
+            const cls = await tx.class.findUnique({ where: { code: primaryOrder.classCode } });
+            if (cls?.level && cls.level !== 'MONTHLY') {
+              const cfg = await tx.courseConfig.findUnique({ where: { level: cls.level } });
+              courseCfgPrice = Math.round(cfg?.price || 0);
+            }
+          }
+          const recordedPromo = Math.round(primaryOrder.promoDiscount || 0);
+          const policyVal = Math.round(student.specialPolicyValue || 0);
+          const policyType = student.specialPolicyType && student.specialPolicyType !== 'Không giảm'
+            ? student.specialPolicyType
+            : '';
+
+          if (courseCfgPrice > 0 && courseCfgPrice > receiptFeeAfterDiscount) {
+            receiptOriginalFee = courseCfgPrice;
+            receiptDiscountAmount = Math.max(recordedPromo, courseCfgPrice - receiptFeeAfterDiscount);
+            if (receiptOriginalFee < receiptFeeAfterDiscount + receiptDiscountAmount) {
+              receiptOriginalFee = receiptFeeAfterDiscount + receiptDiscountAmount;
+            }
+          } else if (recordedPromo > 0) {
+            receiptDiscountAmount = recordedPromo;
+            receiptOriginalFee = receiptFeeAfterDiscount + receiptDiscountAmount;
+          } else if (policyVal > 0 && courseCfgPrice === 0) {
+            receiptDiscountAmount = policyVal;
+            receiptOriginalFee = receiptFeeAfterDiscount + policyVal;
+          }
+
+          if (receiptDiscountAmount > 0) {
+            const promoDesc = String(primaryOrder.promoType || '');
+            const hasExtraReduction = receiptDiscountAmount > policyVal && (promoDesc.includes('Khấu trừ') || promoDesc.includes('Chuyển lớp') || promoDesc.includes('Ví'));
+            if (policyVal > 0 && policyType) {
+              receiptDiscountLabel = receiptDiscountAmount === policyVal
+                ? `Ưu đãi cố định (${policyType})`
+                : hasExtraReduction
+                  ? `Ưu đãi (${policyType}) & Khấu trừ`
+                  : `Ưu đãi cố định (${policyType}) & Giảm trừ`;
+            } else if (policyVal > 0) {
+              receiptDiscountLabel = receiptDiscountAmount === policyVal ? 'Ưu đãi cố định' : 'Ưu đãi cố định & Giảm trừ';
+            } else if (hasExtraReduction) {
+              receiptDiscountLabel = 'Khấu trừ / Chuyển lớp / Ưu đãi';
+            } else {
+              receiptDiscountLabel = 'Ưu đãi / Giảm trừ học phí';
+            }
+          }
           const totalOutstandingDebt = unpaidOrders.reduce(
             (sum, o) => sum + Math.max(0, o.feeToPay - o.amountPaid),
             0
@@ -545,6 +600,11 @@ export async function PUT(request, { params }) {
         data: updatedOrders,
         receiptCode,
         receiptSummary: {
+          originalFee: receiptOriginalFee,
+          discountAmount: receiptDiscountAmount,
+          discountLabel: receiptDiscountLabel,
+          feeAfterDiscount: receiptFeeAfterDiscount,
+          previouslyPaid: receiptPreviouslyPaid,
           oldDebt: oldDebtBeforePayment,
           tuitionPaid: totalTuitionApplied,
           remainingDebt: remainingDebtAfterPayment,

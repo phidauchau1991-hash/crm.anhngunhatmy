@@ -1,6 +1,7 @@
 'use client';
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import * as htmlToImage from 'html-to-image';
+import { generateVietQRDataURL } from '@/lib/vietqr';
 
 // Thư viện hỗ trợ lưu file ảnh
 const downloadImage = (dataUrl, filename) => {
@@ -529,6 +530,27 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
   const bookPrice = (isPersonalized && (isGiftBook || hasBook)) ? 0 : (newCourse?.bookPrice || 0);
   const discountVal = (isPersonalized && discount > 0) ? parseInt(discount) : 0;
   const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
+  const transferAddInfo = `${bankMemoName} dong hoc phi lop ${newCourse?.level || ''}`.trim();
+
+  const [localQrDataUrl, setLocalQrDataUrl] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (qrDataUrl || finalPrice <= 0) {
+      setLocalQrDataUrl('');
+      return () => { active = false; };
+    }
+    generateVietQRDataURL({ amount: finalPrice, addInfo: transferAddInfo, width: 400 })
+      .then((url) => {
+        if (active) setLocalQrDataUrl(url);
+      })
+      .catch((err) => console.error('Local VietQR preview error:', err));
+    return () => {
+      active = false;
+    };
+  }, [qrDataUrl, finalPrice, transferAddInfo]);
+
+  const resolvedQrSrc = qrDataUrl || localQrDataUrl;
 
   return (
     <div style={styles.container} id="promotion-notice-report">
@@ -639,12 +661,22 @@ export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDa
             <div style={{ fontWeight: 'bold', color: '#0d88c4', marginBottom: '10px', fontSize: '13px' }}>
               QUÉT ĐỂ THANH TOÁN
             </div>
-            <img 
-              src={qrDataUrl || `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalPrice}&addInfo=${encodeURIComponent(bankMemoName + ' dong hoc phi lop ' + newCourse?.level)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`} 
-              alt="QR Code" 
-              style={{ width: '100%', height: 'auto', display: 'block' }} 
-              {...(qrDataUrl ? {} : { crossOrigin: "anonymous" })}
-            />
+            {finalPrice <= 0 ? (
+              <div style={{ padding: '24px 10px', background: '#ecfdf5', borderRadius: '8px', color: '#059669', fontWeight: 'bold', fontSize: '14px' }}>
+                0đ — Đã hoàn tất ưu đãi
+              </div>
+            ) : resolvedQrSrc ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img 
+                src={resolvedQrSrc} 
+                alt="QR Code" 
+                style={{ width: '100%', height: 'auto', display: 'block' }} 
+              />
+            ) : (
+              <div style={{ padding: '40px 10px', color: '#64748b', fontSize: '13px' }}>
+                Đang tạo mã QR...
+              </div>
+            )}
             <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0d88c4' }}>NAPAS 247</span>
             </div>

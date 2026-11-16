@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import TuitionNoticeTemplate from '../../components/TuitionNoticeTemplate';
 import ClassSelect from '../../components/ClassSelect';
 import { formatClassCode, getClassScheduleDetails } from '@/lib/classHelper';
+import { generateVietQRDataURL } from '@/lib/vietqr';
 
 export default function TuitionNoticeAction({ student }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,6 +69,18 @@ export default function TuitionNoticeAction({ student }) {
   // 2. Tự động nhận diện lớp học viên khi mở modal hoặc khi classes/configs sẵn sàng
   useEffect(() => {
     if (!isModalOpen) return;
+
+    // Tự động đề xuất mức giảm giá cố định từ hồ sơ học viên
+    const fixedVal = Number(student?.specialPolicyValue) || 0;
+    if (fixedVal > 0 && discountAmount === 0 && discountPercent === 0) {
+      setDiscountAmount(fixedVal);
+      if (!discountReason) {
+        const policyLabel = student?.specialPolicyType && student.specialPolicyType !== 'Không giảm'
+          ? `Ưu đãi cố định (${student.specialPolicyType})`
+          : 'Ưu đãi cố định của học viên';
+        setDiscountReason(policyLabel);
+      }
+    }
 
     const enrollments = student.enrollments || [];
     const orders = (student.orders || []).filter(o => !o.id.startsWith('ORD_BK'));
@@ -248,7 +261,7 @@ export default function TuitionNoticeAction({ student }) {
   // Parse danh sách quà tặng
   const giftsArray = giftsText.split(',').map(s => s.trim()).filter(Boolean);
 
-  // TRỌNG TÂM 3: Tự động tải mã VietQR Base64 (PNG) từ server để đảm bảo hiển thị 100% không bị chặn CORS
+  // TRỌNG TÂM 3: Sinh mã VietQR chuẩn NAPAS 247 nội bộ (0ms, không phụ thuộc bên ngoài, không lỗi CORS)
   useEffect(() => {
     if (finalAmount <= 0 || !transferContent) {
       setQrDataUrl('');
@@ -260,17 +273,20 @@ export default function TuitionNoticeAction({ student }) {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/vietqr?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}`);
-        const data = await res.json();
-        if (isMounted && data.success && data.qrDataURL) {
-          setQrDataUrl(data.qrDataURL);
+        const url = await generateVietQRDataURL({
+          amount: finalAmount,
+          addInfo: transferContent,
+          width: 400,
+        });
+        if (isMounted && url) {
+          setQrDataUrl(url);
         }
       } catch (err) {
-        console.error('Lỗi nạp mã VietQR:', err);
+        console.error('Lỗi sinh mã VietQR nội bộ:', err);
       } finally {
         if (isMounted) setIsQrLoading(false);
       }
-    }, 250);
+    }, 120);
 
     return () => {
       isMounted = false;
@@ -284,22 +300,25 @@ export default function TuitionNoticeAction({ student }) {
     if (qrDataUrl) return true;
 
     try {
-      const res = await fetch(`/api/vietqr?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}`);
-      const data = await res.json();
-      if (data.success && data.qrDataURL) {
-        setQrDataUrl(data.qrDataURL);
-        await new Promise(r => setTimeout(r, 200));
+      const url = await generateVietQRDataURL({
+        amount: finalAmount,
+        addInfo: transferContent,
+        width: 400,
+      });
+      if (url) {
+        setQrDataUrl(url);
+        await new Promise(r => setTimeout(r, 150));
         return true;
       }
     } catch (e) {
-      console.error('Lỗi nạp nhanh QR:', e);
+      console.error('Lỗi sinh nhanh QR:', e);
     }
     return false;
   };
 
   const getQrUrl = () => {
     if (!targetClassCode || finalAmount <= 0) return '';
-    return qrDataUrl || `https://img.vietqr.io/image/970422-6119916886-cTQpC6D.jpg?amount=${finalAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20TNHH%20NGOAI%20NGU%20TRI%20THUC%20VIET`;
+    return qrDataUrl;
   };
 
   const templateData = {

@@ -884,6 +884,11 @@ export default function StudentsPage() {
           receiptCode,
           studentName,
           courseFee: totalCourseFee > 0 ? totalCourseFee : oldDebt,
+          originalFee: summary?.originalFee || 0,
+          discountAmount: summary?.discountAmount || 0,
+          discountLabel: summary?.discountLabel || 'Ưu đãi / Giảm trừ',
+          feeAfterDiscount: summary?.feeAfterDiscount || 0,
+          previouslyPaid: summary?.previouslyPaid || 0,
           oldDebt,
           tuitionPaid,
           remainingDebt,
@@ -1011,13 +1016,14 @@ export default function StudentsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          billingType: formData.enrollmentMode === 'MONTHLY' ? (formData.billingType || 'MONTHLY_PREPAID') : 'COURSE',
           specialPolicyValue: parseNumber(formData.specialPolicyValue),
           promoDiscount: parseNumber(formData.promoDiscount),
           amountPaid: parseNumber(formData.amountPaid),
           customFee: parseNumber(formData.customFee),
           customReason: formData.customReason,
-          monthlyRate: parseNumber(formData.monthlyRate),
-          monthlySessions: parseInt(formData.monthlySessions, 10) || 8,
+          monthlyRate: formData.enrollmentMode === 'MONTHLY' ? parseNumber(formData.monthlyRate) : 0,
+          monthlySessions: formData.enrollmentMode === 'MONTHLY' ? (parseInt(formData.monthlySessions, 10) || 8) : null,
         }),
       });
 
@@ -3495,9 +3501,10 @@ export default function StudentsPage() {
               <div style={{ padding: '1.5rem 1.75rem 2.25rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif", position: 'relative' }}>
                 {/* Header: Logo bên trái, Tiêu đề ở giữa */}
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
-                  <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
+                  <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: '54px', objectFit: 'contain' }} crossOrigin="anonymous" />
                   <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
-                    <h2 style={{ margin: '0 0 0.35rem 0', color: '#085E8A', fontSize: '1.25rem', fontWeight: '900', letterSpacing: '0.5px' }}>ANH NGỮ NHẬT MỸ</h2>
+                    <h2 style={{ margin: '0 0 0.1rem 0', color: '#085E8A', fontSize: '1.25rem', fontWeight: '900', letterSpacing: '0.5px' }}>ANH NGỮ NHẬT MỸ</h2>
+                    <div style={{ fontSize: '0.7rem', fontStyle: 'italic', color: '#64748b', marginBottom: '0.3rem' }}>Dedicated to Excellence</div>
                     <div style={{ display: 'inline-block', background: '#FFCA29', color: '#085E8A', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
                       PHIẾU THU ĐIỆN TỬ
                     </div>
@@ -3527,6 +3534,18 @@ export default function StudentsPage() {
                 
                 {/* Khối chi tiết Học phí */}
                 <div style={{ margin: '0.75rem 0', fontSize: '0.95rem', lineHeight: '1.8' }}>
+                  {Number(eReceiptData.discountAmount || 0) > 0 && Number(eReceiptData.originalFee || 0) > 0 && (
+                    <div style={{ marginBottom: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px dashed #E2E8F0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748B' }}>Học phí gốc khóa học:</span>
+                        <span style={{ color: '#64748B' }}>{Number(eReceiptData.originalFee).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#059669', fontWeight: '600' }}>{eReceiptData.discountLabel || 'Ưu đãi / Giảm trừ'}:</span>
+                        <span style={{ fontWeight: '700', color: '#E11D48' }}>- {Number(eReceiptData.discountAmount).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#475569' }}>Học phí chưa hoàn thành:</span>
                     <span>{Number(eReceiptData.oldDebt || 0).toLocaleString('vi-VN')}đ</span>

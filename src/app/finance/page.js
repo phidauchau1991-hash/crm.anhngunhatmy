@@ -224,6 +224,11 @@ export default function FinancePage() {
           paymentMethod: collectForm.paymentMethod,
           date: now.toLocaleDateString('vi-VN'),
           time: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          originalFee: snap.originalFee || 0,
+          discountAmount: snap.discountAmount || 0,
+          discountLabel: snap.discountLabel || 'Ưu đãi / Giảm trừ',
+          feeAfterDiscount: snap.feeAfterDiscount || 0,
+          previouslyPaid: snap.previouslyPaid || 0,
           oldDebt: snap.oldDebt ?? collectForm.remainingDebt,
           tuitionPaid: snap.tuitionPaid ?? parseNumber(collectForm.collectAmount),
           remainingDebt: snap.remainingDebt ?? Math.max(0, collectForm.remainingDebt - parseNumber(collectForm.collectAmount)),
@@ -1068,6 +1073,18 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <div style={{ margin: '0.75rem 0', fontSize: '0.92rem', lineHeight: '1.8' }}>
+                  {Number(eReceiptData.discountAmount || 0) > 0 && Number(eReceiptData.originalFee || 0) > 0 && (
+                    <div style={{ marginBottom: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px dashed #E2E8F0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748B' }}>Học phí gốc khóa học:</span>
+                        <span style={{ color: '#64748B' }}>{Number(eReceiptData.originalFee).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#059669', fontWeight: '600' }}>{eReceiptData.discountLabel || 'Ưu đãi / Giảm trừ'}:</span>
+                        <span style={{ fontWeight: '700', color: '#E11D48' }}>- {Number(eReceiptData.discountAmount).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#475569' }}>Học phí chưa hoàn thành:</span>
                     <span>{Number(eReceiptData.oldDebt || 0).toLocaleString('vi-VN')}đ</span>
