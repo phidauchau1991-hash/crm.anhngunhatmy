@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import CourseWelcomeTemplate, { FIXED_NOTE_1, FIXED_NOTE_2 } from '@/app/components/CourseWelcomeTemplate';
-import { getClassScheduleDetails, formatClassCode } from '@/lib/classHelper';
+import { getClassScheduleDetails, formatClassCode, isClassEnded } from '@/lib/classHelper';
 
 /**
  * Helper parse chuỗi ngày (hỗ trợ cả ISO "2026-11-14", Date object, lẫn chuỗi vi-VN "14/11/2026")
@@ -120,11 +120,7 @@ export default function CourseWelcomeModal({
       setStudentCode(isOfficialStudentCode ? rawId : '');
 
       // Xác định lớp ban đầu từ danh sách các lớp ĐANG HOẠT ĐỘNG
-      const activeClasses = classList.filter(cls => {
-        if (cls.sessionsRemaining !== undefined && Number(cls.sessionsRemaining) <= 0) return false;
-        if (cls.status === 'Đã kết thúc' || cls.status === 'Kết thúc' || cls.status === 'Đã hoàn thành') return false;
-        return true;
-      });
+      const activeClasses = classList.filter(cls => !isClassEnded(cls));
       const requestedClassCode = data.classCode || data.trialClassCode || data.enrolledClassCode;
       const initialClassCode =
         (requestedClassCode && activeClasses.some(c => c.code === requestedClassCode))
@@ -208,13 +204,9 @@ export default function CourseWelcomeModal({
     setSuggestedMessage(msg);
   }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours, endDateText]);
 
-  // Lọc chỉ lấy các lớp ĐANG HOẠT ĐỘNG (còn số buổi sessionsRemaining > 0 và chưa kết thúc)
+  // Lọc chỉ lấy các lớp ĐANG HOẠT ĐỘNG (dùng helper chuẩn thống nhất toàn hệ thống)
   const activeClassList = useMemo(() => {
-    return classList.filter(cls => {
-      if (cls.sessionsRemaining !== undefined && Number(cls.sessionsRemaining) <= 0) return false;
-      if (cls.status === 'Đã kết thúc' || cls.status === 'Kết thúc' || cls.status === 'Đã hoàn thành') return false;
-      return true;
-    });
+    return classList.filter(cls => !isClassEnded(cls));
   }, [classList]);
 
   // Nhóm danh sách lớp đang hoạt động theo cấp độ chuẩn

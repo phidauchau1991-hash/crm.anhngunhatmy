@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import HolidayStudioModal from './HolidayStudioModal';
+import { isClassEnded } from '@/lib/classHelper';
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState([]);
@@ -139,22 +140,12 @@ export default function HolidaysPage() {
   };
 
   const getActiveShifts = () => {
-    const activeClasses = classes.filter(c => {
-      if (c.level === 'MONTHLY') return false;
-      if (c.sessionsRemaining !== undefined) return c.sessionsRemaining > 0;
-      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') return false;
-      return true;
-    });
+    const activeClasses = classes.filter(c => c.level !== 'MONTHLY' && !isClassEnded(c));
     return Array.from(new Set(activeClasses.map(c => c.scheduleRaw || c.schedule).filter(Boolean)));
   };
 
   const getActiveClasses = () => {
-    return classes.filter(c => {
-      if (c.sessionsRemaining !== undefined) return c.sessionsRemaining > 0;
-      if (c.status === 'Kết thúc' || c.status === 'Đã kết thúc') return false;
-      if (c.expectedEndDate && new Date(c.expectedEndDate) < new Date()) return false;
-      return true;
-    });
+    return classes.filter(c => !isClassEnded(c));
   };
 
   return (

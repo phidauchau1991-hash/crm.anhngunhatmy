@@ -7,7 +7,8 @@ import {
   getAvailableShifts, 
   getShiftTime, 
   formatScheduleDisplay, 
-  getClassScheduleDetails 
+  getClassScheduleDetails,
+  isClassEnded
 } from '@/lib/classHelper';
 
 const parseScheduleString = (str) => {
@@ -567,12 +568,12 @@ export default function ClassesPage() {
   const filteredClasses = classes.filter(cls => {
     if (statusFilter === 'monthly') return cls.level === 'MONTHLY';
     if (cls.level === 'MONTHLY') return false; // Hide monthly classes from course views
-    if (statusFilter === 'active') return cls.sessionsRemaining > 0;
-    if (statusFilter === 'completed') return cls.sessionsRemaining <= 0;
+    if (statusFilter === 'active') return !isClassEnded(cls);
+    if (statusFilter === 'completed') return isClassEnded(cls);
     return true;
   }).sort((a, b) => {
-    const aCompleted = a.sessionsRemaining <= 0;
-    const bCompleted = b.sessionsRemaining <= 0;
+    const aCompleted = isClassEnded(a);
+    const bCompleted = isClassEnded(b);
     if (aCompleted && !bCompleted) return 1;
     if (!aCompleted && bCompleted) return -1;
     return 0;
@@ -595,7 +596,7 @@ export default function ClassesPage() {
           >
             <option value="all">Tất cả lớp theo Khóa</option>
             <option value="active">Đang hoạt động</option>
-            <option value="completed">Đã kết thúc (Đủ số buổi)</option>
+            <option value="completed">Đã kết thúc</option>
             <option value="monthly">📅 Lớp Tháng (Học kèm / Luyện thi)</option>
           </select>
           {!userRole?.includes('TEACHER') && (
@@ -639,7 +640,7 @@ export default function ClassesPage() {
             </thead>
             <tbody>
               {filteredClasses.map((cls) => {
-                const isCompleted = cls.sessionsRemaining <= 0;
+                const isCompleted = isClassEnded(cls);
                 return (
                 <tr key={cls.code} className="table-row" style={isCompleted ? { backgroundColor: '#f1f5f9', opacity: 0.7, filter: 'grayscale(0.5)' } : {}}>
                   <td className="class-code">

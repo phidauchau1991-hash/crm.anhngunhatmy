@@ -84,6 +84,12 @@ export async function GET(request) {
 
       const sessionsTaught = uniqueDates.length;
       const sessionsRemaining = Math.max(0, totalSessions - sessionsTaught);
+      const activeStudentCount = cls.enrollments.filter(e => e.status === 'Đang học').length;
+      const transferredCount = cls.enrollments.filter(e => e.status === 'Đã chuyển' || e.status === 'Đã chuyển lớp').length;
+      const isEnded = cls.level !== 'MONTHLY' && (
+        sessionsRemaining <= 0 ||
+        (activeStudentCount === 0 && transferredCount > 0)
+      );
 
       const finalTeacherName = cls.teacher ? (cls.teacher.shortName || cls.teacher.fullName) : cls.teacherName;
 
@@ -114,13 +120,12 @@ export async function GET(request) {
         careStaff: cls.careStaff || 'Chưa phân công',
         expectedEndDate: cls.expectedEndDate && new Date(cls.expectedEndDate).getFullYear() > 2090 ? 'Học liên tục' : formatToVnDate(cls.expectedEndDate),
         expectedEndDateIso: formatToVnIso(cls.expectedEndDate),
-        studentCount: (() => {
-          const activeCount = cls.enrollments.filter(e => e.status === 'Đang học').length;
-          if (sessionsRemaining > 0) {
-            return activeCount > 0 ? activeCount : cls.enrollments.length;
-          }
-          return cls.enrollments.length;
-        })(),
+        studentCount: (!isEnded && sessionsRemaining > 0)
+          ? (activeStudentCount > 0 ? activeStudentCount : cls.enrollments.length)
+          : cls.enrollments.length,
+        activeStudentCount,
+        transferredCount,
+        isEnded,
         totalSessions,
         sessionsTaught,
         sessionsRemaining,

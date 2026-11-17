@@ -195,9 +195,16 @@ export function formatClassCode(classCode) {
 /**
  * Kiểm tra một lớp có đã kết thúc hay chưa.
  * Lớp đóng theo tháng (MONTHLY) chạy liên tục nên không bao giờ bị xếp vào nhóm đã kết thúc.
+ * Lớp theo khóa đã kết thúc khi: hết số buổi (`sessionsRemaining <= 0`) HOẶC 100% học viên đã chuyển lên khóa tiếp theo (`activeStudentCount === 0 && transferredCount > 0`).
  */
 export function isClassEnded(cls, now = new Date()) {
   if (!cls || cls.level === 'MONTHLY') return false;
+  if (cls.isEnded !== undefined) {
+    return Boolean(cls.isEnded);
+  }
+  if (cls.activeStudentCount === 0 && (cls.transferredCount || 0) > 0) {
+    return true;
+  }
   if (cls.sessionsRemaining !== undefined) {
     return cls.sessionsRemaining <= 0;
   }
