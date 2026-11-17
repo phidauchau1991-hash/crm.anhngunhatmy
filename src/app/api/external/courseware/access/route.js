@@ -124,10 +124,10 @@ export async function GET(request) {
 
       try {
         const stmt14 = db.prepare(
-          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt FROM StudySession WHERE studentId = ? AND createdAt >= datetime('now', '-14 days')"
+          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt, COUNT(DISTINCT date(datetime(createdAt, '+7 hours'))) as activeDays FROM StudySession WHERE studentId = ? AND createdAt >= datetime('now', '-14 days')"
         );
         const stmtRange = db.prepare(
-          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt FROM StudySession WHERE studentId = ? AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) >= ?) AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) <= ?)"
+          "SELECT COALESCE(SUM(durationSeconds), 0)/60.0 as mPeriod, MAX(createdAt) as periodLastActiveAt, COUNT(DISTINCT date(datetime(createdAt, '+7 hours'))) as activeDays FROM StudySession WHERE studentId = ? AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) >= ?) AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) <= ?)"
         );
         const stmtRangeLesson = db.prepare(
           "SELECT lessonTitle FROM StudySession WHERE studentId = ? AND lessonTitle IS NOT NULL AND lessonTitle != '' AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) >= ?) AND (? IS NULL OR date(datetime(createdAt, '+7 hours')) <= ?) ORDER BY id DESC LIMIT 1"
@@ -150,10 +150,11 @@ export async function GET(request) {
               const tel = stmtTel.get(s.id) || {};
 
               const sessionStats = hasCustomRange
-                ? (stmtRange.get(s.id, fromDate, fromDate, toDate, toDate) || { mPeriod: 0, periodLastActiveAt: null })
-                : (stmt14.get(s.id) || { mPeriod: 0, periodLastActiveAt: null });
+                ? (stmtRange.get(s.id, fromDate, fromDate, toDate, toDate) || { mPeriod: 0, periodLastActiveAt: null, activeDays: 0 })
+                : (stmt14.get(s.id) || { mPeriod: 0, periodLastActiveAt: null, activeDays: 0 });
 
               const mPeriod = Math.round(sessionStats.mPeriod || 0);
+              const activeDays = Math.max(0, Math.round(Number(sessionStats.activeDays || 0)));
               const isAct = Boolean(tel.coursewareActivatedAt || mPeriod > 0);
 
               let stStatus = 'danger';
@@ -179,6 +180,7 @@ export async function GET(request) {
                 status: stStatus,
                 last_active: formatRelativeTime(lastActiveSource),
                 duration_minutes: mPeriod,
+                active_days: activeDays,
                 current_progress: progressText,
                 activated: isAct,
                 custom_book_codes: customBooks,
