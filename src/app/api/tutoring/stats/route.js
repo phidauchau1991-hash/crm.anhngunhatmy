@@ -3,13 +3,40 @@ import prisma from '@/lib/db';
 
 export async function GET() {
   try {
-    // 1. Đếm số buổi theo trạng thái của TutoringSession
-    const [scheduledSessions, completedSessions, cancelledSessions, totalSessions] = await Promise.all([
-      prisma.tutoringSession.count({ where: { status: 'SCHEDULED' } }),
-      prisma.tutoringSession.count({ where: { status: 'COMPLETED' } }),
-      prisma.tutoringSession.count({ where: { status: 'CANCELLED' } }),
-      prisma.tutoringSession.count()
-    ]);
+    // 1. Đếm số buổi theo trạng thái (gom nhóm các buổi dùng chung groupCode + sessionNumber để đếm đúng số buổi tổ chức thực tế)
+    const allSessions = await prisma.tutoringSession.findMany({
+      select: {
+        id: true,
+        status: true,
+        sessionNumber: true,
+        teachingDate: true,
+        plan: { select: { id: true, groupCode: true } },
+      },
+    });
+
+    const distinctBuckets = new Map();
+    for (const s of allSessions) {
+      const batchKey = s.plan?.groupCode
+        ? `${s.plan.groupCode}|${s.sessionNumber}|${s.teachingDate}`
+        : `${s.plan?.id}|${s.id}`;
+      const existing = distinctBuckets.get(batchKey);
+      if (!existing) {
+        distinctBuckets.set(batchKey, s.status);
+      } else if (existing !== 'COMPLETED' && s.status === 'COMPLETED') {
+        distinctBuckets.set(batchKey, 'COMPLETED');
+      } else if (existing === 'CANCELLED' && s.status === 'SCHEDULED') {
+        distinctBuckets.set(batchKey, 'SCHEDULED');
+      }
+    }
+
+    let scheduledSessions = 0;
+    let completedSessions = 0;
+    let cancelledSessions = 0;
+    for (const st of distinctBuckets.values()) {
+      if (st === 'SCHEDULED') scheduledSessions++;
+      else if (st === 'COMPLETED') completedSessions++;
+      else if (st === 'CANCELLED') cancelledSessions++;
+    }
 
     // 2. Tính số học viên cảnh báo cần phụ đạo (chưa được lên lịch)
     const dismissedRecords = await prisma.tutoringAlertDismissal.findMany();
@@ -25,7 +52,10 @@ export async function GET() {
     const consecutiveLimit = config?.consecutiveAbsences || 2;
 
     const enrollments = await prisma.enrollment.findMany({
-      where: { status: 'Đang học' },
+      where: {
+        status: 'Đang học',
+        student: { status: 'Đang học' },
+      },
       select: { studentId: true, classCode: true }
     });
 

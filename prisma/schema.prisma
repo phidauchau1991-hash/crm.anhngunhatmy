@@ -473,6 +473,7 @@ model MonthlyPaymentLog {
 model TutoringPlan {
   id               String   @id @default(uuid())
   planCode         String   @unique // Mã đợt, vd: PD2610_001
+  groupCode        String?  // Mã nhóm chung khi xếp lịch nhiều học viên (VD: NH2611_001)
   
   // Học viên & Lớp học
   studentId        String
@@ -507,6 +508,7 @@ model TutoringPlan {
   @@index([studentId, status])
   @@index([teacherId])
   @@index([classCode])
+  @@index([groupCode])
 }
 
 model TutoringSession {

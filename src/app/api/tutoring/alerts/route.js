@@ -20,10 +20,11 @@ export async function GET() {
     let config = await prisma.alertConfig.findFirst();
     const consecutiveLimit = config?.consecutiveAbsences || 2;
 
-    // 4. Lấy tất cả enrollments của học viên đang học
+    // 4. Lấy tất cả enrollments của học viên đang học (cả Enrollment lẫn Student đều phải đang học)
     const enrollments = await prisma.enrollment.findMany({
       where: {
-        status: 'Đang học'
+        status: 'Đang học',
+        student: { status: 'Đang học' },
       },
       include: {
         student: {

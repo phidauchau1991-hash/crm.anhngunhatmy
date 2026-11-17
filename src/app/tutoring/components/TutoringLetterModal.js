@@ -1,44 +1,60 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as htmlToImage from 'html-to-image';
+import { formatClassCode } from '@/lib/classHelper';
 
-export default function TutoringLetterModal({ isOpen, onClose, plan }) {
+export default function TutoringLetterModal({ isOpen, onClose, plan = null, plans = null }) {
   const letterRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [copying, setCopying] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipProgress, setZipProgress] = useState('');
+  const [copySuccess, setCopySuccess] = useState('');
 
-  if (!isOpen || !plan) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setActiveIdx(0);
+      setCopySuccess('');
+    }
+  }, [isOpen, plan, plans]);
 
-  const studentName = plan.student?.name || 'Học viên';
-  const studentPhone = plan.student?.phone || '';
-  const classCode = plan.classCode || plan.class?.code || 'Lớp học tại trung tâm';
-  const tutorName = plan.tutorName || plan.teacher?.fullName || 'Giáo viên phụ trách';
-  const sessionType = plan.sessionType || 'Bù bài học viên vắng (Makeup)';
-  const focusSkills = plan.focusSkills || 'Tổng hợp / Toàn diện';
-  const content = plan.content || 'Ôn tập và củng cố kiến thức theo chương trình';
-  const instructions = plan.instructions || 'Mang theo đầy đủ sách vở và đồ dùng học tập';
-  const sessions = plan.sessions && plan.sessions.length > 0 ? plan.sessions : [
+  const planList = Array.isArray(plans) && plans.length > 0 ? plans : (plan ? [plan] : []);
+  const activePlan = planList[activeIdx] || planList[0];
+
+  if (!isOpen || !activePlan) return null;
+
+  const studentName = activePlan.student?.name || 'Học viên';
+  const studentPhone = activePlan.student?.phone || '';
+  const rawClassCode = activePlan.classCode || activePlan.class?.code || '';
+  const classCode = rawClassCode ? `${formatClassCode(rawClassCode)} (${rawClassCode})` : 'Lớp học tại trung tâm';
+  const tutorName = activePlan.tutorName || activePlan.teacher?.fullName || 'Giáo viên phụ trách';
+  const sessionType = activePlan.sessionType || 'Bù bài học viên vắng (Makeup)';
+  const focusSkills = activePlan.focusSkills || 'Tổng hợp / Toàn diện';
+  const content = activePlan.content || 'Ôn tập và củng cố kiến thức theo chương trình';
+  const instructions = activePlan.instructions || 'Mang theo đầy đủ sách vở và đồ dùng học tập';
+  const sessions = activePlan.sessions && activePlan.sessions.length > 0 ? activePlan.sessions : [
     {
       sessionNumber: 1,
-      teachingDate: new Date().toISOString().split('T')[0],
-      startTimeText: '04:30 CH',
-      endTimeText: '05:30 CH',
+      teachingDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()),
+      startTimeText: '16:30',
+      endTimeText: '17:30',
       roomName: 'Phòng học tại trung tâm'
     }
   ];
 
-  // Helper format ngày tiếng Việt
+  // Helper format ngày tiếng Việt (chuẩn ngày không lệch múi giờ)
   const formatDateVi = (dateStr) => {
     if (!dateStr) return '';
     try {
-      const d = new Date(dateStr);
+      const isoMatch = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const d = isoMatch ? new Date(`${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T12:00:00.000Z`) : new Date(dateStr);
       const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-      const dayName = days[d.getDay()];
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
+      const dayName = days[d.getUTCDay()];
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year = d.getUTCFullYear();
       return `${dayName}, ngày ${day}/${month}/${year}`;
     } catch {
       return dateStr;
@@ -46,9 +62,9 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
   };
 
   // Cập nhật timestamp xuất thư
-  const markExported = async () => {
+  const markExported = async (targetPlanId = activePlan.id) => {
     try {
-      await fetch(`/api/tutoring/${plan.id}/letter-exported`, { method: 'PATCH' });
+      await fetch(`/api/tutoring/${targetPlanId}/letter-exported`, { method: 'PATCH' });
     } catch (e) {
       console.error(e);
     }
@@ -58,7 +74,7 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
   const handleCopyImage = async () => {
     if (!letterRef.current || copying) return;
     setCopying(true);
-    setCopySuccess(false);
+    setCopySuccess('');
 
     try {
       const dataUrl = await htmlToImage.toPng(letterRef.current, {
@@ -74,11 +90,10 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ]);
-        setCopySuccess(true);
-        markExported();
-        setTimeout(() => setCopySuccess(false), 3500);
+        setCopySuccess(`Đã sao chép ảnh của ${studentName}! Mở Zalo bấm Ctrl+V`);
+        markExported(activePlan.id);
+        setTimeout(() => setCopySuccess(''), 3500);
       } else {
-        // Fallback: Tải file ảnh
         handleDownloadImage();
       }
     } catch (err) {
@@ -86,6 +101,27 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
       handleDownloadImage();
     } finally {
       setCopying(false);
+    }
+  };
+
+  // Copy lời nhắn Zalo soạn sẵn
+  const handleCopyZaloText = async () => {
+    const slotLines = sessions
+      .map((s, i) => `• Buổi ${i + 1}: ${formatDateVi(s.teachingDate)} (${s.startTimeText || '16:30'} – ${s.endTimeText || '17:30'}) • ${s.roomName || 'Phòng học tại trung tâm'}`)
+      .join('\n');
+    const msg =
+      `Dạ Trung tâm Anh ngữ Nhật Mỹ kính gửi Quý Phụ huynh Giấy Hẹn Phụ Đạo & Bù Bài của bé ${studentName} (${classCode}):\n\n` +
+      `${slotLines}\n` +
+      `👨‍🏫 Giáo viên kèm: ${tutorName}\n` +
+      `📝 Nội dung: ${content}\n` +
+      `🎒 Dặn dò: ${instructions}\n\n` +
+      `Kính mong Quý Phụ huynh sắp xếp cho con tham dự đầy đủ và đúng giờ ạ! ❤️`;
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCopySuccess(`Đã chép lời nhắn Zalo cho bé ${studentName}!`);
+      setTimeout(() => setCopySuccess(''), 3500);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -101,18 +137,60 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
         backgroundColor: '#ffffff'
       });
 
-      const filename = `Thu_Hen_Phu_Dao_${studentName.replace(/\s+/g, '_')}_${plan.planCode || 'Pass'}.png`;
+      const filename = `Thu_Hen_Phu_Dao_${studentName.replace(/\s+/g, '_')}_${activePlan.planCode || 'Pass'}.png`;
       const link = document.createElement('a');
       link.download = filename;
       link.href = dataUrl;
       link.click();
 
-      markExported();
+      markExported(activePlan.id);
     } catch (err) {
       console.error('Lỗi tải ảnh:', err);
       alert('Không thể tạo file ảnh. Vui lòng thử lại!');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  // Tải trọn bộ ảnh (.ZIP) cho tất cả học viên trong nhóm
+  const handleDownloadAllZip = async () => {
+    if (planList.length <= 1 || zipLoading) return;
+    setZipLoading(true);
+    const prevIdx = activeIdx;
+    try {
+      const JSZip = (await import('jszip')).default;
+      const { saveAs } = await import('file-saver');
+      const zip = new JSZip();
+
+      for (let i = 0; i < planList.length; i++) {
+        const p = planList[i];
+        setActiveIdx(i);
+        setZipProgress(`Đang xuất ${i + 1}/${planList.length}: ${p.student?.name || ''}...`);
+        await new Promise((r) => setTimeout(r, 250));
+        if (!letterRef.current) continue;
+        const dataUrl = await htmlToImage.toPng(letterRef.current, {
+          pixelRatio: 2.2,
+          cacheBust: true,
+          backgroundColor: '#ffffff',
+        });
+        const base64 = dataUrl.split(',')[1];
+        const safeName = (p.student?.name || p.studentId || 'HV').replace(/\s+/g, '_');
+        zip.file(`${i + 1}_${safeName}_${p.planCode}.png`, base64, { base64: true });
+        markExported(p.id);
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const groupLabel = activePlan.groupCode || activePlan.planCode || 'NhomPhuDao';
+      saveAs(blob, `Thu_Hen_Phu_Dao_${groupLabel}.zip`);
+      setCopySuccess(`Đã tải trọn bộ ${planList.length} thư (.ZIP)!`);
+      setTimeout(() => setCopySuccess(''), 4000);
+    } catch (err) {
+      console.error('Lỗi tải ZIP thư phụ đạo:', err);
+      alert('Không thể nén file ZIP. Vui lòng tải từng ảnh!');
+    } finally {
+      setActiveIdx(prevIdx);
+      setZipProgress('');
+      setZipLoading(false);
     }
   };
 
@@ -146,6 +224,43 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
           </button>
         </div>
 
+        {/* Thanh chuyển học viên khi xuất thư nhóm */}
+        {planList.length > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '10px 18px',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            overflowX: 'auto',
+            flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginRight: '4px' }}>
+              Nhóm ({planList.length} HV):
+            </span>
+            {planList.map((p, idx) => (
+              <button
+                key={p.id || idx}
+                type="button"
+                onClick={() => setActiveIdx(idx)}
+                style={{
+                  padding: '5px 11px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: activeIdx === idx ? '1.5px solid #0D88C4' : '1px solid #cbd5e1',
+                  background: activeIdx === idx ? '#e0f2fe' : '#ffffff',
+                  color: activeIdx === idx ? '#0369a1' : '#334155',
+                }}
+              >
+                {idx + 1}. {p.student?.name || p.studentId}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Khung cuộn chứa Giấy Thư */}
         <div className="lm-preview-viewport">
           <div className="letter-paper" ref={letterRef}>
@@ -162,7 +277,7 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
                 </div>
               </div>
               <div className="letter-code-col">
-                <span className="plan-badge-pass">{plan.planCode || 'TUTOR-PASS'}</span>
+                <span className="plan-badge-pass">{activePlan.planCode || 'TUTOR-PASS'}</span>
                 <span className="direct-teach-note">Dạy trực tiếp tại cơ sở</span>
               </div>
             </div>
@@ -264,17 +379,34 @@ export default function TutoringLetterModal({ isOpen, onClose, plan }) {
         {/* Thanh Điều Khiển & Hành Động */}
         <div className="lm-action-bar">
           <div className="action-feedback">
-            {copySuccess && (
+            {(zipProgress || copySuccess) && (
               <span className="copy-success-badge">
-                <i className="fa-solid fa-circle-check"></i> Đã sao chép ảnh! Hãy mở Zalo bấm Ctrl+V
+                <i className="fa-solid fa-circle-check"></i> {zipProgress || copySuccess}
               </span>
             )}
           </div>
 
-          <div className="action-buttons-group">
+          <div className="action-buttons-group" style={{ flexWrap: 'wrap' }}>
+            <button type="button" onClick={handleCopyZaloText} className="btn-download">
+              <i className="fa-solid fa-message"></i> Copy Lời Nhắn
+            </button>
+
             <button type="button" onClick={handleOpenZalo} className="btn-zalo">
               <i className="fa-solid fa-comment-dots"></i> Mở Zalo
             </button>
+
+            {planList.length > 1 && (
+              <button
+                type="button"
+                onClick={handleDownloadAllZip}
+                disabled={zipLoading}
+                className="btn-download"
+                style={{ background: '#dcfce7', color: '#166534', borderColor: '#86efac' }}
+              >
+                <i className={`fa-solid ${zipLoading ? 'fa-spinner fa-spin' : 'fa-file-zipper'}`}></i>
+                Tải Trọn Bộ ({planList.length} ảnh .ZIP)
+              </button>
+            )}
 
             <button
               type="button"

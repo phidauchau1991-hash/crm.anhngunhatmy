@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import TutoringScheduleModal from './components/TutoringScheduleModal';
 import TutoringLetterModal from './components/TutoringLetterModal';
 import TutoringCompleteModal from './components/TutoringCompleteModal';
+import ClassSelect from '../components/ClassSelect';
+import { formatClassCode } from '@/lib/classHelper';
 
 export default function TutoringPage() {
   const [stats, setStats] = useState({
@@ -24,17 +26,21 @@ export default function TutoringPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL'); // ALL, SCHEDULED, COMPLETED, CANCELLED
   const [teacherFilter, setTeacherFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAlertKeys, setSelectedAlertKeys] = useState([]);
 
   // Modals state
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [schedulePrefill, setSchedulePrefill] = useState(null);
+  const [schedulePrefillList, setSchedulePrefillList] = useState(null);
+  const [editPlanGroup, setEditPlanGroup] = useState(null);
 
   const [isLetterOpen, setIsLetterOpen] = useState(false);
-  const [letterPlan, setLetterPlan] = useState(null);
+  const [letterPlans, setLetterPlans] = useState([]);
 
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
-  const [completeTarget, setCompleteTarget] = useState({ session: null, plan: null });
+  const [completeTarget, setCompleteTarget] = useState({ session: null, plan: null, groupTargets: null });
 
   // Tải dữ liệu ban đầu
   const fetchData = async () => {
@@ -65,7 +71,7 @@ export default function TutoringPage() {
       if (classesData.success) setClasses(classesData.data || []);
       if (usersData.success) {
         const teacherUsers = (usersData.data || []).filter(
-          (u) => u.role === 'TEACHER' || u.role === 'DIRECTOR' || u.role === 'CSKH' || u.role === 'ADVISOR'
+          (u) => ['TEACHER', 'DIRECTOR', 'MANAGER', 'CSKH', 'ADVISOR'].includes(u.role)
         );
         setTeachers(teacherUsers);
       }
@@ -104,35 +110,67 @@ export default function TutoringPage() {
     }
   };
 
-  // Mở modal xếp lịch từ cảnh báo
+  // Mở modal xếp lịch từ 1 cảnh báo
   const handleOpenScheduleFromAlert = (cand) => {
+    setEditPlanGroup(null);
+    setSchedulePrefillList(null);
     setSchedulePrefill(cand);
+    setIsScheduleOpen(true);
+  };
+
+  // Mở modal xếp lịch chung từ nhiều cảnh báo đã tick chọn
+  const handleOpenScheduleFromSelectedAlerts = () => {
+    const selectedCands = alerts.filter((a) => selectedAlertKeys.includes(`${a.studentId}|${a.classCode}`));
+    if (selectedCands.length === 0) return;
+    setEditPlanGroup(null);
+    setSchedulePrefill(null);
+    setSchedulePrefillList(selectedCands);
     setIsScheduleOpen(true);
   };
 
   // Mở modal tạo mới tự do
   const handleOpenScheduleNew = () => {
+    setEditPlanGroup(null);
     setSchedulePrefill(null);
+    setSchedulePrefillList(null);
     setIsScheduleOpen(true);
   };
 
-  // Sau khi tạo thành công
-  const handleScheduleSuccess = (createdPlan, andExport = false) => {
+  // Mở modal chỉnh sửa đợt/nhóm
+  const handleOpenEditGroup = (groupRow) => {
+    setSchedulePrefill(null);
+    setSchedulePrefillList(null);
+    setEditPlanGroup({ primaryPlan: groupRow.primaryPlan, plans: groupRow.plans });
+    setIsScheduleOpen(true);
+  };
+
+  // Sau khi tạo hoặc sửa thành công
+  const handleScheduleSuccess = (createdPlansOrSingle, andExport = false) => {
     setIsScheduleOpen(false);
     setSchedulePrefill(null);
+    setSchedulePrefillList(null);
+    setEditPlanGroup(null);
+    setSelectedAlertKeys([]);
     fetchData();
 
-    if (andExport && createdPlan) {
-      setLetterPlan(createdPlan);
+    const list = Array.isArray(createdPlansOrSingle)
+      ? createdPlansOrSingle.filter(Boolean)
+      : (createdPlansOrSingle ? [createdPlansOrSingle] : []);
+    if (andExport && list.length > 0) {
+      setLetterPlans(list);
       setIsLetterOpen(true);
     }
   };
 
-  // Hủy đợt phụ đạo
-  const handleCancelPlan = async (plan) => {
-    if (!confirm(`Bạn có chắc muốn hủy đợt phụ đạo ${plan.planCode} của học viên ${plan.student?.name}?`)) return;
+  // Hủy đợt hoặc cả nhóm phụ đạo
+  const handleCancelGroup = async (groupRow) => {
+    const label = groupRow.isGroup
+      ? `cả nhóm ${groupRow.groupCode} (${groupRow.plans.length} học viên)`
+      : `đợt ${groupRow.primaryPlan.planCode} của học viên ${groupRow.primaryPlan.student?.name}`;
+    if (!confirm(`Bạn có chắc muốn hủy ${label}?`)) return;
     try {
-      const res = await fetch(`/api/tutoring/${plan.id}`, { method: 'DELETE' });
+      const qs = groupRow.isGroup ? '?scope=GROUP' : '';
+      const res = await fetch(`/api/tutoring/${groupRow.primaryPlan.id}${qs}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         fetchData();
@@ -145,13 +183,13 @@ export default function TutoringPage() {
     }
   };
 
-  // Mở modal đánh giá sau buổi học
-  const handleOpenCompleteModal = (session, plan) => {
-    setCompleteTarget({ session, plan });
+  // Mở modal điểm danh (hỗ trợ cả 1 bạn lẫn cả nhóm)
+  const handleOpenCompleteModal = (session, plan, groupTargets = null) => {
+    setCompleteTarget({ session, plan, groupTargets });
     setIsCompleteOpen(true);
   };
 
-  // Lọc danh sách theo Tab, Giáo viên và Tìm kiếm
+  // Lọc danh sách theo Tab, Giáo viên, Lớp học và Tìm kiếm
   const filteredPlans = useMemo(() => {
     return plans.filter((plan) => {
       // 1. Lọc theo tab
@@ -162,24 +200,55 @@ export default function TutoringPage() {
       // 2. Lọc theo giáo viên
       if (teacherFilter && plan.teacherId !== teacherFilter) return false;
 
-      // 3. Tìm kiếm từ khóa
+      // 3. Lọc theo lớp
+      if (classFilter && plan.classCode !== classFilter) return false;
+
+      // 4. Tìm kiếm từ khóa
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const stName = (plan.student?.name || '').toLowerCase();
         const stPhone = (plan.student?.phone || '').toLowerCase();
         const code = (plan.planCode || '').toLowerCase();
+        const grp = (plan.groupCode || '').toLowerCase();
         const cls = (plan.classCode || '').toLowerCase();
         const tutor = (plan.tutorName || '').toLowerCase();
         const hasRoom = (plan.sessions || []).some((s) => (s.roomName || '').toLowerCase().includes(q));
 
-        if (!stName.includes(q) && !stPhone.includes(q) && !code.includes(q) && !cls.includes(q) && !tutor.includes(q) && !hasRoom) {
+        if (!stName.includes(q) && !stPhone.includes(q) && !code.includes(q) && !grp.includes(q) && !cls.includes(q) && !tutor.includes(q) && !hasRoom) {
           return false;
         }
       }
 
       return true;
     });
-  }, [plans, activeTab, teacherFilter, searchQuery]);
+  }, [plans, activeTab, teacherFilter, classFilter, searchQuery]);
+
+  // Gom các học viên chung groupCode thành 1 hàng Nhóm gọn gàng
+  const displayRows = useMemo(() => {
+    const groupMap = new Map();
+    const order = [];
+
+    for (const plan of filteredPlans) {
+      const key = plan.groupCode ? `GRP:${plan.groupCode}` : `SINGLE:${plan.id}`;
+      if (!groupMap.has(key)) {
+        const entry = {
+          key,
+          groupCode: plan.groupCode || null,
+          plans: [plan],
+          primaryPlan: plan,
+        };
+        groupMap.set(key, entry);
+        order.push(entry);
+      } else {
+        groupMap.get(key).plans.push(plan);
+      }
+    }
+
+    return order.map((entry) => ({
+      ...entry,
+      isGroup: Boolean(entry.groupCode && entry.plans.length > 1),
+    }));
+  }, [filteredPlans]);
 
   return (
     <div className="tutoring-page">
@@ -262,9 +331,32 @@ export default function TutoringPage() {
                 <p>Tự động quét từ hệ thống Điểm danh: Học viên vắng từ 2 buổi liên tiếp hoặc hổng kỹ năng cần bổ trợ</p>
               </div>
             </div>
-            <button className="btn-create-alert" onClick={handleOpenScheduleNew}>
-              <i className="fa-solid fa-plus"></i> Tạo buổi mới
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {selectedAlertKeys.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenScheduleFromSelectedAlerts}
+                  style={{
+                    background: '#085e8a',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <i className="fa-solid fa-users-line"></i> Xếp lịch chung ({selectedAlertKeys.length} bạn)
+                </button>
+              )}
+              <button className="btn-create-alert" onClick={handleOpenScheduleNew}>
+                <i className="fa-solid fa-plus"></i> Tạo buổi mới
+              </button>
+            </div>
           </div>
 
           {alerts.length === 0 ? (
@@ -279,18 +371,37 @@ export default function TutoringPage() {
             </div>
           ) : (
             <div className="warning-grid">
-              {alerts.map((cand, idx) => (
-                <div key={idx} className="warning-card">
+              {alerts.map((cand, idx) => {
+                const alertUid = `${cand.studentId}|${cand.classCode}`;
+                const isChecked = selectedAlertKeys.includes(alertUid);
+                return (
+                <div
+                  key={alertUid || idx}
+                  className="warning-card"
+                  style={isChecked ? { border: '2px solid #0284c7', background: '#f0f9ff' } : {}}
+                >
                   <div className="warning-card-body">
                     <div className="warning-top-row">
-                      <strong className="student-name">{cand.studentName}</strong>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setSelectedAlertKeys((prev) =>
+                              prev.includes(alertUid) ? prev.filter((k) => k !== alertUid) : [...prev, alertUid]
+                            );
+                          }}
+                          style={{ width: '16px', height: '16px', accentColor: '#0284c7', cursor: 'pointer' }}
+                        />
+                        <strong className="student-name">{cand.studentName}</strong>
+                      </label>
                       <span className="badge-absent">
                         Vắng {cand.consecutiveAbsences} buổi
                       </span>
                     </div>
 
                     <div className="student-meta">
-                      <div>Lớp: <span className="meta-strong">{cand.classCode}</span></div>
+                      <div>Lớp: <span className="meta-strong">{formatClassCode(cand.classCode) || cand.classCode}</span></div>
                       <div>SĐT: <span className="meta-phone">{cand.phone || 'Chưa có SĐT'}</span></div>
                       <div>GV chủ nhiệm: <span className="meta-teacher">{cand.teacherName}</span></div>
                     </div>
@@ -317,7 +428,8 @@ export default function TutoringPage() {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -341,7 +453,17 @@ export default function TutoringPage() {
             ))}
           </div>
 
-          <div className="filter-controls">
+          <div className="filter-controls" style={{ flexWrap: 'wrap' }}>
+            <div className="teacher-select-wrap">
+              <ClassSelect
+                classes={classes}
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
+                placeholder="-- Tất cả lớp học --"
+                className="select-custom"
+              />
+            </div>
+
             <div className="teacher-select-wrap">
               <select
                 value={teacherFilter}
@@ -376,12 +498,12 @@ export default function TutoringPage() {
             <thead>
               <tr>
                 <th style={{ width: '13%' }}>Mã Đợt / Buổi</th>
-                <th style={{ width: '18%' }}>Học Viên & Lớp</th>
-                <th style={{ width: '18%' }}>Loại Buổi & Kỹ Năng</th>
-                <th style={{ width: '25%' }}>Lịch Học & Phòng Học (Trực tiếp)</th>
-                <th style={{ width: '12%' }}>Giáo Viên Kèm</th>
-                <th style={{ width: '14%' }}>Trạng Thái</th>
-                <th style={{ width: '12%', textAlign: 'right' }}>Thao Tác</th>
+                <th style={{ width: '20%' }}>Học Viên & Lớp</th>
+                <th style={{ width: '17%' }}>Loại Buổi & Kỹ Năng</th>
+                <th style={{ width: '24%' }}>Lịch Học & Phòng Học (Trực tiếp)</th>
+                <th style={{ width: '11%' }}>Giáo Viên Kèm</th>
+                <th style={{ width: '11%' }}>Trạng Thái</th>
+                <th style={{ width: '14%', textAlign: 'right' }}>Thao Tác</th>
               </tr>
             </thead>
             <tbody>
@@ -392,7 +514,7 @@ export default function TutoringPage() {
                     <span>Đang tải danh sách phụ đạo & bù bài...</span>
                   </td>
                 </tr>
-              ) : filteredPlans.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="table-empty">
                     <i className="fa-regular fa-folder-open"></i>
@@ -400,11 +522,40 @@ export default function TutoringPage() {
                   </td>
                 </tr>
               ) : (
-                filteredPlans.map((plan) => (
-                  <tr key={plan.id} className="table-row">
-                    {/* 1. Mã đợt */}
+                displayRows.map((row) => {
+                  const plan = row.primaryPlan;
+                  const memberPlans = row.plans;
+                  const isGroup = row.isGroup;
+                  const allExported = memberPlans.every((mp) => mp.letterExportedAt);
+                  const someExported = memberPlans.some((mp) => mp.letterExportedAt);
+
+                  const derivedGroupStatus = memberPlans.every((mp) => mp.status === 'COMPLETED')
+                    ? 'COMPLETED'
+                    : memberPlans.every((mp) => mp.status === 'CANCELLED')
+                      ? 'CANCELLED'
+                      : memberPlans.some((mp) => mp.status === 'IN_PROGRESS' || mp.status === 'COMPLETED')
+                        ? 'IN_PROGRESS'
+                        : 'SCHEDULED';
+
+                  return (
+                  <tr key={row.key} className="table-row">
+                    {/* 1. Mã đợt / Nhóm */}
                     <td className="cell-top">
-                      <span className="plan-code">{plan.planCode}</span>
+                      <span className="plan-code">{isGroup ? row.groupCode : plan.planCode}</span>
+                      {isGroup && (
+                        <span style={{
+                          display: 'inline-block',
+                          background: '#dbeafe',
+                          color: '#1d4ed8',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          marginTop: '4px',
+                        }}>
+                          <i className="fa-solid fa-users"></i> Nhóm {memberPlans.length} HV
+                        </span>
+                      )}
                       <span className="session-count-badge">
                         {plan.sessions?.length || 1} buổi học
                       </span>
@@ -412,13 +563,23 @@ export default function TutoringPage() {
 
                     {/* 2. Học viên & Lớp */}
                     <td className="cell-top">
-                      <strong className="student-name-main">{plan.student?.name}</strong>
-                      <span className="student-phone-sub">
-                        <i className="fa-solid fa-phone"></i> {plan.student?.phone || 'Chưa có SĐT'}
-                      </span>
-                      <span className="class-badge">
-                        {plan.classCode || 'Lớp riêng'}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {memberPlans.map((mp) => (
+                          <div key={mp.id} style={isGroup ? { paddingBottom: '5px', borderBottom: '1px dashed #e2e8f0' } : {}}>
+                            <strong className="student-name-main" style={{ display: 'block', fontSize: isGroup ? '13px' : '14px' }}>
+                              {mp.student?.name}
+                            </strong>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                              <span className="student-phone-sub">
+                                <i className="fa-solid fa-phone"></i> {mp.student?.phone || 'Chưa có SĐT'}
+                              </span>
+                              <span className="class-badge">
+                                {mp.classCode ? formatClassCode(mp.classCode) : 'Lớp riêng'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </td>
 
                     {/* 3. Loại buổi & Kỹ năng */}
@@ -435,34 +596,65 @@ export default function TutoringPage() {
                     {/* 4. Lịch học & Phòng học */}
                     <td className="cell-top">
                       <div className="sessions-list">
-                        {(plan.sessions || []).map((s, sIdx) => (
-                          <div key={s.id || sIdx} className="session-slot-item">
-                            <div className="slot-info">
-                              <span className="slot-num">B.{s.sessionNumber}:</span>
-                              <span className="slot-date">{s.teachingDate}</span>
-                              <span className="slot-time">({s.startTimeText || '16:30'} – {s.endTimeText || '17:30'})</span>
-                              <span className="slot-room">📍 {s.roomName || 'Phòng học tại trung tâm'}</span>
-                            </div>
+                        {(plan.sessions || []).map((s, sIdx) => {
+                          const groupTargetsForSlot = memberPlans
+                            .map((mp) => {
+                              const matchSession = (mp.sessions || []).find(
+                                (ms) => ms.sessionNumber === s.sessionNumber || ms.teachingDate === s.teachingDate
+                              );
+                              return matchSession ? { session: matchSession, plan: mp } : null;
+                            })
+                            .filter(Boolean);
 
-                            <div className="slot-action">
-                              {s.status === 'COMPLETED' ? (
-                                <span className="badge-completed">
-                                  <i className="fa-solid fa-check"></i> {s.attendanceStatus || 'Có mặt'} ({s.evaluation || 'Tốt'})
-                                </span>
-                              ) : s.status === 'CANCELLED' ? (
-                                <span className="badge-cancelled">Đã hủy</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleOpenCompleteModal(s, plan)}
-                                  className="btn-attend-mini"
-                                  title="Điểm danh & đánh giá buổi này"
-                                >
-                                  <i className="fa-solid fa-check"></i> Điểm danh
-                                </button>
-                              )}
+                          const completedCount = groupTargetsForSlot.filter((t) => t.session.status === 'COMPLETED').length;
+                          const cancelledCount = groupTargetsForSlot.filter((t) => t.session.status === 'CANCELLED').length;
+                          const totalInSlot = groupTargetsForSlot.length;
+                          const allDone = totalInSlot > 0 && completedCount === totalInSlot;
+                          const allCancelled = totalInSlot > 0 && cancelledCount === totalInSlot;
+
+                          return (
+                            <div key={s.id || sIdx} className="session-slot-item">
+                              <div className="slot-info">
+                                <span className="slot-num">B.{s.sessionNumber}:</span>
+                                <span className="slot-date">{s.teachingDate}</span>
+                                <span className="slot-time">({s.startTimeText || '16:30'} – {s.endTimeText || '17:30'})</span>
+                                <span className="slot-room">📍 {s.roomName || 'Phòng học tại trung tâm'}</span>
+                              </div>
+
+                              <div className="slot-action">
+                                {allDone ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span className="badge-completed">
+                                      <i className="fa-solid fa-check"></i>{' '}
+                                      {isGroup
+                                        ? `Đã điểm danh (${completedCount}/${totalInSlot} HV)`
+                                        : `${s.attendanceStatus || 'Có mặt'} (${s.evaluation || 'Tốt'})`}
+                                    </span>
+                                    <button
+                                      onClick={() => handleOpenCompleteModal(s, plan, isGroup ? groupTargetsForSlot : null)}
+                                      className="btn-attend-mini"
+                                      style={{ background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }}
+                                      title="Xem / Sửa đánh giá"
+                                    >
+                                      Sửa ĐG
+                                    </button>
+                                  </div>
+                                ) : allCancelled ? (
+                                  <span className="badge-cancelled">Đã hủy</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleOpenCompleteModal(s, plan, isGroup ? groupTargetsForSlot : null)}
+                                    className="btn-attend-mini"
+                                    title={isGroup ? 'Điểm danh & đánh giá cả nhóm' : 'Điểm danh & đánh giá buổi này'}
+                                  >
+                                    <i className="fa-solid fa-check"></i>{' '}
+                                    {isGroup ? `Điểm danh Nhóm (${completedCount}/${totalInSlot})` : 'Điểm danh'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </td>
 
@@ -473,15 +665,15 @@ export default function TutoringPage() {
 
                     {/* 6. Trạng thái */}
                     <td className="cell-top">
-                      {plan.status === 'COMPLETED' ? (
+                      {derivedGroupStatus === 'COMPLETED' ? (
                         <span className="status-pill status-completed">
                           <span className="dot dot-completed"></span> Đã hoàn thành
                         </span>
-                      ) : plan.status === 'IN_PROGRESS' ? (
+                      ) : derivedGroupStatus === 'IN_PROGRESS' ? (
                         <span className="status-pill status-in-progress">
                           <span className="dot dot-in-progress"></span> Đang phụ đạo
                         </span>
-                      ) : plan.status === 'CANCELLED' ? (
+                      ) : derivedGroupStatus === 'CANCELLED' ? (
                         <span className="status-pill status-cancelled">
                           <span className="dot dot-cancelled"></span> Đã hủy
                         </span>
@@ -491,40 +683,55 @@ export default function TutoringPage() {
                         </span>
                       )}
 
-                      {plan.letterExportedAt && (
+                      {someExported && (
                         <span className="letter-exported-tag">
-                          <i className="fa-solid fa-check"></i> Đã gửi thư PH
+                          <i className="fa-solid fa-check"></i>{' '}
+                          {isGroup
+                            ? (allExported ? 'Đã gửi đủ thư PH' : 'Đã gửi một phần')
+                            : 'Đã gửi thư PH'}
                         </span>
                       )}
                     </td>
 
                     {/* 7. Thao tác */}
                     <td className="cell-top text-right">
-                      <div className="action-row">
+                      <div className="action-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <button
                           onClick={() => {
-                            setLetterPlan(plan);
+                            setLetterPlans(memberPlans);
                             setIsLetterOpen(true);
                           }}
                           className="btn-export-letter"
                           title="Xuất thư hẹn phụ huynh (gửi Zalo)"
                         >
-                          <i className="fa-solid fa-envelope-open-text"></i> Xuất Thư
+                          <i className="fa-solid fa-envelope-open-text"></i>{' '}
+                          {isGroup ? `Xuất Thư (${memberPlans.length})` : 'Xuất Thư'}
                         </button>
 
-                        {plan.status !== 'CANCELLED' && (
-                          <button
-                            onClick={() => handleCancelPlan(plan)}
-                            className="btn-cancel-plan"
-                            title="Hủy đợt phụ đạo này"
-                          >
-                            <i className="fa-regular fa-trash-can"></i>
-                          </button>
+                        {derivedGroupStatus !== 'CANCELLED' && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditGroup(row)}
+                              className="btn-cancel-plan"
+                              style={{ color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff' }}
+                              title="Chỉnh sửa lịch / học viên / giáo viên"
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button
+                              onClick={() => handleCancelGroup(row)}
+                              className="btn-cancel-plan"
+                              title={isGroup ? 'Hủy cả nhóm phụ đạo này' : 'Hủy đợt phụ đạo này'}
+                            >
+                              <i className="fa-regular fa-trash-can"></i>
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -538,37 +745,43 @@ export default function TutoringPage() {
         onClose={() => {
           setIsScheduleOpen(false);
           setSchedulePrefill(null);
+          setSchedulePrefillList(null);
+          setEditPlanGroup(null);
         }}
         onSuccess={handleScheduleSuccess}
         prefillData={schedulePrefill}
+        prefillList={schedulePrefillList}
+        editPlanGroup={editPlanGroup}
         students={students}
         classes={classes}
         teachers={teachers}
+        existingPlans={plans}
       />
 
       <TutoringLetterModal
         isOpen={isLetterOpen}
         onClose={() => {
           setIsLetterOpen(false);
-          setLetterPlan(null);
+          setLetterPlans([]);
           fetchData();
         }}
-        plan={letterPlan}
+        plans={letterPlans}
       />
 
       <TutoringCompleteModal
         isOpen={isCompleteOpen}
         onClose={() => {
           setIsCompleteOpen(false);
-          setCompleteTarget({ session: null, plan: null });
+          setCompleteTarget({ session: null, plan: null, groupTargets: null });
         }}
         onSuccess={() => {
           setIsCompleteOpen(false);
-          setCompleteTarget({ session: null, plan: null });
+          setCompleteTarget({ session: null, plan: null, groupTargets: null });
           fetchData();
         }}
         session={completeTarget.session}
         plan={completeTarget.plan}
+        groupTargets={completeTarget.groupTargets}
       />
 
       {/* ============ SCOPED CSS ============ */}
