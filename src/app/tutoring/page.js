@@ -461,6 +461,20 @@ export default function TutoringPage() {
                 onChange={(e) => setClassFilter(e.target.value)}
                 placeholder="-- Tất cả lớp học --"
                 className="select-custom"
+                style={{
+                  minWidth: '240px',
+                  height: '40px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: classFilter ? '1.5px solid #0284c7' : '1.5px solid #cbd5e1',
+                  background: classFilter ? '#f0f9ff' : '#ffffff',
+                  color: classFilter ? '#085e8a' : '#1e293b',
+                  fontWeight: classFilter ? 700 : 600,
+                  fontSize: '13.5px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  boxShadow: classFilter ? '0 0 0 3px rgba(2,132,199,0.12)' : '0 1px 2px rgba(0,0,0,0.04)'
+                }}
               />
             </div>
 
@@ -756,6 +770,7 @@ export default function TutoringPage() {
         classes={classes}
         teachers={teachers}
         existingPlans={plans}
+        alerts={alerts}
       />
 
       <TutoringLetterModal

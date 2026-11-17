@@ -51,12 +51,19 @@ function parseTimeToMinutes(timeStr) {
   return hh * 60 + mm;
 }
 
-function getStudentClassCodes(st) {
+function getStudentClassCodes(st, includeExtras = false) {
   if (!st) return [];
   const list = [];
+  if (includeExtras && Array.isArray(st.enrolledClasses)) {
+    st.enrolledClasses.forEach((c) => {
+      if (c && c.classCode && ['Đang học', 'Tạm nghỉ', 'Bảo lưu'].includes(c.status)) {
+        if (!list.includes(c.classCode)) list.push(c.classCode);
+      }
+    });
+  }
   if (Array.isArray(st.activeClasses)) {
     st.activeClasses.forEach((c) => {
-      if (c && c.classCode) list.push(c.classCode);
+      if (c && c.classCode && !list.includes(c.classCode)) list.push(c.classCode);
     });
   }
   if (st.classCode && !st.classCode.startsWith('Chưa xếp') && !st.classCode.startsWith('Kèm 1-1')) {
@@ -76,6 +83,7 @@ export default function TutoringScheduleModal({
   classes = [],
   teachers = [],
   existingPlans = [],
+  alerts = [],
 }) {
   const isEditMode = Boolean(editPlanGroup && editPlanGroup.primaryPlan);
 
@@ -83,6 +91,7 @@ export default function TutoringScheduleModal({
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedParticipants, setSelectedParticipants] = useState([]); // [{ studentId, classCode }]
   const [showAllStudentStatuses, setShowAllStudentStatuses] = useState(false);
+  const [onlyAlertStudents, setOnlyAlertStudents] = useState(false);
 
   const [sessionType, setSessionType] = useState('Bù bài học viên vắng (Makeup)');
   const [focusSkills, setFocusSkills] = useState('Tổng hợp / Toàn diện');
@@ -211,6 +220,7 @@ export default function TutoringScheduleModal({
       ]);
     }
     setShowAllStudentStatuses(false);
+    setOnlyAlertStudents(false);
     setErrorMsg('');
   }, [prefillData, prefillList, editPlanGroup, isOpen]);
 
@@ -235,18 +245,41 @@ export default function TutoringScheduleModal({
     }
   };
 
-  // Danh sách học viên đã được lọc chính xác theo Lớp + Trạng thái + Từ khóa tìm kiếm
+  const alertMap = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(alerts)) {
+      alerts.forEach((a) => {
+        if (a && a.studentId) map.set(a.studentId, a);
+      });
+    }
+    return map;
+  }, [alerts]);
+
+  // Danh sách học viên đã được lọc chính xác theo Lớp + Cảnh báo + Trạng thái + Từ khóa tìm kiếm
   const filteredStudents = useMemo(() => {
     const q = studentSearch.trim().toLowerCase();
-    return students.filter((st) => {
+    const includeExtras = showAllStudentStatuses || onlyAlertStudents;
+
+    const matched = students.filter((st) => {
       if (!st || !st.id) return false;
-      if (!showAllStudentStatuses && st.status && st.status !== 'Đang học') {
-        return false;
+      const alertInfo = alertMap.get(st.id);
+
+      if (onlyAlertStudents) {
+        if (!alertInfo) return false;
+      } else if (showAllStudentStatuses) {
+        // Hiện Đang học, Tạm nghỉ, Bảo lưu và mọi HV trong hàng đợi Cảnh báo vắng 2+ buổi
+        const isAllowedStatus = !st.status || ['Đang học', 'Tạm nghỉ', 'Bảo lưu'].includes(st.status);
+        if (!isAllowedStatus && !alertInfo) return false;
+      } else {
+        if (st.status && st.status !== 'Đang học') return false;
       }
+
       if (filterClassCode) {
-        const clsCodes = getStudentClassCodes(st);
-        if (!clsCodes.includes(filterClassCode)) return false;
+        const clsCodes = getStudentClassCodes(st, includeExtras || Boolean(alertInfo));
+        const alertMatchesClass = alertInfo && alertInfo.classCode === filterClassCode;
+        if (!clsCodes.includes(filterClassCode) && !alertMatchesClass) return false;
       }
+
       if (q) {
         const name = (st.name || '').toLowerCase();
         const id = (st.id || '').toLowerCase();
@@ -255,7 +288,15 @@ export default function TutoringScheduleModal({
       }
       return true;
     });
-  }, [students, filterClassCode, studentSearch, showAllStudentStatuses]);
+
+    // Đưa các học viên đang có Cảnh báo vắng 2+ buổi lên đầu danh sách
+    return matched.sort((a, b) => {
+      const alertA = alertMap.has(a.id) ? 1 : 0;
+      const alertB = alertMap.has(b.id) ? 1 : 0;
+      if (alertA !== alertB) return alertB - alertA;
+      return 0;
+    });
+  }, [students, filterClassCode, studentSearch, showAllStudentStatuses, onlyAlertStudents, alertMap]);
 
   const selectedIdsSet = useMemo(
     () => new Set(selectedParticipants.map((p) => p.studentId)),
@@ -267,7 +308,12 @@ export default function TutoringScheduleModal({
       setSelectedParticipants((prev) => prev.filter((p) => p.studentId !== st.id));
       return;
     }
-    const defaultClass = filterClassCode || getStudentClassCodes(st)[0] || '';
+    const alertInfo = alertMap.get(st.id);
+    const defaultClass =
+      filterClassCode ||
+      alertInfo?.classCode ||
+      getStudentClassCodes(st, showAllStudentStatuses || onlyAlertStudents || Boolean(alertInfo))[0] ||
+      '';
     setSelectedParticipants((prev) => [...prev, { studentId: st.id, classCode: defaultClass }]);
     if (!teacherId && defaultClass) {
       const clsObj = classes.find((c) => c.code === defaultClass);
@@ -287,7 +333,12 @@ export default function TutoringScheduleModal({
         const existing = new Set(prev.map((p) => p.studentId));
         for (const st of filteredStudents) {
           if (!existing.has(st.id)) {
-            const clsCode = filterClassCode || getStudentClassCodes(st)[0] || '';
+            const alertInfo = alertMap.get(st.id);
+            const clsCode =
+              filterClassCode ||
+              alertInfo?.classCode ||
+              getStudentClassCodes(st, showAllStudentStatuses || onlyAlertStudents || Boolean(alertInfo))[0] ||
+              '';
             next.push({ studentId: st.id, classCode: clsCode });
           }
         }
@@ -496,13 +547,27 @@ export default function TutoringScheduleModal({
                 1. Chọn học viên tham gia <span className="req">*</span>{' '}
                 <span className="tsm-count-pill">{selectedParticipants.length} học viên đã chọn</span>
               </div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <label
+                style={{
+                  fontSize: '12.5px',
+                  color: showAllStudentStatuses ? '#b45309' : '#475569',
+                  fontWeight: showAllStudentStatuses ? 700 : 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  background: showAllStudentStatuses ? '#fffbeb' : 'transparent',
+                  padding: showAllStudentStatuses ? '4px 10px' : '4px 2px',
+                  borderRadius: '8px',
+                  border: showAllStudentStatuses ? '1px solid #fcd34d' : '1px solid transparent',
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={showAllStudentStatuses}
                   onChange={(e) => setShowAllStudentStatuses(e.target.checked)}
                 />
-                Hiện cả HV tạm nghỉ / bảo lưu
+                Hiện cả HV nghỉ 2+ buổi (Cảnh báo) &amp; Tạm nghỉ / Bảo lưu
               </label>
             </div>
 
@@ -542,6 +607,20 @@ export default function TutoringScheduleModal({
                   onChange={(e) => handleFilterClassChange(e.target.value)}
                   placeholder="-- Tất cả các lớp đang mở --"
                   className="tsm-select"
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: filterClassCode ? '1.5px solid #0284c7' : '1.5px solid #94a3b8',
+                    background: filterClassCode ? '#f0f9ff' : '#ffffff',
+                    color: filterClassCode ? '#085e8a' : '#1e293b',
+                    fontWeight: filterClassCode ? 700 : 600,
+                    fontSize: '13.5px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    boxShadow: filterClassCode ? '0 0 0 3px rgba(2,132,199,0.12)' : '0 1px 2px rgba(0,0,0,0.04)',
+                  }}
                 />
               </div>
 
@@ -553,6 +632,7 @@ export default function TutoringScheduleModal({
                   onChange={(e) => setStudentSearch(e.target.value)}
                   placeholder="Gõ tên, mã HV hoặc SĐT..."
                   className="tsm-input"
+                  style={{ height: '42px', borderRadius: '10px', borderWidth: '1.5px', borderColor: '#94a3b8' }}
                 />
               </div>
             </div>
@@ -560,10 +640,22 @@ export default function TutoringScheduleModal({
             {/* Khung tick chọn học viên */}
             <div className="tsm-student-picker">
               <div className="tsm-picker-toolbar">
-                <span>
-                  Hiển thị <strong>{filteredStudents.length}</strong> học viên
-                  {filterClassCode ? ` thuộc lớp ${formatClassCode(filterClassCode)}` : ' toàn trung tâm'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>
+                    Hiển thị <strong>{filteredStudents.length}</strong> học viên
+                    {filterClassCode ? ` thuộc lớp ${formatClassCode(filterClassCode)}` : ' toàn trung tâm'}
+                  </span>
+                  {alerts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOnlyAlertStudents((v) => !v)}
+                      className={`tsm-btn-alert-filter ${onlyAlertStudents ? 'active' : ''}`}
+                    >
+                      <i className="fa-solid fa-bell"></i>{' '}
+                      {onlyAlertStudents ? `Đang lọc Cảnh báo (${alerts.length})` : `Lọc HV Cảnh báo vắng (${alerts.length})`}
+                    </button>
+                  )}
+                </div>
                 {filteredStudents.length > 0 && (
                   <button
                     type="button"
@@ -585,8 +677,26 @@ export default function TutoringScheduleModal({
                 ) : (
                   filteredStudents.map((st) => {
                     const checked = selectedIdsSet.has(st.id);
-                    const clsCodes = getStudentClassCodes(st);
+                    const alertInfo = alertMap.get(st.id);
+                    const clsCodes = getStudentClassCodes(
+                      st,
+                      showAllStudentStatuses || onlyAlertStudents || Boolean(alertInfo)
+                    );
+                    if (alertInfo?.classCode && !clsCodes.includes(alertInfo.classCode)) {
+                      clsCodes.unshift(alertInfo.classCode);
+                    }
                     const clsShort = clsCodes.map((c) => formatClassCode(c)).join(', ') || 'Chưa xếp lớp';
+                    const enrolledStatus =
+                      filterClassCode && Array.isArray(st.enrolledClasses)
+                        ? st.enrolledClasses.find((c) => c.classCode === filterClassCode)?.status
+                        : null;
+                    const displayStatus =
+                      enrolledStatus && enrolledStatus !== 'Đang học'
+                        ? enrolledStatus
+                        : st.status && st.status !== 'Đang học'
+                        ? st.status
+                        : null;
+
                     return (
                       <label key={st.id} className={`tsm-picker-row ${checked ? 'checked' : ''}`}>
                         <input
@@ -595,7 +705,17 @@ export default function TutoringScheduleModal({
                           onChange={() => toggleStudent(st)}
                         />
                         <div className="tsm-picker-main">
-                          <span className="tsm-picker-name">{st.name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span className="tsm-picker-name">{st.name}</span>
+                            {alertInfo && (
+                              <span className="tsm-badge-alert">
+                                Vắng {alertInfo.absentCount} buổi
+                              </span>
+                            )}
+                            {displayStatus && (
+                              <span className="tsm-badge-status">{displayStatus}</span>
+                            )}
+                          </div>
                           <span className="tsm-picker-meta">
                             {st.id} • {st.phone && st.phone !== 'N/A' ? st.phone : 'Chưa có SĐT'}
                           </span>
@@ -1122,6 +1242,48 @@ export default function TutoringScheduleModal({
           border: 1px solid #e0f2fe;
           padding: 2px 8px;
           border-radius: 6px;
+          white-space: nowrap;
+        }
+        .tsm-btn-alert-filter {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: #fef2f2;
+          color: #dc2626;
+          border: 1px solid #fecaca;
+          padding: 3px 9px;
+          border-radius: 999px;
+          font-size: 11.5px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.12s;
+        }
+        .tsm-btn-alert-filter:hover {
+          background: #fee2e2;
+        }
+        .tsm-btn-alert-filter.active {
+          background: #dc2626;
+          color: #ffffff;
+          border-color: #b91c1c;
+        }
+        .tsm-badge-alert {
+          font-size: 10.5px;
+          font-weight: 800;
+          color: #dc2626;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          padding: 1px 6px;
+          border-radius: 999px;
+          white-space: nowrap;
+        }
+        .tsm-badge-status {
+          font-size: 10.5px;
+          font-weight: 700;
+          color: #b45309;
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          padding: 1px 6px;
+          border-radius: 999px;
           white-space: nowrap;
         }
 

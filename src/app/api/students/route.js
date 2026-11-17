@@ -299,6 +299,8 @@ export async function GET(request) {
         activeClasses: student.enrollments
           .filter(e => e.status === 'Đang học')
           .map(e => ({ classCode: e.classCode, billingType: e.billingType || 'COURSE', level: e.class?.level || '' })),
+        enrolledClasses: student.enrollments
+          .map(e => ({ classCode: e.classCode, status: e.status, billingType: e.billingType || 'COURSE', level: e.class?.level || '' })),
         createdAt: student.createdAt,
       };
     });

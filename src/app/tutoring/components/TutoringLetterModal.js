@@ -1,8 +1,74 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as htmlToImage from 'html-to-image';
+import html2canvas from 'html2canvas';
+import OfficialRedSeal from '@/components/OfficialRedSeal';
 import { formatClassCode } from '@/lib/classHelper';
+
+const FONT_UNIFIED = '"Be Vietnam Pro", "Segoe UI", Arial, sans-serif';
+const CENTER_ADDRESS = 'Số 15, Đường D9, KDC Phú Tân, Phường Bình Dương, Thành phố Hồ Chí Minh';
+
+const BRAND = {
+  blue: '#0D88C4',
+  blueDark: '#08557B',
+  blueLight: '#E8F5FD',
+  gold: '#FFCA29',
+  goldDark: '#D97706',
+  ink: '#0F172A',
+  muted: '#475569',
+  white: '#FFFFFF',
+};
+
+function SvgIconCalendar({ color = '#D97706', size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <rect x="3" y="4" width="18" height="17" rx="3" stroke={color} strokeWidth="2.2" />
+      <path d="M8 2V6M16 2V6M3 10H21" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SvgIconPin({ color = '#D97706', size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <path
+        d="M12 21C12 21 19 14.5 19 9.5C19 5.63401 15.866 2.5 12 2.5C8.13401 2.5 5 5.63401 5 9.5C5 14.5 12 21 12 21Z"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="9.5" r="2.5" stroke={color} strokeWidth="2.2" />
+    </svg>
+  );
+}
+
+function SvgIconTarget({ color = '#0D88C4', size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2.2" />
+      <circle cx="12" cy="12" r="5" stroke={color} strokeWidth="2" />
+      <circle cx="12" cy="12" r="1.8" fill={color} />
+    </svg>
+  );
+}
+
+function SvgIconNote({ color = '#0D88C4', size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <rect x="4" y="3" width="16" height="18" rx="2.5" stroke={color} strokeWidth="2.2" />
+      <path d="M8 8H16M8 12H16M8 16H13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SvgIconBag({ color = '#D97706', size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <path d="M6 8H18L19 20H5L6 8Z" stroke={color} strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M9 8V6C9 4.34315 10.3431 3 12 3C13.6569 3 15 4.34315 15 6V8" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function TutoringLetterModal({ isOpen, onClose, plan = null, plans = null }) {
   const letterRef = useRef(null);
@@ -34,17 +100,18 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
   const focusSkills = activePlan.focusSkills || 'Tổng hợp / Toàn diện';
   const content = activePlan.content || 'Ôn tập và củng cố kiến thức theo chương trình';
   const instructions = activePlan.instructions || 'Mang theo đầy đủ sách vở và đồ dùng học tập';
+  const todayVnDisplay = new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
   const sessions = activePlan.sessions && activePlan.sessions.length > 0 ? activePlan.sessions : [
     {
       sessionNumber: 1,
       teachingDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()),
       startTimeText: '16:30',
       endTimeText: '17:30',
-      roomName: 'Phòng học tại trung tâm'
-    }
+      roomName: 'Phòng học tại trung tâm',
+    },
   ];
 
-  // Helper format ngày tiếng Việt (chuẩn ngày không lệch múi giờ)
+  // Format ngày tiếng Việt chuẩn không lệch múi giờ
   const formatDateVi = (dateStr) => {
     if (!dateStr) return '';
     try {
@@ -61,7 +128,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
     }
   };
 
-  // Cập nhật timestamp xuất thư
   const markExported = async (targetPlanId = activePlan.id) => {
     try {
       await fetch(`/api/tutoring/${targetPlanId}/letter-exported`, { method: 'PATCH' });
@@ -70,41 +136,70 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
     }
   };
 
-  // Copy ảnh vào Clipboard
+  // Chụp ảnh chuẩn Retina 2x bằng html2canvas + đợi load đầy đủ font Be Vietnam Pro
+  const captureLetterCanvas = async () => {
+    if (typeof document !== 'undefined' && document.fonts) {
+      try {
+        await document.fonts.ready;
+        const criticalFonts = [
+          '500 16px "Be Vietnam Pro"',
+          '600 16px "Be Vietnam Pro"',
+          '700 16px "Be Vietnam Pro"',
+          '800 16px "Be Vietnam Pro"',
+          '900 16px "Be Vietnam Pro"',
+        ];
+        await Promise.allSettled(
+          criticalFonts.map((f) => document.fonts.load(f, 'ANH NGỮ NHẬT MỸ Ữ Ậ Ỹ Đ'))
+        );
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      } catch {
+        // Fallback nếu font API bị giới hạn
+      }
+    }
+
+    return html2canvas(letterRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#FFFFFF',
+      logging: false,
+    });
+  };
+
   const handleCopyImage = async () => {
     if (!letterRef.current || copying) return;
     setCopying(true);
     setCopySuccess('');
 
     try {
-      const dataUrl = await htmlToImage.toPng(letterRef.current, {
-        pixelRatio: 2.5,
-        cacheBust: true,
-        backgroundColor: '#ffffff'
-      });
-
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        setCopySuccess(`Đã sao chép ảnh của ${studentName}! Mở Zalo bấm Ctrl+V`);
-        markExported(activePlan.id);
-        setTimeout(() => setCopySuccess(''), 3500);
-      } else {
-        handleDownloadImage();
-      }
+      const canvas = await captureLetterCanvas();
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          handleDownloadImage();
+          return;
+        }
+        try {
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setCopySuccess(`Đã sao chép ảnh của ${studentName}! Mở Zalo bấm Ctrl+V`);
+            markExported(activePlan.id);
+            setTimeout(() => setCopySuccess(''), 3500);
+          } else {
+            handleDownloadImage();
+          }
+        } catch (clipErr) {
+          console.warn('Clipboard fallback to download:', clipErr);
+          handleDownloadImage();
+        } finally {
+          setCopying(false);
+        }
+      }, 'image/png');
     } catch (err) {
       console.error('Lỗi copy ảnh:', err);
-      handleDownloadImage();
-    } finally {
       setCopying(false);
+      handleDownloadImage();
     }
   };
 
-  // Copy lời nhắn Zalo soạn sẵn
   const handleCopyZaloText = async () => {
     const slotLines = sessions
       .map((s, i) => `• Buổi ${i + 1}: ${formatDateVi(s.teachingDate)} (${s.startTimeText || '16:30'} – ${s.endTimeText || '17:30'}) • ${s.roomName || 'Phòng học tại trung tâm'}`)
@@ -125,22 +220,16 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
     }
   };
 
-  // Tải file ảnh PNG
   const handleDownloadImage = async () => {
     if (!letterRef.current || downloading) return;
     setDownloading(true);
 
     try {
-      const dataUrl = await htmlToImage.toPng(letterRef.current, {
-        pixelRatio: 2.5,
-        cacheBust: true,
-        backgroundColor: '#ffffff'
-      });
-
+      const canvas = await captureLetterCanvas();
       const filename = `Thu_Hen_Phu_Dao_${studentName.replace(/\s+/g, '_')}_${activePlan.planCode || 'Pass'}.png`;
       const link = document.createElement('a');
       link.download = filename;
-      link.href = dataUrl;
+      link.href = canvas.toDataURL('image/png');
       link.click();
 
       markExported(activePlan.id);
@@ -152,7 +241,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
     }
   };
 
-  // Tải trọn bộ ảnh (.ZIP) cho tất cả học viên trong nhóm
   const handleDownloadAllZip = async () => {
     if (planList.length <= 1 || zipLoading) return;
     setZipLoading(true);
@@ -168,11 +256,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
         setZipProgress(`Đang xuất ${i + 1}/${planList.length}: ${p.student?.name || ''}...`);
         await new Promise((r) => setTimeout(r, 250));
         if (!letterRef.current) continue;
-        const dataUrl = await htmlToImage.toPng(letterRef.current, {
-          pixelRatio: 2.2,
-          cacheBust: true,
-          backgroundColor: '#ffffff',
-        });
+        const canvas = await captureLetterCanvas();
+        const dataUrl = canvas.toDataURL('image/png');
         const base64 = dataUrl.split(',')[1];
         const safeName = (p.student?.name || p.studentId || 'HV').replace(/\s+/g, '_');
         zip.file(`${i + 1}_${safeName}_${p.planCode}.png`, base64, { base64: true });
@@ -194,7 +279,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
     }
   };
 
-  // Mở Zalo phụ huynh
   const handleOpenZalo = () => {
     if (studentPhone) {
       const cleanPhone = studentPhone.replace(/\D/g, '');
@@ -207,7 +291,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
   return (
     <div className="lm-overlay" onClick={onClose}>
       <div className="lm-modal" onClick={(e) => e.stopPropagation()}>
-
         {/* Header Modal */}
         <div className="lm-header">
           <div className="lm-header-left">
@@ -215,8 +298,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
               <i className="fa-solid fa-envelope-open-text"></i>
             </div>
             <div>
-              <h3>Thư Hẹn Phụ Huynh (Bản xem trước)</h3>
-              <p>Xuất ảnh chất lượng cao gửi Zalo cho phụ huynh học viên</p>
+              <h3>Thư Hẹn Phụ Huynh (Bản xem trước chuẩn Bộ nhận diện)</h3>
+              <p>Logo / Font Be Vietnam Pro sắc nét chuẩn gửi Zalo phụ huynh</p>
             </div>
           </div>
           <button className="lm-close-btn" onClick={onClose} aria-label="Đóng">
@@ -226,16 +309,18 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
 
         {/* Thanh chuyển học viên khi xuất thư nhóm */}
         {planList.length > 1 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '10px 18px',
-            background: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-            overflowX: 'auto',
-            flexWrap: 'wrap',
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 18px',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              overflowX: 'auto',
+              flexWrap: 'wrap',
+            }}
+          >
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginRight: '4px' }}>
               Nhóm ({planList.length} HV):
             </span>
@@ -263,116 +348,398 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
 
         {/* Khung cuộn chứa Giấy Thư */}
         <div className="lm-preview-viewport">
-          <div className="letter-paper" ref={letterRef}>
-
-            {/* Header Thương hiệu */}
-            <div className="letter-brand-row">
-              <div className="letter-brand-logo">
-                <div className="brand-logo-badge">
-                  <span>NM</span>
-                </div>
+          <div
+            ref={letterRef}
+            style={{
+              width: '660px',
+              backgroundColor: BRAND.white,
+              color: BRAND.ink,
+              fontFamily: FONT_UNIFIED,
+              lineHeight: 1.5,
+              boxSizing: 'border-box',
+              position: 'relative',
+              margin: '0 auto',
+              overflow: 'hidden',
+              border: `3px solid ${BRAND.gold}`,
+              borderRadius: '16px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.16)',
+              WebkitFontSmoothing: 'antialiased',
+            }}
+          >
+            {/* 1. HEADER BỘ NHẬN DIỆN CHUẨN NHẬT MỸ — LOGO 1:1 NGUYÊN BẢN */}
+            <div
+              style={{
+                backgroundColor: BRAND.white,
+                padding: '18px 28px 14px 28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: `3px solid ${BRAND.gold}`,
+                fontFamily: FONT_UNIFIED,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <img
+                  src="/logo.png"
+                  alt="Logo Anh ngữ Nhật Mỹ"
+                  width={72}
+                  height={72}
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    display: 'block',
+                    flexShrink: 0,
+                  }}
+                  crossOrigin="anonymous"
+                />
                 <div>
-                  <div className="brand-title">ANH NGỮ QUỐC TẾ NHẬT MỸ</div>
-                  <div className="brand-slogan">DEDICATED TO EXCELLENCE</div>
-                </div>
-              </div>
-              <div className="letter-code-col">
-                <span className="plan-badge-pass">{activePlan.planCode || 'TUTOR-PASS'}</span>
-                <span className="direct-teach-note">Dạy trực tiếp tại cơ sở</span>
-              </div>
-            </div>
-
-            <div className="letter-gold-line"></div>
-
-            {/* Tiêu đề thư */}
-            <div className="letter-title-section">
-              <span className="session-type-pill">{sessionType}</span>
-              <h1 className="letter-main-title">GIẤY HẸN PHỤ ĐẠO & BÙ BÀI</h1>
-              <p className="letter-subtitle">
-                Hỗ trợ củng cố kiến thức và đồng hành cùng tiến độ học tập của bé
-              </p>
-            </div>
-
-            {/* Thông tin học viên */}
-            <div className="letter-student-box">
-              <div className="student-info-row">
-                <span className="info-label">Kính gửi Quý Phụ huynh em:</span>
-                <span className="info-value-name">{studentName}</span>
-              </div>
-              <div className="student-info-row">
-                <span className="info-label">Lớp học chính khóa:</span>
-                <span className="info-value-class">{classCode}</span>
-              </div>
-              <div className="student-info-row">
-                <span className="info-label">Giáo viên / Trợ giảng kèm:</span>
-                <span className="info-value-tutor">{tutorName}</span>
-              </div>
-            </div>
-
-            {/* Lịch học kèm chi tiết */}
-            <div className="letter-sessions-section">
-              <div className="sessions-section-title">
-                <i className="fa-solid fa-calendar-day"></i> LỊCH HỌC KÈM CHI TIẾT (TRỰC TIẾP):
-              </div>
-
-              <div className="sessions-slots-container">
-                {sessions.map((s, idx) => (
-                  <div key={idx} className="session-slot-card">
-                    <div className="slot-top-row">
-                      <div className="slot-date-info">
-                        <span className="slot-idx-circle">{idx + 1}</span>
-                        <strong className="slot-date-text">{formatDateVi(s.teachingDate)}</strong>
-                      </div>
-                      <span className="slot-time-highlight">
-                        {s.startTimeText || '16:30'} – {s.endTimeText || '17:30'}
-                      </span>
-                    </div>
-
-                    <div className="slot-room-row">
-                      <i className="fa-solid fa-location-dot"></i>
-                      <span>Địa điểm học: <strong>{s.roomName || 'Phòng học tại trung tâm'}</strong></span>
-                    </div>
+                  <div
+                    style={{
+                      fontFamily: FONT_UNIFIED,
+                      fontSize: '23px',
+                      fontWeight: '900',
+                      color: BRAND.blue,
+                      letterSpacing: '0.5px',
+                      lineHeight: '1.15',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    ANH NGỮ NHẬT MỸ
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Nội dung ôn tập & Kỹ năng */}
-            <div className="letter-content-box">
-              <div className="content-item">
-                <span className="content-item-label">🎯 Kỹ năng trọng tâm:</span>
-                <span className="content-item-value-skill">{focusSkills}</span>
-              </div>
-              <div className="content-item">
-                <span className="content-item-label">📝 Nội dung ôn tập:</span>
-                <span className="content-item-value">{content}</span>
-              </div>
-              <div className="content-item">
-                <span className="content-item-label">🎒 Đồ dùng mang theo:</span>
-                <span className="content-item-value-bold">{instructions}</span>
-              </div>
-            </div>
-
-            {/* Lời nhắn nhủ */}
-            <div className="letter-polite-note">
-              "Vì sự tiến bộ của con, kính mong Quý Phụ huynh sắp xếp nhắc nhở và đưa đón bé tham dự đầy đủ, đúng giờ."
-            </div>
-
-            {/* Chân trang & Xác nhận */}
-            <div className="letter-footer-row">
-              <div className="footer-left">
-                <div className="center-name">TRUNG TÂM ANH NGỮ NHẬT MỸ</div>
-                <div className="department-name">Bộ Phận Chuyên Môn & CSKH</div>
-                <div className="hotline-text">Hotline hỗ trợ phụ huynh: 090x xxx xxx</div>
+                  <div
+                    style={{
+                      fontFamily: FONT_UNIFIED,
+                      fontSize: '13px',
+                      fontStyle: 'italic',
+                      fontWeight: '600',
+                      color: BRAND.goldDark,
+                      letterSpacing: '0.35px',
+                      marginTop: '3px',
+                    }}
+                  >
+                    Dedicated to Excellence
+                  </div>
+                </div>
               </div>
 
-              <div className="footer-right">
-                <div className="confirm-stamp">
-                  <i className="fa-solid fa-certificate"></i> XÁC NHẬN TỔ CHỨC
+              <div style={{ textAlign: 'right', fontFamily: FONT_UNIFIED }}>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    backgroundColor: '#FEF3C7',
+                    border: '1px solid #FDE68A',
+                    color: '#92400E',
+                    fontSize: '11.5px',
+                    fontWeight: '800',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {activePlan.planCode || 'TUTOR-PASS'}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_UNIFIED,
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    color: BRAND.muted,
+                    marginTop: '4px',
+                  }}
+                >
+                  Dạy trực tiếp tại cơ sở
                 </div>
               </div>
             </div>
 
+            {/* 2. BODY NỘI DUNG */}
+            <div style={{ padding: '22px 28px 18px 28px', backgroundColor: '#FAFDFE', fontFamily: FONT_UNIFIED }}>
+              {/* Tiêu đề thư */}
+              <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    backgroundColor: '#E0F2FE',
+                    color: '#0369A1',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    padding: '4px 14px',
+                    borderRadius: '999px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px',
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {sessionType}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_UNIFIED,
+                    fontSize: '25px',
+                    fontWeight: '900',
+                    color: BRAND.blueDark,
+                    letterSpacing: '0.4px',
+                    lineHeight: '1.2',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  GIẤY HẸN PHỤ ĐẠO & BÙ BÀI
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_UNIFIED,
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    fontStyle: 'italic',
+                    color: BRAND.muted,
+                    marginTop: '4px',
+                  }}
+                >
+                  Hỗ trợ củng cố kiến thức và đồng hành cùng tiến độ học tập của bé
+                </div>
+              </div>
+
+              {/* Thông tin học viên */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  border: '1.5px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '7px',
+                  fontFamily: FONT_UNIFIED,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: '600', color: BRAND.muted }}>
+                    Kính gửi Quý Phụ huynh em:
+                  </span>
+                  <span style={{ fontSize: '17px', fontWeight: '900', color: BRAND.blueDark }}>
+                    {studentName}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: '600', color: BRAND.muted }}>
+                    Lớp học chính khóa:
+                  </span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: BRAND.ink }}>
+                    {classCode}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: '600', color: BRAND.muted }}>
+                    Giáo viên / Trợ giảng kèm:
+                  </span>
+                  <span style={{ fontSize: '14.5px', fontWeight: '800', color: BRAND.blue }}>
+                    {tutorName}
+                  </span>
+                </div>
+              </div>
+
+              {/* Lịch học kèm chi tiết */}
+              <div style={{ marginBottom: '16px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    color: BRAND.blueDark,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <SvgIconCalendar color="#D97706" size={16} />
+                  <span>LỊCH HỌC KÈM CHI TIẾT (TRỰC TIẾP):</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {sessions.map((s, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: '#FFFBEB',
+                        border: '1.5px solid #FDE68A',
+                        borderRadius: '11px',
+                        padding: '11px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '5px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                          <span
+                            style={{
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '50%',
+                              backgroundColor: '#F59E0B',
+                              color: '#FFFFFF',
+                              fontSize: '12px',
+                              fontWeight: '800',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <strong style={{ color: BRAND.ink, fontSize: '14.5px', fontWeight: '800' }}>
+                            {formatDateVi(s.teachingDate)}
+                          </strong>
+                        </div>
+                        <span style={{ fontWeight: '900', color: '#B45309', fontSize: '14.5px' }}>
+                          {s.startTimeText || '16:30'} – {s.endTimeText || '17:30'}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          color: BRAND.muted,
+                          paddingLeft: '31px',
+                        }}
+                      >
+                        <SvgIconPin color="#D97706" size={14} />
+                        <span>
+                          Địa điểm học: <strong style={{ color: BRAND.ink, fontWeight: '800' }}>{s.roomName || 'Phòng học tại trung tâm'}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nội dung ôn tập & Dặn dò */}
+              <div
+                style={{
+                  backgroundColor: '#F0F9FF',
+                  border: '1.5px solid #BAE6FD',
+                  borderRadius: '12px',
+                  padding: '13px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginBottom: '14px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px' }}>
+                  <SvgIconTarget color={BRAND.blue} size={16} />
+                  <div>
+                    <strong style={{ color: BRAND.ink, fontWeight: '800' }}>Kỹ năng trọng tâm: </strong>
+                    <span style={{ color: BRAND.blueDark, fontWeight: '800' }}>{focusSkills}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px' }}>
+                  <SvgIconNote color={BRAND.blue} size={16} />
+                  <div>
+                    <strong style={{ color: BRAND.ink, fontWeight: '800' }}>Nội dung ôn tập: </strong>
+                    <span style={{ color: '#1E293B', fontWeight: '600' }}>{content}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px' }}>
+                  <SvgIconBag color="#D97706" size={16} />
+                  <div>
+                    <strong style={{ color: BRAND.ink, fontWeight: '800' }}>Đồ dùng mang theo: </strong>
+                    <span style={{ color: '#0F172A', fontWeight: '700' }}>{instructions}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lời nhắn + Mộc đỏ Nhật Mỹ */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 120px',
+                  gap: '14px',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    fontStyle: 'italic',
+                    color: BRAND.muted,
+                    lineHeight: 1.55,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px dashed #CBD5E1',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                  }}
+                >
+                  “Vì sự tiến bộ của con, kính mong Quý Phụ huynh sắp xếp nhắc nhở và đưa đón bé tham dự đầy đủ, đúng giờ.”
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <OfficialRedSeal
+                    title="XÁC NHẬN"
+                    subtitle="PHỤ ĐẠO & BÙ BÀI"
+                    size={112}
+                    date={todayVnDisplay}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ */}
+            <div
+              style={{
+                backgroundColor: BRAND.blue,
+                padding: '14px 28px',
+                color: BRAND.white,
+                textAlign: 'center',
+                borderTop: `3px solid ${BRAND.gold}`,
+                fontFamily: FONT_UNIFIED,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: FONT_UNIFIED,
+                  fontSize: '15.5px',
+                  fontWeight: '900',
+                  letterSpacing: '0.8px',
+                  color: BRAND.gold,
+                  textTransform: 'uppercase',
+                  lineHeight: 1.2,
+                }}
+              >
+                ANH NGỮ NHẬT MỸ
+              </div>
+              <div
+                style={{
+                  fontFamily: FONT_UNIFIED,
+                  fontSize: '12px',
+                  fontStyle: 'italic',
+                  fontWeight: '500',
+                  color: '#FEF08A',
+                  letterSpacing: '0.35px',
+                  marginTop: '2px',
+                  marginBottom: '6px',
+                }}
+              >
+                Dedicated to Excellence
+              </div>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontWeight: '500', opacity: 0.96 }}>
+                Hotline hỗ trợ phụ huynh: <strong style={{ fontWeight: '800' }}>0911 767 069</strong> • Website:{' '}
+                <strong style={{ fontWeight: '800' }}>anhngunhatmy.edu.vn</strong>
+              </div>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '500', opacity: 0.9, marginTop: '2px' }}>
+                Địa chỉ: {CENTER_ADDRESS}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -414,11 +781,7 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
               disabled={downloading}
               className="btn-download"
             >
-              {downloading ? (
-                <i className="fa-solid fa-spinner fa-spin"></i>
-              ) : (
-                <i className="fa-solid fa-download"></i>
-              )}
+              {downloading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-download"></i>}
               Tải Ảnh (.PNG)
             </button>
 
@@ -428,55 +791,36 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
               disabled={copying}
               className="btn-copy-png"
             >
-              {copying ? (
-                <i className="fa-solid fa-spinner fa-spin"></i>
-              ) : (
-                <i className="fa-solid fa-copy"></i>
-              )}
+              {copying ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-copy"></i>}
               Copy Ảnh Gửi Zalo
             </button>
           </div>
         </div>
-
       </div>
 
-      {/* Scoped CSS */}
       <style jsx>{`
         .lm-overlay {
           position: fixed;
           inset: 0;
           z-index: 1000;
-          background: rgba(15, 23, 42, 0.7);
+          background: rgba(15, 23, 42, 0.72);
           backdrop-filter: blur(4px);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 16px;
-          animation: lmFade 0.2s ease;
         }
-        @keyframes lmFade {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
         .lm-modal {
           background: #ffffff;
           border-radius: 16px;
-          max-width: 600px;
+          max-width: 740px;
           width: 100%;
           max-height: 94vh;
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: 0 20px 60px -12px rgba(15, 23, 42, 0.4);
-          animation: lmSlide 0.25s ease;
+          box-shadow: 0 20px 60px -12px rgba(15, 23, 42, 0.45);
         }
-        @keyframes lmSlide {
-          from { opacity: 0; transform: translateY(16px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* Header */
         .lm-header {
           display: flex;
           justify-content: space-between;
@@ -502,17 +846,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           font-size: 18px;
           flex-shrink: 0;
         }
-        .lm-header h3 {
-          font-size: 15px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
-        .lm-header p {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-        }
+        .lm-header h3 { font-size: 15px; font-weight: 800; color: #0f172a; margin: 0; }
+        .lm-header p { font-size: 12px; color: #64748b; margin: 0; }
         .lm-close-btn {
           width: 32px;
           height: 32px;
@@ -520,19 +855,9 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           background: transparent;
           border: none;
           color: #64748b;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           cursor: pointer;
           font-size: 16px;
-          transition: all 0.15s ease;
         }
-        .lm-close-btn:hover {
-          background: #e2e8f0;
-          color: #0f172a;
-        }
-
-        /* Viewport */
         .lm-preview-viewport {
           padding: 16px;
           overflow-y: auto;
@@ -540,310 +865,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           background: #64748b;
           display: flex;
           justify-content: center;
-        }
-
-        /* Giấy Thư Hẹn */
-        .letter-paper {
-          width: 520px;
-          background: #ffffff;
-          border-radius: 16px;
-          padding: 24px;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-          border: 2px solid #FFCA29;
-          font-family: inherit;
-          color: #1e293b;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-
-        .letter-brand-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .letter-brand-logo {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .brand-logo-badge {
-          width: 44px;
-          height: 44px;
-          border-radius: 10px;
-          background: linear-gradient(135deg, #085e8a 0%, #0D88C4 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #FFCA29;
-          font-weight: 900;
-          font-size: 18px;
-          border: 1.5px solid #FFCA29;
-          box-shadow: 0 2px 6px rgba(13, 136, 196, 0.3);
-        }
-        .brand-title {
-          font-size: 13.5px;
-          font-weight: 900;
-          color: #085e8a;
-          letter-spacing: 0.03em;
-        }
-        .brand-slogan {
-          font-size: 10px;
-          font-weight: 700;
-          color: #cca120;
-          letter-spacing: 0.08em;
-        }
-        .letter-code-col {
-          text-align: right;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 2px;
-        }
-        .plan-badge-pass {
-          background: #fef3c7;
-          border: 1px solid #fde68a;
-          color: #92400e;
-          font-size: 10.5px;
-          font-weight: 800;
-          padding: 2px 8px;
-          border-radius: 5px;
-          font-family: monospace;
-        }
-        .direct-teach-note {
-          font-size: 10px;
-          color: #64748b;
-        }
-
-        .letter-gold-line {
-          height: 2px;
-          background: linear-gradient(90deg, #FFCA29 0%, #0D88C4 100%);
-          border-radius: 2px;
-        }
-
-        /* Title */
-        .letter-title-section {
-          text-align: center;
-          padding: 2px 0;
-        }
-        .session-type-pill {
-          display: inline-block;
-          background: #e0f2fe;
-          color: #0369a1;
-          font-size: 11px;
-          font-weight: 800;
-          padding: 3px 12px;
-          border-radius: 999px;
-          text-transform: uppercase;
-          margin-bottom: 6px;
-        }
-        .letter-main-title {
-          font-size: 18px;
-          font-weight: 900;
-          color: #085e8a;
-          letter-spacing: 0.02em;
-          margin: 0 0 4px 0;
-        }
-        .letter-subtitle {
-          font-size: 11.5px;
-          color: #64748b;
-          font-style: italic;
-          margin: 0;
-        }
-
-        /* Student Box */
-        .letter-student-box {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-          padding: 12px 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          font-size: 12px;
-        }
-        .student-info-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .info-label {
-          color: #64748b;
-        }
-        .info-value-name {
-          font-size: 14px;
-          font-weight: 800;
-          color: #085e8a;
-        }
-        .info-value-class {
-          font-weight: 700;
-          color: #1e293b;
-        }
-        .info-value-tutor {
-          font-weight: 700;
-          color: #0369a1;
-        }
-
-        /* Sessions */
-        .letter-sessions-section {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .sessions-section-title {
-          font-size: 11.5px;
-          font-weight: 800;
-          color: #085e8a;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .sessions-section-title i {
-          color: #d97706;
-        }
-        .sessions-slots-container {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .session-slot-card {
-          background: #fffbeb;
-          border: 1px solid #fef3c7;
-          border-radius: 10px;
-          padding: 10px 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          font-size: 12px;
-        }
-        .slot-top-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .slot-date-info {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .slot-idx-circle {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #f59e0b;
-          color: #ffffff;
-          font-size: 10px;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .slot-date-text {
-          color: #0f172a;
-          font-size: 12.5px;
-        }
-        .slot-time-highlight {
-          font-weight: 800;
-          color: #b45309;
-          font-size: 12.5px;
-        }
-        .slot-room-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11.5px;
-          color: #64748b;
-          padding-left: 28px;
-        }
-        .slot-room-row i {
-          color: #f59e0b;
-        }
-        .slot-room-row strong {
-          color: #1e293b;
-        }
-
-        /* Content Box */
-        .letter-content-box {
-          background: #f0f9ff;
-          border: 1px solid #e0f2fe;
-          border-radius: 10px;
-          padding: 12px 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          font-size: 11.5px;
-        }
-        .content-item {
-          display: flex;
           align-items: flex-start;
-          gap: 6px;
         }
-        .content-item-label {
-          font-weight: 800;
-          color: #085e8a;
-          white-space: nowrap;
-        }
-        .content-item-value-skill {
-          font-weight: 700;
-          color: #0284c7;
-        }
-        .content-item-value {
-          color: #334155;
-        }
-        .content-item-value-bold {
-          font-weight: 700;
-          color: #1e293b;
-        }
-
-        /* Polite Note */
-        .letter-polite-note {
-          font-size: 11px;
-          color: #64748b;
-          text-align: center;
-          font-style: italic;
-          line-height: 1.4;
-          padding: 2px 0;
-        }
-
-        /* Footer */
-        .letter-footer-row {
-          border-top: 1px solid #e2e8f0;
-          padding-top: 10px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          font-size: 11px;
-        }
-        .center-name {
-          font-size: 10px;
-          color: #94a3b8;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-        }
-        .department-name {
-          font-size: 12px;
-          font-weight: 800;
-          color: #085e8a;
-        }
-        .hotline-text {
-          color: #64748b;
-          font-size: 10.5px;
-        }
-        .confirm-stamp {
-          background: #fef3c7;
-          border: 1.5px solid #FFCA29;
-          color: #92400e;
-          font-size: 10.5px;
-          font-weight: 800;
-          padding: 4px 10px;
-          border-radius: 6px;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        /* Action Bar */
         .lm-action-bar {
           padding: 12px 20px;
           background: #ffffff;
@@ -851,11 +874,13 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           display: flex;
           justify-content: space-between;
           align-items: center;
-          flex-wrap: wrap;
           gap: 10px;
+          flex-wrap: wrap;
         }
         .action-feedback {
-          min-height: 24px;
+          min-height: 20px;
+          display: flex;
+          align-items: center;
         }
         .copy-success-badge {
           background: #d1fae5;
@@ -885,11 +910,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          transition: all 0.15s ease;
-        }
-        .btn-zalo:hover {
-          background: #0284c7;
-          color: #ffffff;
         }
         .btn-download {
           background: #f1f5f9;
@@ -903,11 +923,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          transition: all 0.15s ease;
-        }
-        .btn-download:hover {
-          background: #e2e8f0;
-          color: #0f172a;
         }
         .btn-copy-png {
           background: linear-gradient(135deg, #0D88C4 0%, #085e8a 100%);
@@ -921,23 +936,6 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          box-shadow: 0 4px 12px -2px rgba(13, 136, 196, 0.4);
-          transition: all 0.15s ease;
-        }
-        .btn-copy-png:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px -2px rgba(13, 136, 196, 0.55);
-        }
-
-        @media (max-width: 600px) {
-          .letter-paper {
-            width: 100%;
-            padding: 16px;
-          }
-          .action-buttons-group {
-            width: 100%;
-            justify-content: flex-end;
-          }
         }
       `}</style>
     </div>
