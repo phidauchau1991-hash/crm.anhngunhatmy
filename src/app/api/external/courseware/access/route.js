@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { decryptStudentId, encryptStudentId } from '@/lib/token';
 import { getBookCodesFromClass, parseCustomBookCodes } from '@/lib/coursewareBooks';
+import { evaluateCoursewareAccess } from '@/lib/coursewareAccess';
 
 const COURSEWARE_SECRET_KEY = process.env.COURSEWARE_SECRET_KEY || 'nhatmy_cw_sec_8f92a4b8e19c4d379058fa16';
 
@@ -186,6 +187,8 @@ export async function GET(request) {
                 custom_book_codes: customBooks,
                 effective_book_codes: effectiveBooks,
                 retain_access: Boolean(s.retainCoursewareAccess),
+                courseware_blocked: Boolean(s.coursewareBlocked),
+                courseware_expires_at: s.coursewareExpiresAt ? new Date(s.coursewareExpiresAt).toISOString() : null,
               };
             });
 
@@ -263,13 +266,7 @@ export async function GET(request) {
           ? await prisma.class.findUnique({ where: { code: lead.trialClassCode } })
           : null;
 
-        const classBookCodes = getBookCodesFromClass(trialClass);
-        const customBookCodes = parseCustomBookCodes(lead.customBookCodes);
-        const effectiveBookCodes = customBookCodes && customBookCodes.length > 0 ? customBookCodes : classBookCodes;
-
-        const isDropped = lead.status === 'Trượt' || lead.status === 'Hủy';
-        const retainGranted = Boolean(lead.retainCoursewareAccess);
-        const accessGranted = !isDropped || retainGranted;
+        const cw = evaluateCoursewareAccess(lead, { isTrial: true, trialClass });
 
         return NextResponse.json(
           {
@@ -278,7 +275,7 @@ export async function GET(request) {
               student_id: `LEAD_${lead.id}`,
               student_name: lead.name,
               phone: lead.phone || '',
-              status: isDropped ? 'QUIT' : 'ACTIVE',
+              status: cw.normalizedStatus,
               is_trial: true,
               portal_token: encryptStudentId(`LEAD_${lead.id}`),
               class_info: trialClass
@@ -289,11 +286,14 @@ export async function GET(request) {
                     teacher_name: trialClass.teacherName || '',
                   }
                 : null,
-              retain_courseware_access: retainGranted,
-              custom_book_codes: customBookCodes,
-              effective_book_codes: accessGranted ? effectiveBookCodes : [],
-              access_granted: accessGranted,
-              access_reason: accessGranted ? 'OK' : 'NO_ACCESS',
+              retain_courseware_access: cw.retainGranted,
+              courseware_blocked: cw.blocked,
+              blocked_reason: cw.blockedReason,
+              courseware_expires_at: cw.expiresAt ? cw.expiresAt.toISOString() : null,
+              custom_book_codes: cw.customBookCodes,
+              effective_book_codes: cw.effectiveBookCodes,
+              access_granted: cw.accessGranted,
+              access_reason: cw.accessReason,
               effective_date: (lead.updatedAt || new Date()).toISOString(),
             },
           },
@@ -327,47 +327,13 @@ export async function GET(request) {
       );
     }
 
-    // 4. Chuẩn hóa trạng thái học viên
-    let normalizedStatus = 'ACTIVE';
-    const rawStatus = (student.status || '').trim();
-    if (rawStatus === 'Tạm nghỉ' || rawStatus === 'Bảo lưu') {
-      normalizedStatus = 'PAUSED';
-    } else if (
-      rawStatus === 'Nghỉ luôn' ||
-      rawStatus === 'Đã chuyển' ||
-      rawStatus === 'Thôi học' ||
-      rawStatus === 'Nghỉ học'
-    ) {
-      normalizedStatus = 'QUIT';
-    } else if (rawStatus === 'Chờ xếp lớp') {
-      normalizedStatus = 'PENDING';
-    }
-
-    // 5. Tính toán danh sách giáo trình được cấp phát (gộp sách từ mọi lớp đang học nếu chưa cấu hình riêng)
+    // 4-6. Đánh giá tập trung quyền truy cập (Khóa thủ công > Hết hạn > Trạng thái lớp / Giữ quyền)
     const activeEnrollment = student.enrollments?.[0] || null;
     const classInfo = activeEnrollment?.class || null;
-    const classBookCodes = [
-      ...new Set(
-        (student.enrollments || []).flatMap((e) => getBookCodesFromClass(e.class))
-      ),
-    ];
-    const customBookCodes = parseCustomBookCodes(student.customBookCodes);
-    const effectiveBookCodes = customBookCodes && customBookCodes.length > 0 ? customBookCodes : classBookCodes;
-
-    // 6. Tính toán quyền truy cập
-    const retainGranted = Boolean(student.retainCoursewareAccess);
-    const isStudentActive = normalizedStatus === 'ACTIVE';
-
-    let accessGranted = false;
-    let accessReason = 'NO_ACCESS';
-
-    if (isStudentActive || retainGranted) {
-      accessGranted = true;
-      accessReason = 'OK';
-    } else {
-      accessGranted = false;
-      accessReason = normalizedStatus === 'PAUSED' ? 'PAUSED' : 'NO_ACCESS';
-    }
+    const cw = evaluateCoursewareAccess(student, {
+      isTrial: false,
+      enrollments: student.enrollments || [],
+    });
 
     const portalToken = encryptStudentId(student.id);
 
@@ -378,7 +344,7 @@ export async function GET(request) {
           student_id: student.id,
           student_name: student.name,
           phone: student.phone || '',
-          status: normalizedStatus,
+          status: cw.normalizedStatus,
           portal_token: portalToken,
           class_info: classInfo
             ? {
@@ -388,11 +354,14 @@ export async function GET(request) {
                 teacher_name: classInfo.teacherName || '',
               }
             : null,
-          retain_courseware_access: retainGranted,
-          custom_book_codes: customBookCodes,
-          effective_book_codes: accessGranted ? effectiveBookCodes : [],
-          access_granted: accessGranted,
-          access_reason: accessReason,
+          retain_courseware_access: cw.retainGranted,
+          courseware_blocked: cw.blocked,
+          blocked_reason: cw.blockedReason,
+          courseware_expires_at: cw.expiresAt ? cw.expiresAt.toISOString() : null,
+          custom_book_codes: cw.customBookCodes,
+          effective_book_codes: cw.effectiveBookCodes,
+          access_granted: cw.accessGranted,
+          access_reason: cw.accessReason,
           effective_date: (student.updatedAt || new Date()).toISOString(),
         },
       },

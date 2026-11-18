@@ -184,7 +184,57 @@ export default function ClassPortalPage() {
                       {student.name} 
                       {student.isTrial && <span className="badge" style={{fontSize:'0.7rem', background:'#fef08a', marginLeft: '5px'}}>Học thử</span>}
                       {student.isHistorical && <span className="badge" style={{fontSize:'0.7rem', background:'#e2e8f0', color:'#475569', marginLeft: '5px'}}>Đã chuyển/Nghỉ</span>}
-                      {student.coursewareLetterExportedAt ? (
+                      {student.coursewareBlocked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoursewareSingleStudent(student);
+                            setIsCoursewareModalOpen(true);
+                          }}
+                          title={`🔒 Tài khoản học liệu đang bị KHÓA${student.coursewareBlockedReason ? ` (${student.coursewareBlockedReason})` : ''} - Bấm để quản lý`}
+                          style={{
+                            border: '1px solid #fecaca',
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            borderRadius: '4px',
+                            padding: '2px 7px',
+                            cursor: 'pointer',
+                            marginLeft: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <i className="fa-solid fa-lock"></i> Đã khóa
+                        </button>
+                      ) : student.coursewareExpiresAt && new Date() > new Date(student.coursewareExpiresAt) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoursewareSingleStudent(student);
+                            setIsCoursewareModalOpen(true);
+                          }}
+                          title="⏳ Học liệu số đã HẾT HẠN - Bấm để gia hạn hoặc quản lý"
+                          style={{
+                            border: '1px solid #fde68a',
+                            background: '#fffbeb',
+                            color: '#b45309',
+                            borderRadius: '4px',
+                            padding: '2px 7px',
+                            cursor: 'pointer',
+                            marginLeft: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <i className="fa-solid fa-hourglass-end"></i> Hết hạn HL
+                        </button>
+                      ) : student.coursewareLetterExportedAt ? (
                         <button
                           type="button"
                           onClick={() => {

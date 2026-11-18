@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { parseCoursewareExpiresAt } from '@/lib/coursewareAccess';
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { studentIds, customBooksMap = {}, retainAccessMap = {}, markExported = true } = body;
+    const {
+      studentIds,
+      customBooksMap = {},
+      retainAccessMap = {},
+      blockedMap = {},
+      blockedReasonMap = {},
+      expiresAtMap = {},
+      markExported = true,
+    } = body;
 
     if (!Array.isArray(studentIds) || studentIds.length === 0) {
       return NextResponse.json(
@@ -33,6 +42,22 @@ export async function POST(request) {
       const retainVal = retainAccessMap[rawId] !== undefined ? retainAccessMap[rawId] : retainAccessMap[idStr];
       if (retainVal !== undefined) {
         updateData.retainCoursewareAccess = Boolean(retainVal);
+      }
+
+      const blockedVal = blockedMap[rawId] !== undefined ? blockedMap[rawId] : blockedMap[idStr];
+      if (blockedVal !== undefined) {
+        updateData.coursewareBlocked = Boolean(blockedVal);
+      }
+
+      const blockedReasonVal =
+        blockedReasonMap[rawId] !== undefined ? blockedReasonMap[rawId] : blockedReasonMap[idStr];
+      if (blockedReasonVal !== undefined) {
+        updateData.coursewareBlockedReason = String(blockedReasonVal || '').trim() || null;
+      }
+
+      const expiresVal = expiresAtMap[rawId] !== undefined ? expiresAtMap[rawId] : expiresAtMap[idStr];
+      if (expiresVal !== undefined) {
+        updateData.coursewareExpiresAt = parseCoursewareExpiresAt(expiresVal);
       }
 
       if (markExported) {

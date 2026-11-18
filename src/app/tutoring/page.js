@@ -50,7 +50,7 @@ export default function TutoringPage() {
         fetch('/api/tutoring/stats'),
         fetch('/api/tutoring/alerts'),
         fetch('/api/tutoring'),
-        fetch('/api/students'),
+        fetch('/api/students?includeHistorical=true'),
         fetch('/api/classes'),
         fetch('/api/users')
       ]);

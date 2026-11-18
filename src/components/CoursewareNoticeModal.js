@@ -10,6 +10,12 @@ import {
   getEffectiveBooksForStudent,
 } from '@/lib/coursewareBooks';
 import { renderStudentCardCanvas, canvasToPngBlob } from '@/lib/studentCardCanvas';
+import { toVnDateInputValue, formatCoursewareExpiryVi } from '@/lib/coursewareAccess';
+
+function addDaysVnInput(days) {
+  const target = new Date(Date.now() + days * 86400000);
+  return toVnDateInputValue(target);
+}
 
 export default function CoursewareNoticeModal({
   isOpen,
@@ -36,6 +42,10 @@ export default function CoursewareNoticeModal({
   // Bản đồ cấu hình sách & quyền lưu tạm
   const [customBooksMap, setCustomBooksMap] = useState({});
   const [retainAccessMap, setRetainAccessMap] = useState({});
+  const [blockedMap, setBlockedMap] = useState({});
+  const [blockedReasonMap, setBlockedReasonMap] = useState({});
+  const [expiresAtMap, setExpiresAtMap] = useState({});
+  const [togglingBlock, setTogglingBlock] = useState(false);
   const [exportedMap, setExportedMap] = useState({});
 
   // Ghi nhớ ID học viên đang xem để KHÔNG bị nhảy về học viên đầu tiên khi re-render
@@ -57,9 +67,21 @@ export default function CoursewareNoticeModal({
     }
   }, [activeStudent]);
 
+  // Reset map tạm khi đóng modal để lần mở sau luôn đồng bộ mới nhất từ CRM
+  useEffect(() => {
+    if (!isOpen) {
+      setCustomBooksMap({});
+      setRetainAccessMap({});
+      setBlockedMap({});
+      setBlockedReasonMap({});
+      setExpiresAtMap({});
+      setExportedMap({});
+    }
+  }, [isOpen]);
+
   // Khởi tạo và đồng bộ state sách khi danh sách học viên hoặc lớp học thay đổi
   useEffect(() => {
-    if (studentList.length > 0) {
+    if (isOpen && studentList.length > 0) {
       setCustomBooksMap(prev => {
         const next = { ...prev };
         studentList.forEach(std => {
@@ -85,6 +107,36 @@ export default function CoursewareNoticeModal({
         studentList.forEach(std => {
           if (next[std.id] === undefined) {
             next[std.id] = Boolean(std.retainCoursewareAccess);
+          }
+        });
+        return next;
+      });
+
+      setBlockedMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          if (next[std.id] === undefined) {
+            next[std.id] = Boolean(std.coursewareBlocked);
+          }
+        });
+        return next;
+      });
+
+      setBlockedReasonMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          if (next[std.id] === undefined) {
+            next[std.id] = std.coursewareBlockedReason || '';
+          }
+        });
+        return next;
+      });
+
+      setExpiresAtMap(prev => {
+        const next = { ...prev };
+        studentList.forEach(std => {
+          if (next[std.id] === undefined) {
+            next[std.id] = toVnDateInputValue(std.coursewareExpiresAt);
           }
         });
         return next;
@@ -116,7 +168,7 @@ export default function CoursewareNoticeModal({
         }
       }
     }
-  }, [studentList, classInfo]);
+  }, [isOpen, studentList, classInfo]);
 
   // Thông báo Toast tự tắt
   const showToast = (msg, type = 'success') => {
@@ -224,9 +276,14 @@ export default function CoursewareNoticeModal({
     }
   };
 
-  // Tính toán danh sách giáo trình thực tế cho học viên hiện tại
+  // Tính toán danh sách giáo trình & trạng thái kiểm soát cho học viên hiện tại
   const currentCustomCodes = activeStudent ? (customBooksMap[activeStudent.id] || []) : [];
   const currentRetainAccess = activeStudent ? Boolean(retainAccessMap[activeStudent.id]) : false;
+  const currentBlocked = activeStudent ? Boolean(blockedMap[activeStudent.id]) : false;
+  const currentBlockedReason = activeStudent ? (blockedReasonMap[activeStudent.id] || '') : '';
+  const currentExpiresAt = activeStudent ? (expiresAtMap[activeStudent.id] || '') : '';
+  const todayVnStr = toVnDateInputValue(new Date());
+  const isCurrentExpired = Boolean(currentExpiresAt && todayVnStr && currentExpiresAt < todayVnStr);
 
   const currentEffectiveBooks = useMemo(() => {
     if (!activeStudent) return [];
@@ -298,47 +355,67 @@ export default function CoursewareNoticeModal({
     }));
   };
 
+  // Lưu cấu hình học liệu (sách, giữ quyền, khóa tài khoản, hạn dùng) cho 1 học viên
+  const persistSingleStudentCourseware = async (std, overrides = {}) => {
+    const stdId = std.id;
+    const codes = overrides.customBookCodes ?? (customBooksMap[stdId] || []);
+    const retain = overrides.retainCoursewareAccess ?? Boolean(retainAccessMap[stdId]);
+    const blocked = overrides.coursewareBlocked ?? Boolean(blockedMap[stdId]);
+    const blockedReason = overrides.coursewareBlockedReason ?? (blockedReasonMap[stdId] || '');
+    const expiresAt = overrides.coursewareExpiresAt ?? (expiresAtMap[stdId] || '');
+
+    const idStr = String(stdId).trim();
+    const isLead = idStr.startsWith('LEAD_') || /^\d+$/.test(idStr);
+
+    let res;
+    if (isLead) {
+      res = await fetch('/api/students/courseware-batch-exported', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentIds: [stdId],
+          customBooksMap: { [stdId]: codes },
+          retainAccessMap: { [stdId]: retain },
+          blockedMap: { [stdId]: blocked },
+          blockedReasonMap: { [stdId]: blockedReason },
+          expiresAtMap: { [stdId]: expiresAt || null },
+          markExported: false,
+        }),
+      });
+    } else {
+      res = await fetch(`/api/students/${stdId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'courseware',
+          customBookCodes: codes,
+          retainCoursewareAccess: retain,
+          coursewareBlocked: blocked,
+          coursewareBlockedReason: blockedReason,
+          coursewareExpiresAt: expiresAt || null,
+        }),
+      });
+    }
+
+    const data = await res.json();
+    if (data.success && onStudentUpdated) {
+      onStudentUpdated(stdId, codes, retain, {
+        coursewareBlocked: blocked,
+        coursewareBlockedReason: blockedReason,
+        coursewareExpiresAt: expiresAt || null,
+      });
+    }
+    return data;
+  };
+
   // Lưu cấu hình giáo trình vào CSDL CRM cho học viên hiện tại (Hỗ trợ cả Student & Lead)
   const handleSaveStudentBooks = async () => {
     if (!activeStudent) return;
     setSavingBooks(true);
     try {
-      const stdId = activeStudent.id;
-      const codes = customBooksMap[stdId] || [];
-      const retain = Boolean(retainAccessMap[stdId]);
-      const idStr = String(stdId).trim();
-      const isLead = idStr.startsWith('LEAD_') || /^\d+$/.test(idStr);
-
-      let res;
-      if (isLead) {
-        res = await fetch('/api/students/courseware-batch-exported', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            studentIds: [stdId],
-            customBooksMap: { [stdId]: codes },
-            retainAccessMap: { [stdId]: retain },
-            markExported: false,
-          }),
-        });
-      } else {
-        res = await fetch(`/api/students/${stdId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'courseware',
-            customBookCodes: codes,
-            retainCoursewareAccess: retain,
-          }),
-        });
-      }
-
-      const data = await res.json();
+      const data = await persistSingleStudentCourseware(activeStudent);
       if (data.success) {
-        showToast(`✅ Đã lưu phân quyền sách cho bé ${activeStudent.name}!`);
-        if (onStudentUpdated) {
-          onStudentUpdated(stdId, codes, retain);
-        }
+        showToast(`✅ Đã lưu cấu hình & quyền học liệu cho bé ${activeStudent.name}!`);
       } else {
         showToast('❌ Lỗi khi lưu: ' + (data.error || 'Thất bại'), 'error');
       }
@@ -347,6 +424,33 @@ export default function CoursewareNoticeModal({
       showToast('❌ Lỗi kết nối server', 'error');
     } finally {
       setSavingBooks(false);
+    }
+  };
+
+  // Khóa / Mở khóa ngay lập tức cho học viên đang xem
+  const handleQuickToggleBlock = async (nextBlocked) => {
+    if (!activeStudent || togglingBlock) return;
+    setTogglingBlock(true);
+    setBlockedMap(prev => ({ ...prev, [activeStudent.id]: nextBlocked }));
+    try {
+      const data = await persistSingleStudentCourseware(activeStudent, {
+        coursewareBlocked: nextBlocked,
+      });
+      if (data.success) {
+        showToast(
+          nextBlocked
+            ? `🔒 Đã KHÓA quyền quét QR học liệu của bé ${activeStudent.name} ngay lập tức!`
+            : `🔓 Đã MỞ KHÓA quyền học liệu cho bé ${activeStudent.name}!`
+        );
+      } else {
+        setBlockedMap(prev => ({ ...prev, [activeStudent.id]: !nextBlocked }));
+        showToast('❌ Không thể cập nhật trạng thái khóa: ' + (data.error || 'Thất bại'), 'error');
+      }
+    } catch (err) {
+      setBlockedMap(prev => ({ ...prev, [activeStudent.id]: !nextBlocked }));
+      showToast('❌ Lỗi kết nối server', 'error');
+    } finally {
+      setTogglingBlock(false);
     }
   };
 
@@ -363,13 +467,16 @@ export default function CoursewareNoticeModal({
           studentIds: allIds,
           customBooksMap,
           retainAccessMap,
-          markExported: false, // Chỉ lưu cấu hình sách, không đổi trạng thái xuất thư
+          blockedMap,
+          blockedReasonMap,
+          expiresAtMap,
+          markExported: false, // Chỉ lưu cấu hình, không đổi trạng thái xuất thư
         }),
       });
 
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Đã lưu cấu hình phân quyền sách cho toàn bộ ${studentList.length} học viên vào CRM!`);
+        showToast(`✅ Đã lưu cấu hình phân quyền & khóa/hạn dùng cho toàn bộ ${studentList.length} học viên!`);
         if (onStudentUpdated) {
           onStudentUpdated(allIds, customBooksMap, retainAccessMap);
         }
@@ -466,9 +573,15 @@ export default function CoursewareNoticeModal({
       showToast('💾 Đang tự động lưu cấu hình sách vào CRM...');
       const exportCustomBooks = {};
       const exportRetain = {};
+      const exportBlocked = {};
+      const exportBlockedReason = {};
+      const exportExpiresAt = {};
       exportIds.forEach(id => {
         if (customBooksMap[id]) exportCustomBooks[id] = customBooksMap[id];
         if (retainAccessMap[id] !== undefined) exportRetain[id] = retainAccessMap[id];
+        if (blockedMap[id] !== undefined) exportBlocked[id] = blockedMap[id];
+        if (blockedReasonMap[id] !== undefined) exportBlockedReason[id] = blockedReasonMap[id];
+        if (expiresAtMap[id] !== undefined) exportExpiresAt[id] = expiresAtMap[id] || null;
       });
 
       const saveRes = await fetch('/api/students/courseware-batch-exported', {
@@ -478,6 +591,9 @@ export default function CoursewareNoticeModal({
           studentIds: exportIds,
           customBooksMap: exportCustomBooks,
           retainAccessMap: exportRetain,
+          blockedMap: exportBlocked,
+          blockedReasonMap: exportBlockedReason,
+          expiresAtMap: exportExpiresAt,
           markExported: true, // Lưu sách đồng thời đánh dấu thời điểm xuất thư vào DB
         }),
       });
@@ -797,6 +913,28 @@ export default function CoursewareNoticeModal({
                             <span style={{ fontSize: '0.72rem', color: '#0369A1', background: '#E0F2FE', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
                               {bookCount} giáo trình
                             </span>
+                            {Boolean(blockedMap[std.id]) && (
+                              <span style={{ fontSize: '0.68rem', color: '#DC2626', background: '#FEF2F2', border: '1px solid #FECACA', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>
+                                🔒 Đang khóa
+                              </span>
+                            )}
+                            {!Boolean(blockedMap[std.id]) && Boolean(expiresAtMap[std.id]) && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  color: todayVnStr && expiresAtMap[std.id] < todayVnStr ? '#B91C1C' : '#B45309',
+                                  background: todayVnStr && expiresAtMap[std.id] < todayVnStr ? '#FEE2E2' : '#FFFBEB',
+                                  border: `1px solid ${todayVnStr && expiresAtMap[std.id] < todayVnStr ? '#FCA5A5' : '#FDE68A'}`,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {todayVnStr && expiresAtMap[std.id] < todayVnStr
+                                  ? '⏳ Đã hết hạn'
+                                  : `⏳ Hạn ${formatCoursewareExpiryVi(expiresAtMap[std.id])}`}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -861,6 +999,32 @@ export default function CoursewareNoticeModal({
                 Sau <i className="fa-solid fa-chevron-right"></i>
               </button>
             </div>
+
+            {/* Cảnh báo trạng thái Khóa / Hết hạn khi xem trước */}
+            {(currentBlocked || isCurrentExpired) && (
+              <div
+                style={{
+                  marginBottom: '0.65rem',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  background: currentBlocked ? '#FEF2F2' : '#FFFBEB',
+                  border: `1.5px solid ${currentBlocked ? '#FCA5A5' : '#FCD34D'}`,
+                  color: currentBlocked ? '#991B1B' : '#92400E',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <i className={`fa-solid ${currentBlocked ? 'fa-lock' : 'fa-hourglass-end'}`}></i>
+                <span>
+                  {currentBlocked
+                    ? `Tài khoản ĐANG BỊ KHÓA quyền quét QR${currentBlockedReason ? ` (${currentBlockedReason})` : ''}.`
+                    : `Mã QR đã HẾT HẠN sử dụng (hạn cuối: ${formatCoursewareExpiryVi(currentExpiresAt)}).`}
+                </span>
+              </div>
+            )}
 
             {/* Vùng hiển thị ảnh xem trước */}
             <div style={styles.previewBox}>
@@ -1045,6 +1209,196 @@ export default function CoursewareNoticeModal({
                     </div>
                   </div>
                 </label>
+              </div>
+            </div>
+
+            {/* KHỐI KIỂM SOÁT KHÓA QUYỀN & HẠN SỬ DỤNG TỰ ĐỘNG */}
+            <div
+              style={{
+                ...styles.sectionCard,
+                border: currentBlocked ? '1.5px solid #FCA5A5' : '1px solid #E2E8F0',
+                background: currentBlocked ? '#FFFDFD' : '#FFFFFF',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                <h3 style={{ ...styles.sectionTitle, margin: 0, color: currentBlocked ? '#DC2626' : '#0B2A4A' }}>
+                  <i className={`fa-solid ${currentBlocked ? 'fa-lock' : 'fa-shield-halved'}`} style={{ color: currentBlocked ? '#DC2626' : '#0D88C4' }}></i>
+                  {' '}Kiểm Soát Khóa &amp; Hạn Dùng
+                </h3>
+                <button
+                  type="button"
+                  disabled={!activeStudent || togglingBlock}
+                  onClick={() => handleQuickToggleBlock(!currentBlocked)}
+                  style={{
+                    padding: '5px 11px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: togglingBlock ? 'wait' : 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    background: currentBlocked ? '#059669' : '#DC2626',
+                    color: '#FFFFFF',
+                    boxShadow: currentBlocked ? '0 2px 6px rgba(5,150,105,0.25)' : '0 2px 6px rgba(220,38,38,0.25)',
+                  }}
+                  title={currentBlocked ? 'Mở lại quyền quét QR học liệu ngay lập tức' : 'Ngắt quyền quét QR học liệu ngay lập tức (không ảnh hưởng điểm danh lớp)'}
+                >
+                  {togglingBlock
+                    ? 'Đang xử lý...'
+                    : currentBlocked
+                    ? '🔓 Mở khóa ngay'
+                    : '🔒 Khóa tài khoản ngay'}
+                </button>
+              </div>
+
+              {/* 1. Công tắc khóa thủ công */}
+              <div
+                style={{
+                  padding: '0.6rem 0.75rem',
+                  borderRadius: '8px',
+                  background: currentBlocked ? '#FEF2F2' : '#F8FAFC',
+                  border: `1px solid ${currentBlocked ? '#FECACA' : '#E2E8F0'}`,
+                  marginBottom: '0.75rem',
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={currentBlocked}
+                    onChange={(e) => {
+                      if (!activeStudent) return;
+                      setBlockedMap(prev => ({ ...prev, [activeStudent.id]: e.target.checked }));
+                    }}
+                    style={{ accentColor: '#DC2626', width: '16px', height: '16px', marginTop: '2px' }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: '0.84rem', color: currentBlocked ? '#B91C1C' : '#1E293B' }}>
+                      🔒 Khóa quyền học liệu số (độc lập trạng thái lớp)
+                    </strong>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '2px' }}>
+                      Chặn ngay lập tức tại cổng QR &amp; Web App dù bé vẫn Đang học hoặc đang giữ quyền.
+                    </div>
+                  </div>
+                </label>
+
+                <div style={{ marginTop: '0.55rem' }}>
+                  <input
+                    type="text"
+                    value={currentBlockedReason}
+                    onChange={(e) => {
+                      if (!activeStudent) return;
+                      setBlockedReasonMap(prev => ({ ...prev, [activeStudent.id]: e.target.value }));
+                    }}
+                    placeholder="Lý do khóa (hiển thị khi quét QR, VD: Chậm học phí...)"
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '0.8rem',
+                      background: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px' }}>
+                    {['Chậm học phí', 'Hết hạn học thử', 'Cấp nhầm tài khoản'].map((reasonPreset) => (
+                      <button
+                        key={reasonPreset}
+                        type="button"
+                        onClick={() => {
+                          if (!activeStudent) return;
+                          setBlockedReasonMap(prev => ({ ...prev, [activeStudent.id]: reasonPreset }));
+                        }}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '2px 7px',
+                          borderRadius: '999px',
+                          border: '1px solid #CBD5E1',
+                          background: '#FFFFFF',
+                          color: '#475569',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + {reasonPreset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Hạn sử dụng tự động (Học thử / Cấp tạm) */}
+              <div
+                style={{
+                  padding: '0.6rem 0.75rem',
+                  borderRadius: '8px',
+                  background: isCurrentExpired ? '#FFFBEB' : '#F8FAFC',
+                  border: `1px solid ${isCurrentExpired ? '#FDE68A' : '#E2E8F0'}`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', flexWrap: 'wrap', gap: '4px' }}>
+                  <strong style={{ fontSize: '0.83rem', color: '#0F172A' }}>
+                    ⏳ Hạn sử dụng tự động (Học thử / Cấp tạm)
+                  </strong>
+                  {currentExpiresAt ? (
+                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: isCurrentExpired ? '#DC2626' : '#059669' }}>
+                      {isCurrentExpired
+                        ? `Đã hết hạn (${formatCoursewareExpiryVi(currentExpiresAt)})`
+                        : `Hết hạn sau ${formatCoursewareExpiryVi(currentExpiresAt)}`}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>Không giới hạn</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <input
+                    type="date"
+                    value={currentExpiresAt}
+                    onChange={(e) => {
+                      if (!activeStudent) return;
+                      setExpiresAtMap(prev => ({ ...prev, [activeStudent.id]: e.target.value }));
+                    }}
+                    style={{
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '0.8rem',
+                      background: '#FFFFFF',
+                    }}
+                  />
+                  {[
+                    { label: 'Không giới hạn', days: null },
+                    { label: '+7 ngày (Học thử)', days: 7 },
+                    { label: '+14 ngày', days: 14 },
+                    { label: '+30 ngày', days: 30 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        if (!activeStudent) return;
+                        setExpiresAtMap(prev => ({
+                          ...prev,
+                          [activeStudent.id]: preset.days === null ? '' : addDaysVnInput(preset.days),
+                        }));
+                      }}
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: preset.days === 7 && activeStudent?.isTrial ? '1px solid #D97706' : '1px solid #CBD5E1',
+                        background: preset.days === 7 && activeStudent?.isTrial ? '#FEF3C7' : '#FFFFFF',
+                        color: preset.days === 7 && activeStudent?.isTrial ? '#92400E' : '#334155',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '5px' }}>
+                  Bấm <strong>Lưu vào CRM</strong> (hoặc <strong>💾 Lưu tất cả</strong>) để áp dụng ngày hết hạn mới.
+                </div>
               </div>
             </div>
 

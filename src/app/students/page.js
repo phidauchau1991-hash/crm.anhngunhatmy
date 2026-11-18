@@ -1666,11 +1666,37 @@ export default function StudentsPage() {
                             </button>
                             <button 
                               className="action-btn" 
-                              style={student.coursewareLetterExportedAt ? { color: '#059669', background: '#ecfdf5', border: '1px solid #10b981' } : { color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }} 
-                              title={student.coursewareLetterExportedAt ? `✓ Đã xuất thư học liệu (${new Date(student.coursewareLetterExportedAt).toLocaleDateString('vi-VN')})` : "📚 Thư Thông Báo Cấp Học Liệu Số (Chưa xuất)"} 
+                              style={
+                                student.coursewareBlocked
+                                  ? { color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca' }
+                                  : student.coursewareExpiresAt && new Date() > new Date(student.coursewareExpiresAt)
+                                  ? { color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a' }
+                                  : student.coursewareLetterExportedAt
+                                  ? { color: '#059669', background: '#ecfdf5', border: '1px solid #10b981' }
+                                  : { color: '#0D88C4', background: 'rgba(13, 136, 196, 0.1)' }
+                              } 
+                              title={
+                                student.coursewareBlocked
+                                  ? `🔒 Đã KHÓA quyền học liệu${student.coursewareBlockedReason ? ` (${student.coursewareBlockedReason})` : ''} - Bấm để mở khóa`
+                                  : student.coursewareExpiresAt && new Date() > new Date(student.coursewareExpiresAt)
+                                  ? `⏳ Học liệu đã HẾT HẠN - Bấm để gia hạn`
+                                  : student.coursewareLetterExportedAt
+                                  ? `✓ Đã xuất thư học liệu (${new Date(student.coursewareLetterExportedAt).toLocaleDateString('vi-VN')})`
+                                  : "📚 Thư Thông Báo Cấp Học Liệu Số (Chưa xuất)"
+                              } 
                               onClick={() => handleOpenSingleCourseware(student)}
                             >
-                              <i className={student.coursewareLetterExportedAt ? "fa-solid fa-circle-check" : "fa-solid fa-book-open"}></i>
+                              <i
+                                className={
+                                  student.coursewareBlocked
+                                    ? "fa-solid fa-lock"
+                                    : student.coursewareExpiresAt && new Date() > new Date(student.coursewareExpiresAt)
+                                    ? "fa-solid fa-hourglass-end"
+                                    : student.coursewareLetterExportedAt
+                                    ? "fa-solid fa-circle-check"
+                                    : "fa-solid fa-book-open"
+                                }
+                              ></i>
                             </button>
                             <Link href={`/students/${student.id}`} className="action-btn view-btn" title="Xem chi tiết">
                               <i className="fa-regular fa-eye"></i>

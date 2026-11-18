@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { encryptStudentId } from '@/lib/token';
+import { buildCoursewareUpdateData } from '@/lib/coursewareAccess';
 
 function roundDown5000(amount) {
   return Math.floor(amount / 5000) * 5000;
@@ -143,6 +144,9 @@ export async function GET(request, { params }) {
           dropoutReason: student.dropoutReason,
           customBookCodes: student.customBookCodes,
           retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
+          coursewareBlocked: Boolean(student.coursewareBlocked),
+          coursewareBlockedReason: student.coursewareBlockedReason || '',
+          coursewareExpiresAt: student.coursewareExpiresAt ? student.coursewareExpiresAt.toISOString() : null,
           coursewareLetterExportedAt: student.coursewareLetterExportedAt ? student.coursewareLetterExportedAt.toISOString() : null,
           parentPortalToken: encryptStudentId(student.id),
         },
@@ -240,29 +244,14 @@ export async function PUT(request, { params }) {
               student: updatedLead,
             });
           } else {
-            const { customBookCodes, retainCoursewareAccess } = body;
-            let formattedCodes = '[]';
-            if (Array.isArray(customBookCodes)) {
-              formattedCodes = JSON.stringify([...new Set(customBookCodes.map(c => String(c).trim()).filter(Boolean))]);
-            } else if (typeof customBookCodes === 'string') {
-              try {
-                const parsed = JSON.parse(customBookCodes);
-                formattedCodes = JSON.stringify(Array.isArray(parsed) ? parsed : []);
-              } catch {
-                formattedCodes = JSON.stringify([customBookCodes.trim()]);
-              }
-            }
-
+            const cwData = buildCoursewareUpdateData(body);
             const updatedLead = await prisma.lead.update({
               where: { id: numericLeadId },
-              data: {
-                customBookCodes: formattedCodes,
-                retainCoursewareAccess: Boolean(retainCoursewareAccess),
-              },
+              data: cwData,
             });
             return NextResponse.json({
               success: true,
-              message: 'Đã cập nhật phân quyền giáo trình học thử thành công.',
+              message: 'Đã cập nhật phân quyền học liệu số cho học viên học thử thành công.',
               student: updatedLead,
             });
           }
@@ -274,32 +263,21 @@ export async function PUT(request, { params }) {
 
     const now = new Date();
 
-    // LUỒNG CẤP PHÁT HỌC LIỆU SỐ (Courseware Integration)
-    if (action === 'courseware' || (!action && body.customBookCodes !== undefined)) {
-      const { customBookCodes, retainCoursewareAccess } = body;
-      let formattedCodes = '[]';
-      if (Array.isArray(customBookCodes)) {
-        formattedCodes = JSON.stringify([...new Set(customBookCodes.map(c => String(c).trim()).filter(Boolean))]);
-      } else if (typeof customBookCodes === 'string') {
-        try {
-          const parsed = JSON.parse(customBookCodes);
-          formattedCodes = JSON.stringify(Array.isArray(parsed) ? parsed : []);
-        } catch {
-          formattedCodes = JSON.stringify([customBookCodes.trim()]);
-        }
-      }
+    // LUỒNG CẤP PHÁT & KIỂM SOÁT HỌC LIỆU SỐ (Courseware Integration)
+    if (
+      action === 'courseware' ||
+      (!action && (body.customBookCodes !== undefined || body.coursewareBlocked !== undefined || body.coursewareExpiresAt !== undefined))
+    ) {
+      const cwData = buildCoursewareUpdateData(body);
 
       const updatedStudent = await prisma.student.update({
         where: { id },
-        data: {
-          customBookCodes: formattedCodes,
-          retainCoursewareAccess: Boolean(retainCoursewareAccess),
-        },
+        data: cwData,
       });
 
       return NextResponse.json({
         success: true,
-        message: 'Đã cập nhật phân quyền giáo trình học viên thành công.',
+        message: 'Đã cập nhật quyền truy cập học liệu số thành công.',
         student: updatedStudent,
       });
     }

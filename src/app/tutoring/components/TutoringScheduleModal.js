@@ -56,7 +56,7 @@ function getStudentClassCodes(st, includeExtras = false) {
   const list = [];
   if (includeExtras && Array.isArray(st.enrolledClasses)) {
     st.enrolledClasses.forEach((c) => {
-      if (c && c.classCode && ['Đang học', 'Tạm nghỉ', 'Bảo lưu'].includes(c.status)) {
+      if (c && c.classCode && ['Đang học', 'Tạm nghỉ', 'Bảo lưu', 'Nghỉ học'].includes(c.status)) {
         if (!list.includes(c.classCode)) list.push(c.classCode);
       }
     });
@@ -266,11 +266,7 @@ export default function TutoringScheduleModal({
 
       if (onlyAlertStudents) {
         if (!alertInfo) return false;
-      } else if (showAllStudentStatuses) {
-        // Hiện Đang học, Tạm nghỉ, Bảo lưu và mọi HV trong hàng đợi Cảnh báo vắng 2+ buổi
-        const isAllowedStatus = !st.status || ['Đang học', 'Tạm nghỉ', 'Bảo lưu'].includes(st.status);
-        if (!isAllowedStatus && !alertInfo) return false;
-      } else {
+      } else if (!showAllStudentStatuses) {
         if (st.status && st.status !== 'Đang học') return false;
       }
 
@@ -709,7 +705,7 @@ export default function TutoringScheduleModal({
                             <span className="tsm-picker-name">{st.name}</span>
                             {alertInfo && (
                               <span className="tsm-badge-alert">
-                                Vắng {alertInfo.absentCount} buổi
+                                Vắng {alertInfo.consecutiveAbsences ?? alertInfo.absentCount ?? 2} buổi
                               </span>
                             )}
                             {displayStatus && (

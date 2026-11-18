@@ -105,7 +105,7 @@ export async function GET(request) {
     }
 
     const enrollmentWhere = includeHistorical
-      ? { status: { in: ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã chuyển lớp', 'Đã hoàn thành', 'Tạm nghỉ'] } }
+      ? { status: { in: ['Đang học', 'Bảo lưu', 'Đã chuyển', 'Đã chuyển lớp', 'Đã hoàn thành', 'Tạm nghỉ', 'Nghỉ học'] } }
       : { status: { in: ['Đang học', 'Bảo lưu', 'Tạm nghỉ'] } };
 
     // Lấy danh sách học viên
@@ -292,6 +292,9 @@ export async function GET(request) {
         dropoutReason: student.dropoutReason,
         customBookCodes: student.customBookCodes || null,
         retainCoursewareAccess: Boolean(student.retainCoursewareAccess),
+        coursewareBlocked: Boolean(student.coursewareBlocked),
+        coursewareBlockedReason: student.coursewareBlockedReason || '',
+        coursewareExpiresAt: student.coursewareExpiresAt ? student.coursewareExpiresAt.toISOString() : null,
         coursewareLetterExportedAt: student.coursewareLetterExportedAt ? student.coursewareLetterExportedAt.toISOString() : null,
         portalToken: encryptStudentId(student.id),
         isMonthlyStudent: isMonthlyEnrollment,
