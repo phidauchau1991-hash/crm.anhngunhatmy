@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getBranchFilter } from '@/lib/rbac';
+import { migrateLeadHistoryToStudent } from '@/lib/leadMigration';
 
 export async function GET(request) {
   try {
@@ -49,7 +50,8 @@ export async function POST(request) {
       billingType, 
       monthlyRate, 
       monthlySessions,
-      notes 
+      notes,
+      convertLeadId,
     } = body;
 
     // 1. Trường hợp cập nhật Enrollment đã có (Chỉnh sửa học viên)
@@ -213,6 +215,11 @@ export async function POST(request) {
           class: true,
         },
       });
+    }
+
+    // Nếu chốt từ Học thử / Lead -> gộp toàn bộ điểm danh học thử, bài Test, nhận xét & học liệu sang Student mới
+    if (convertLeadId && finalStudentId) {
+      await migrateLeadHistoryToStudent(prisma, convertLeadId, finalStudentId);
     }
 
     return NextResponse.json({ success: true, data: enrollmentRecord });

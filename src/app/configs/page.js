@@ -7,7 +7,13 @@ export default function ConfigsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [activeTab, setActiveTab] = useState('courses'); // 'courses' or 'alerts'
+  const [activeTab, setActiveTab] = useState('courses'); // 'courses' | 'alerts' | 'ai'
+  const [userRole, setUserRole] = useState('');
+  const [aiConfigs, setAiConfigs] = useState([]);
+  const [aiDrafts, setAiDrafts] = useState({}); // { [provider]: { apiKey, modelName, isActive } }
+  const [aiSavingProvider, setAiSavingProvider] = useState('');
+  const [aiTestingProvider, setAiTestingProvider] = useState('');
+  const [aiTestResults, setAiTestResults] = useState({}); // { [provider]: { ok, text } }
 
   // Alert Config State
   const [alertConfig, setAlertConfig] = useState({
@@ -54,8 +60,40 @@ export default function ConfigsPage() {
     }
   };
 
+  const fetchAiConfigs = async () => {
+    try {
+      const res = await fetch('/api/configs/ai');
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setAiConfigs(json.data);
+        const drafts = {};
+        json.data.forEach((item) => {
+          drafts[item.provider] = {
+            apiKey: '',
+            modelName: item.modelName || item.defaultModel,
+            isActive: item.isActive,
+          };
+        });
+        setAiDrafts(drafts);
+      }
+    } catch (e) {
+      console.error('Không thể tải cấu hình AI:', e);
+    }
+  };
+
   useEffect(() => {
     fetchConfigs();
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((j) => {
+        const roleStr = String(j?.data?.role || '');
+        setUserRole(roleStr);
+        if (roleStr.includes('DIRECTOR') || roleStr.includes('REGIONAL_MANAGER')) {
+          fetchAiConfigs();
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const [isCustomCapDo, setIsCustomCapDo] = useState(false);
@@ -201,6 +239,72 @@ export default function ConfigsPage() {
     }
   };
 
+  const canManageAi = userRole.includes('DIRECTOR') || userRole.includes('REGIONAL_MANAGER');
+
+  const handleSaveAiProvider = async (provider, { isPrimary = false } = {}) => {
+    const draft = aiDrafts[provider] || {};
+    setAiSavingProvider(provider);
+    setMessage({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/configs/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save',
+          provider,
+          apiKey: draft.apiKey || '',
+          modelName: draft.modelName,
+          isActive: isPrimary ? true : Boolean(draft.isActive),
+          isPrimary,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMessage({ type: 'success', text: json.message });
+        await fetchAiConfigs();
+      } else {
+        setMessage({ type: 'error', text: json.error || 'Không thể lưu cấu hình AI' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Lỗi kết nối máy chủ.' });
+    } finally {
+      setAiSavingProvider('');
+    }
+  };
+
+  const handleTestAiProvider = async (provider) => {
+    const draft = aiDrafts[provider] || {};
+    setAiTestingProvider(provider);
+    setAiTestResults((prev) => ({ ...prev, [provider]: null }));
+    try {
+      const res = await fetch('/api/configs/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test',
+          provider,
+          apiKey: draft.apiKey || '',
+          modelName: draft.modelName,
+        }),
+      });
+      const json = await res.json();
+      setAiTestResults((prev) => ({
+        ...prev,
+        [provider]: {
+          ok: Boolean(json.success),
+          text: json.success ? json.message : (json.error || 'Kết nối thất bại'),
+        },
+      }));
+    } catch {
+      setAiTestResults((prev) => ({
+        ...prev,
+        [provider]: { ok: false, text: 'Lỗi kết nối máy chủ.' },
+      }));
+    } finally {
+      setAiTestingProvider('');
+    }
+  };
+
   return (
     <div className="page-container">
       <div className="page-header-actions" style={{ marginBottom: '1rem' }}>
@@ -230,6 +334,15 @@ export default function ConfigsPage() {
         >
           <i className="fa-solid fa-bell"></i> Ngưỡng Cảnh báo
         </button>
+        {canManageAi && (
+          <button
+            className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('ai'); setMessage({ type: '', text: '' }); fetchAiConfigs(); }}
+            style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold', borderBottom: activeTab === 'ai' ? '3px solid var(--color-primary)' : '3px solid transparent', color: activeTab === 'ai' ? 'var(--color-primary)' : 'var(--color-text-muted)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
+          >
+            <i className="fa-solid fa-robot"></i> Cấu hình AI &amp; Dự phòng
+          </button>
+        )}
       </div>
 
       {message.text && (
@@ -308,7 +421,7 @@ export default function ConfigsPage() {
             )}
           </div>
         </>
-      ) : (
+      ) : activeTab === 'alerts' ? (
         <div className="glass-panel" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '1.5rem', color: 'var(--color-text)' }}>
             <i className="fa-solid fa-triangle-exclamation" style={{ color: 'var(--color-warning)' }}></i> Ngưỡng Cảnh Báo Thông Minh
@@ -355,6 +468,189 @@ export default function ConfigsPage() {
               </button>
             </div>
           </form>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '960px', margin: '0 auto' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #0D88C4', background: '#f8fafc' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: '800', margin: '0 0 0.35rem 0', color: '#085E8A' }}>
+              <i className="fa-solid fa-robot"></i> Quản lý AI Đa Mô Hình &amp; Tự động Dự phòng (Fallback)
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
+              Hệ thống ưu tiên gọi <strong>AI Chính</strong> trước; nếu AI Chính hết hạn mức (lỗi 402) hoặc quá tải (429), CRM tự động chuyển sang các AI đang bật khác để không gián đoạn việc soạn tin Zalo, nhận xét học thử và báo cáo.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '1rem' }}>
+            {aiConfigs.map((cfg) => {
+              const draft = aiDrafts[cfg.provider] || {
+                apiKey: '',
+                modelName: cfg.modelName || cfg.defaultModel,
+                isActive: cfg.isActive,
+              };
+              const testRes = aiTestResults[cfg.provider];
+              const isBusy = aiSavingProvider === cfg.provider || aiTestingProvider === cfg.provider;
+
+              return (
+                <div
+                  key={cfg.provider}
+                  className="glass-panel"
+                  style={{
+                    padding: '1.25rem',
+                    border: cfg.isPrimary ? '2px solid #0D88C4' : '1px solid #e2e8f0',
+                    background: cfg.isPrimary ? '#f0f9ff' : '#ffffff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.85rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <div>
+                      <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>{cfg.label}</strong>
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
+                        {cfg.hasKey
+                          ? `Key đã lưu: ${cfg.maskedKey}`
+                          : cfg.hasEnvFallback
+                          ? `Dùng biến môi trường (${cfg.envVarName})`
+                          : 'Chưa cấu hình API Key'}
+                      </div>
+                    </div>
+                    {cfg.isPrimary ? (
+                      <span style={{ fontSize: '0.72rem', fontWeight: '800', background: '#0D88C4', color: '#fff', padding: '3px 9px', borderRadius: '999px' }}>
+                        ★ AI Chính
+                      </span>
+                    ) : cfg.isActive ? (
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', background: '#dcfce7', color: '#15803d', padding: '3px 9px', borderRadius: '999px' }}>
+                        Dự phòng (Bật)
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', background: '#f1f5f9', color: '#64748b', padding: '3px 9px', borderRadius: '999px' }}>
+                        Đang tắt
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700' }}>API Key {cfg.hasKey ? '(Để trống nếu giữ Key cũ)' : '*'}</label>
+                    <input
+                      type="password"
+                      value={draft.apiKey}
+                      onChange={(e) =>
+                        setAiDrafts((prev) => ({
+                          ...prev,
+                          [cfg.provider]: { ...draft, apiKey: e.target.value },
+                        }))
+                      }
+                      placeholder={cfg.hasKey ? `Đã lưu (${cfg.maskedKey}) — nhập để thay mới` : `Dán API Key ${cfg.label}...`}
+                      style={{ width: '100%', padding: '0.5rem 0.7rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700' }}>Model sử dụng</label>
+                    <select
+                      value={cfg.suggestedModels.includes(draft.modelName) ? draft.modelName : '__custom__'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== '__custom__') {
+                          setAiDrafts((prev) => ({
+                            ...prev,
+                            [cfg.provider]: { ...draft, modelName: val },
+                          }));
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', marginBottom: '4px' }}
+                    >
+                      {cfg.suggestedModels.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                      {!cfg.suggestedModels.includes(draft.modelName) && (
+                        <option value="__custom__">Tùy chỉnh: {draft.modelName}</option>
+                      )}
+                    </select>
+                    <input
+                      type="text"
+                      value={draft.modelName}
+                      onChange={(e) =>
+                        setAiDrafts((prev) => ({
+                          ...prev,
+                          [cfg.provider]: { ...draft, modelName: e.target.value },
+                        }))
+                      }
+                      placeholder={cfg.defaultModel}
+                      style={{ width: '100%', padding: '0.42rem 0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569' }}
+                    />
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: '600', color: '#334155' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.isActive)}
+                      onChange={(e) =>
+                        setAiDrafts((prev) => ({
+                          ...prev,
+                          [cfg.provider]: { ...draft, isActive: e.target.checked },
+                        }))
+                      }
+                      style={{ width: '16px', height: '16px', accentColor: '#0D88C4' }}
+                    />
+                    Kích hoạt AI này (Chính hoặc Dự phòng)
+                  </label>
+
+                  {testRes && (
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: '700',
+                        background: testRes.ok ? '#ecfdf5' : '#fef2f2',
+                        border: `1px solid ${testRes.ok ? '#a7f3d0' : '#fecaca'}`,
+                        color: testRes.ok ? '#047857' : '#dc2626',
+                      }}
+                    >
+                      {testRes.ok ? '✅ ' : '❌ '}
+                      {testRes.text}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: 'auto', paddingTop: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      disabled={isBusy}
+                      onClick={() => handleSaveAiProvider(cfg.provider, { isPrimary: false })}
+                      style={{ flex: 1, fontWeight: '700' }}
+                    >
+                      {aiSavingProvider === cfg.provider ? 'Đang lưu...' : '💾 Lưu'}
+                    </button>
+                    {!cfg.isPrimary && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        disabled={isBusy}
+                        onClick={() => handleSaveAiProvider(cfg.provider, { isPrimary: true })}
+                        style={{ fontWeight: '700', borderColor: '#0D88C4', color: '#0D88C4' }}
+                        title="Đặt làm AI ưu tiên gọi đầu tiên"
+                      >
+                        ★ Đặt Chính
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      disabled={isBusy}
+                      onClick={() => handleTestAiProvider(cfg.provider)}
+                      style={{ fontWeight: '700', borderColor: '#d97706', color: '#b45309' }}
+                    >
+                      {aiTestingProvider === cfg.provider ? 'Đang thử...' : '⚡ Test'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -744,7 +744,8 @@ export default function LeadsPage() {
       <TrialInviteModal 
         isOpen={showTrialModal} 
         onClose={() => { setShowTrialModal(false); setTrialLead(null); }} 
-        lead={trialLead} 
+        lead={trialLead}
+        classList={classList}
       />
 
       

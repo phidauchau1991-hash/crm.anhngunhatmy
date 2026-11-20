@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 import MultiClassSelect from '@/app/components/MultiClassSelect';
+import CourseWelcomeModal from '@/components/CourseWelcomeModal';
 import PaidStamp from '@/components/PaidStamp';
 import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
@@ -127,11 +128,17 @@ export default function MonthlyBillingPage() {
   // Modal Thêm / Sửa Học viên Tháng (1 màn hình KHÔNG KÉO THANH TRƯỢT)
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEnrollmentId, setEditingEnrollmentId] = useState(null);
-  const [addMode, setAddMode] = useState('new');
+  const [addMode, setAddMode] = useState('new'); // 'new' | 'lead' | 'existing'
   const [searchStudent, setSearchStudent] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchingStudent, setSearchingStudent] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [leadOptions, setLeadOptions] = useState([]);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [welcomeData, setWelcomeData] = useState(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // Form fields cho modal Thêm / Sửa Học viên Tháng
   const [formName, setFormName] = useState('');
@@ -148,7 +155,7 @@ export default function MonthlyBillingPage() {
   const [savingStudent, setSavingStudent] = useState(false);
 
   // Tab 2: Attendance state
-  const [attendanceData, setAttendanceData] = useState({ enrollments: [], attendances: [] });
+  const [attendanceData, setAttendanceData] = useState({ enrollments: [], trialLeads: [], attendances: [] });
   const [loadingAttendance, setLoadingAttendance] = useState(false);
 
   // Tab 3: Notices state
@@ -347,6 +354,7 @@ export default function MonthlyBillingPage() {
   // Chọn học viên có sẵn
   const handleSelectExistingStudent = (student) => {
     setSelectedStudent(student);
+    setSelectedLead(null);
     setFormName(student.name || '');
     setFormPhone(student.phone || '');
     setFormDob(student.dobRaw || (student.dob ? student.dob.split('T')[0] : ''));
@@ -358,13 +366,70 @@ export default function MonthlyBillingPage() {
     setSearchResults([]);
   };
 
+  // Tải danh sách Leads (Học thử / Đã chốt / Đang tư vấn) để chốt nhanh thành Học viên tháng
+  const fetchLeadsForMonthly = async () => {
+    setLoadingLeads(true);
+    try {
+      const res = await fetch('/api/leads');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const eligible = json.data.filter((l) => l.status !== 'Trượt');
+        // Ưu tiên Lead Học thử hoặc đang gắn lớp tháng lên đầu
+        eligible.sort((a, b) => {
+          const score = (l) => (l.status === 'Học thử' ? 2 : l.status === 'Đang tư vấn' ? 1 : 0);
+          return score(b) - score(a);
+        });
+        setLeadOptions(eligible);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách Leads:', err);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  const handleSelectLeadForMonthly = (lead) => {
+    setSelectedLead(lead);
+    setSelectedStudent(null);
+    setFormName(lead.name || '');
+    setFormPhone(lead.phone && lead.phone !== 'N/A' ? lead.phone : '');
+    setFormDob(lead.dob ? String(lead.dob).substring(0, 10) : '');
+    setFormAddress(lead.address || '');
+    setFormNationalId('');
+    const monthlyOnlyClasses = allClasses.filter((c) => c.level === 'MONTHLY');
+    if (lead.trialClassCode && monthlyOnlyClasses.some((c) => c.code === lead.trialClassCode)) {
+      setFormClassCode(lead.trialClassCode);
+    } else if (monthlyOnlyClasses.length > 0 && !formClassCode) {
+      setFormClassCode(monthlyOnlyClasses[0].code);
+    }
+  };
+
+  // Mở modal Chốt nhanh từ dòng [Học thử] ngay trong Tab Điểm danh tháng
+  const handleOpenConvertLeadModal = (lead) => {
+    setEditingEnrollmentId(null);
+    setAddMode('lead');
+    setSearchStudent('');
+    setSearchResults([]);
+    setLeadSearch('');
+    setFormStartDate(new Date().toISOString().split('T')[0]);
+    setFormBillingType('MONTHLY_PREPAID');
+    setFormMonthlyRate('1200000');
+    setFormMonthlySessions('8');
+    setFormNotes('');
+    handleSelectLeadForMonthly(lead);
+    fetchLeadsForMonthly();
+    setShowAddModal(true);
+  };
+
   // Mở modal Thêm mới học viên
   const handleOpenAddModal = () => {
     setEditingEnrollmentId(null);
     setAddMode('new');
     setSelectedStudent(null);
+    setSelectedLead(null);
     setSearchStudent('');
     setSearchResults([]);
+    setLeadSearch('');
     setFormName('');
     setFormPhone('');
     setFormDob('');
@@ -516,6 +581,7 @@ export default function MonthlyBillingPage() {
         enrollmentId: editingEnrollmentId,
         isNewStudent: !editingEnrollmentId && !selectedStudent,
         studentId: selectedStudent ? selectedStudent.id : null,
+        convertLeadId: !editingEnrollmentId && addMode === 'lead' && selectedLead ? selectedLead.id : null,
         name: formName.trim(),
         phone: formPhone.trim(),
         dob: formDob || null,
@@ -537,10 +603,21 @@ export default function MonthlyBillingPage() {
 
       const json = await res.json();
       if (res.ok && json.success) {
+        const savedEnr = json.data;
+        if (!editingEnrollmentId) {
+          setWelcomeData({
+            id: savedEnr?.studentId || selectedStudent?.id || '',
+            name: formName.trim(),
+            classCode: formClassCode,
+            trialStartDate: formStartDate,
+          });
+        }
         setMessage({
           type: 'success',
           text: editingEnrollmentId
             ? `Cập nhật thông tin học viên ${formName} thành công!`
+            : addMode === 'lead' && selectedLead
+            ? `Đã chốt bé ${formName} từ Học thử thành Học viên Tháng chính thức (đã giữ trọn lịch sử test & điểm danh)!`
             : `Thêm học viên ${formName} vào danh sách tháng thành công!`,
         });
         setShowAddModal(false);
@@ -558,23 +635,36 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Toggle Điểm danh nhanh
-  const handleToggleAttendance = async (studentId, classCode, date, currentStatus) => {
+  // Toggle Điểm danh nhanh (hỗ trợ cả Học viên chính thức và Lead Học thử)
+  const handleToggleAttendance = async (row, date, currentStatus) => {
+    const isPresentNow = currentStatus === 'Có mặt' || currentStatus === 'Đi trễ';
+    const isAbsentNow =
+      currentStatus === 'Vắng' ||
+      currentStatus === 'Vắng có phép' ||
+      currentStatus === 'Vắng không phép';
+
     let nextStatus = '';
-    if (currentStatus === '' || currentStatus === 'Trống') nextStatus = 'Có mặt';
-    else if (currentStatus === 'Có mặt') nextStatus = 'Vắng';
+    if (!isPresentNow && !isAbsentNow) nextStatus = 'Có mặt';
+    else if (isPresentNow) nextStatus = 'Vắng';
     else nextStatus = 'Trống';
 
-    const updatedAttendances = [...attendanceData.attendances];
-    const existingIndex = updatedAttendances.findIndex(
-      (a) => a.studentId === studentId && a.classCode === classCode && a.date.startsWith(date)
-    );
+    const updatedAttendances = [...(attendanceData.attendances || [])];
+    const existingIndex = updatedAttendances.findIndex((a) => {
+      const sameOwner = row.isTrial ? a.leadId === row.leadId : a.studentId === row.studentId;
+      return sameOwner && a.classCode === row.classCode && a.date.startsWith(date);
+    });
 
     if (existingIndex >= 0) {
       if (nextStatus === 'Trống') updatedAttendances.splice(existingIndex, 1);
       else updatedAttendances[existingIndex].status = nextStatus;
     } else {
-      updatedAttendances.push({ studentId, classCode, date: date + 'T00:00:00.000Z', status: nextStatus });
+      updatedAttendances.push({
+        studentId: row.isTrial ? null : row.studentId,
+        leadId: row.isTrial ? row.leadId : null,
+        classCode: row.classCode,
+        date: date + 'T00:00:00.000Z',
+        status: nextStatus,
+      });
     }
     setAttendanceData({ ...attendanceData, attendances: updatedAttendances });
 
@@ -582,7 +672,14 @@ export default function MonthlyBillingPage() {
       await fetch('/api/finance/monthly/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, classCode, date, status: nextStatus }),
+        body: JSON.stringify({
+          studentId: row.isTrial ? `LEAD_${row.leadId}` : row.studentId,
+          leadId: row.isTrial ? row.leadId : null,
+          isTrial: Boolean(row.isTrial),
+          classCode: row.classCode,
+          date,
+          status: nextStatus,
+        }),
       });
     } catch (err) {
       console.error('Lỗi cập nhật điểm danh:', err);
@@ -1086,6 +1183,7 @@ export default function MonthlyBillingPage() {
     new Set([
       ...configData.map((e) => e.classCode),
       ...(attendanceData?.enrollments || []).map((e) => e.classCode),
+      ...(attendanceData?.trialLeads || []).map((l) => l.trialClassCode),
       ...noticesData.map((e) => e.classCode),
     ].filter(Boolean))
   );
@@ -1106,6 +1204,34 @@ export default function MonthlyBillingPage() {
     selectedClassCodes.length === 0
       ? attendanceData.enrollments
       : attendanceData.enrollments.filter((e) => selectedClassCodes.includes(e.classCode));
+  const getFilteredTrialLeads = () => {
+    const leads = Array.isArray(attendanceData?.trialLeads) ? attendanceData.trialLeads : [];
+    return selectedClassCodes.length === 0
+      ? leads
+      : leads.filter((l) => selectedClassCodes.includes(l.trialClassCode));
+  };
+  const getCombinedAttendanceRows = () => {
+    const officialRows = getFilteredEnrollments().map((enr) => ({
+      rowKey: `enr-${enr.id}`,
+      isTrial: false,
+      studentId: enr.studentId,
+      leadId: null,
+      name: enr.student?.name || '',
+      classCode: enr.classCode,
+      raw: enr,
+    }));
+    const trialRows = getFilteredTrialLeads().map((lead) => ({
+      rowKey: `lead-${lead.id}`,
+      isTrial: true,
+      studentId: null,
+      leadId: lead.id,
+      name: lead.name,
+      classCode: lead.trialClassCode,
+      trialStartDate: lead.trialStartDate,
+      raw: lead,
+    }));
+    return [...officialRows, ...trialRows];
+  };
   const getFilteredNotices = () => {
     let list =
       selectedClassCodes.length === 0
@@ -1136,9 +1262,21 @@ export default function MonthlyBillingPage() {
 
       {/* Thông báo Alert */}
       {message.text && (
-        <div className={`alert-box alert-${message.type} animated-scale`}>
-          <i className={message.type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'}></i>
-          <span>{message.text}</span>
+        <div className={`alert-box alert-${message.type} animated-scale`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <i className={message.type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'}></i>
+            <span>{message.text}</span>
+          </div>
+          {message.type === 'success' && welcomeData && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setShowWelcomeModal(true)}
+              style={{ background: '#0369a1', color: '#fff', fontWeight: '800', border: 'none', padding: '5px 12px', borderRadius: '6px' }}
+            >
+              📢 Xuất Thư Chào Mừng Chính Thức ({welcomeData.name})
+            </button>
+          )}
         </div>
       )}
 
@@ -1452,7 +1590,7 @@ export default function MonthlyBillingPage() {
               <i className="fa-solid fa-spinner fa-spin"></i>
               <p>Đang tải ma trận điểm danh...</p>
             </div>
-          ) : getFilteredEnrollments().length === 0 ? (
+          ) : getCombinedAttendanceRows().length === 0 ? (
             <div className="empty-table-state">
               <p>Chưa có học viên nào trong danh sách điểm danh tháng {monthYear}.</p>
             </div>
@@ -1605,30 +1743,67 @@ export default function MonthlyBillingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getFilteredEnrollments().map((enr) => (
-                    <tr key={enr.id}>
+                  {getCombinedAttendanceRows().map((row) => (
+                    <tr key={row.rowKey} style={row.isTrial ? { background: '#fffbeb' } : {}}>
                       <td
                         style={{
                           position: 'sticky',
                           left: 0,
                           zIndex: 15,
-                          background: '#fff',
+                          background: row.isTrial ? '#fffbeb' : '#fff',
                           padding: '10px 14px',
                           whiteSpace: 'nowrap',
                           fontWeight: '700',
-                          color: '#085E8A',
+                          color: row.isTrial ? '#92400e' : '#085E8A',
                           borderBottom: '1px solid #e2e8f0',
                           borderRight: '1px solid #e2e8f0',
                         }}
                       >
-                        {enr.student?.name}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{row.name}</span>
+                          {row.isTrial && (
+                            <>
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: '800',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
+                                  border: '1px solid #fcd34d',
+                                  padding: '1px 6px',
+                                  borderRadius: '999px',
+                                }}
+                                title={row.trialStartDate ? `Học thử từ ${new Date(row.trialStartDate).toLocaleDateString('vi-VN')}` : 'Học viên đang học thử (không tính học phí)'}
+                              >
+                                Học thử
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenConvertLeadModal(row.raw)}
+                                style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: '800',
+                                  background: '#059669',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '2px 7px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                }}
+                                title="Chốt sang Học viên Tháng chính thức (giữ nguyên toàn bộ lịch sử học thử & test)"
+                              >
+                                ⚡ Chốt
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td
                         style={{
                           position: 'sticky',
                           left: '180px',
                           zIndex: 15,
-                          background: '#fff',
+                          background: row.isTrial ? '#fffbeb' : '#fff',
                           padding: '10px 14px',
                           whiteSpace: 'nowrap',
                           borderBottom: '1px solid #e2e8f0',
@@ -1638,7 +1813,7 @@ export default function MonthlyBillingPage() {
                           fontWeight: '600',
                         }}
                       >
-                        {enr.classCode}
+                        {row.classCode}
                       </td>
                       {daysList.map((d) => {
                         const dateParts = d.split('-');
@@ -1647,19 +1822,23 @@ export default function MonthlyBillingPage() {
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                         const dayName = dayOfWeek === 0 ? 'Chủ Nhật' : dayOfWeek === 6 ? 'Thứ 7' : `Thứ ${dayOfWeek + 1}`;
 
-                        const att = attendanceData.attendances.find(
-                          (a) => a.studentId === enr.studentId && a.classCode === enr.classCode && a.date.startsWith(d)
-                        );
+                        const att = (attendanceData.attendances || []).find((a) => {
+                          const sameOwner = row.isTrial ? a.leadId === row.leadId : a.studentId === row.studentId;
+                          return sameOwner && a.classCode === row.classCode && a.date.startsWith(d);
+                        });
                         let icon = '';
-                        // Cột cuối tuần (T7 & CN) tô màu xanh nhạt phân biệt rõ như hình 2, ngày trong tuần nền trắng
-                        let bgColor = isWeekend ? '#f0fdf4' : '#ffffff';
+                        let bgColor = isWeekend ? '#f0fdf4' : (row.isTrial ? '#fffdf5' : '#ffffff');
                         let color = '';
 
-                        if (att?.status === 'Có mặt') {
+                        if (att?.status === 'Có mặt' || att?.status === 'Đi trễ') {
                           icon = 'fa-check';
                           color = '#16a34a';
                           bgColor = isWeekend ? '#dcfce7' : '#ecfdf5';
-                        } else if (att?.status === 'Vắng') {
+                        } else if (
+                          att?.status === 'Vắng' ||
+                          att?.status === 'Vắng có phép' ||
+                          att?.status === 'Vắng không phép'
+                        ) {
                           icon = 'fa-xmark';
                           color = '#dc2626';
                           bgColor = '#fee2e2';
@@ -1678,7 +1857,7 @@ export default function MonthlyBillingPage() {
                               userSelect: 'none',
                               transition: 'all 0.12s ease',
                             }}
-                            onClick={() => handleToggleAttendance(enr.studentId, enr.classCode, d, att?.status || 'Trống')}
+                            onClick={() => handleToggleAttendance(row, d, att?.status || 'Trống')}
                             title={`${dayName}, ngày ${dateParts[2]}/${dateParts[1]}: ${att?.status || 'Chưa điểm danh (Bấm để đổi)'}`}
                           >
                             {icon && (
@@ -2047,13 +2226,14 @@ export default function MonthlyBillingPage() {
                 </h2>
 
                 {!editingEnrollmentId && (
-                  <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '6px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className="btn btn-sm"
                       onClick={() => {
                         setAddMode('new');
                         setSelectedStudent(null);
+                        setSelectedLead(null);
                       }}
                       style={{
                         fontSize: '0.8rem',
@@ -2069,7 +2249,29 @@ export default function MonthlyBillingPage() {
                     <button
                       type="button"
                       className="btn btn-sm"
-                      onClick={() => setAddMode('existing')}
+                      onClick={() => {
+                        setAddMode('lead');
+                        setSelectedStudent(null);
+                        fetchLeadsForMonthly();
+                      }}
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '4px 12px',
+                        background: addMode === 'lead' ? '#059669' : 'transparent',
+                        color: addMode === 'lead' ? '#fff' : '#047857',
+                        borderRadius: '4px',
+                        fontWeight: '700',
+                      }}
+                    >
+                      Chốt từ Học thử / Lead
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        setAddMode('existing');
+                        setSelectedLead(null);
+                      }}
                       style={{
                         fontSize: '0.8rem',
                         padding: '4px 12px',
@@ -2089,6 +2291,76 @@ export default function MonthlyBillingPage() {
                 <i className="fa-solid fa-times"></i>
               </button>
             </div>
+
+            {/* Khung chọn từ Leads Học thử / Đã chốt */}
+            {!editingEnrollmentId && addMode === 'lead' && (
+              <div
+                style={{
+                  background: '#ecfdf5',
+                  border: '1.5px solid #6ee7b7',
+                  borderRadius: '8px',
+                  padding: '0.65rem 0.85rem',
+                  marginBottom: '0.85rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  <input
+                    type="text"
+                    placeholder="Tìm nhanh học viên Học thử / Lead (gõ tên hoặc SĐT)..."
+                    className="form-control"
+                    value={leadSearch}
+                    onChange={(e) => setLeadSearch(e.target.value)}
+                    style={{ flex: 1, minWidth: '220px', padding: '0.42rem 0.75rem', fontSize: '0.88rem', background: '#fff' }}
+                  />
+                  {selectedLead && (
+                    <span style={{ fontSize: '0.85rem', color: '#047857', fontWeight: '800' }}>
+                      ✓ Đang chốt từ Lead: {selectedLead.name}
+                    </span>
+                  )}
+                </div>
+                {loadingLeads ? (
+                  <div style={{ fontSize: '0.82rem', color: '#047857' }}>Đang tải danh sách học thử...</div>
+                ) : (
+                  <div style={{ maxHeight: '130px', overflowY: 'auto', background: '#fff', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                    {leadOptions
+                      .filter((l) => {
+                        const q = leadSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return (l.name || '').toLowerCase().includes(q) || (l.phone || '').toLowerCase().includes(q);
+                      })
+                      .slice(0, 20)
+                      .map((l) => {
+                        const active = selectedLead?.id === l.id;
+                        return (
+                          <div
+                            key={l.id}
+                            onClick={() => handleSelectLeadForMonthly(l)}
+                            style={{
+                              padding: '7px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9',
+                              fontSize: '0.85rem',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              background: active ? '#d1fae5' : '#fff',
+                            }}
+                          >
+                            <span>
+                              <strong style={{ color: '#065f46' }}>{l.name}</strong>
+                              {l.phone && l.phone !== 'N/A' ? ` • ${l.phone}` : ''}
+                              {l.trialClassCode ? ` • Lớp: ${l.trialClassCode}` : ''}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: l.status === 'Học thử' ? '#b45309' : '#047857' }}>
+                              {l.status}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Thanh tìm nhanh nếu chọn học viên có sẵn */}
             {!editingEnrollmentId && addMode === 'existing' && (
@@ -3451,6 +3723,12 @@ export default function MonthlyBillingPage() {
           </div>
         </div>
       )}
+      <CourseWelcomeModal
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
+        data={welcomeData}
+        classList={allClasses}
+      />
     </div>
   );
 }

@@ -86,10 +86,11 @@ export async function GET(request) {
     const prevMonthYear = `${prevM.toString().padStart(2, '0')}/${prevY}`;
 
     for (const enr of enrollments) {
-      // Đếm số buổi học thực tế trong tháng
+      // Đếm số buổi học thực tế trong tháng (loại trừ buổi học thử Lead trước khi chốt chính thức)
       const attendances = await prisma.attendance.findMany({
         where: {
           studentId: enr.studentId,
+          leadId: null,
           classCode: enr.classCode,
           date: {
             gte: startDate,

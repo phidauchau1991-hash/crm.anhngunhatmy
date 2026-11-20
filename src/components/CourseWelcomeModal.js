@@ -146,10 +146,16 @@ export default function CourseWelcomeModal({
       targetClass?.scheduleRaw || targetClass?.schedule
     );
     setScheduleDays(targetClass?.schedule || scheduleDetails.daysDisplay || 'Thứ 7, Chủ Nhật');
+    const cleanHours = (scheduleDetails.hours || '').replace(/'/g, '').trim();
+    const isMonthlyClass = targetClass?.level === 'MONTHLY';
     setStudyHours(
-      scheduleDetails.hours
-        ? `${scheduleDetails.hours} (${scheduleDetails.shiftName || 'Ca 1'})`
-        : scheduleDetails.shiftName || 'Ca 1'
+      cleanHours
+        ? scheduleDetails.shiftName
+          ? `${cleanHours} (${scheduleDetails.shiftName})`
+          : isMonthlyClass
+          ? cleanHours
+          : `${cleanHours} (Ca 1)`
+        : scheduleDetails.shiftName || (isMonthlyClass ? 'Theo lịch lớp' : 'Ca 1')
     );
 
     // Giáo viên
@@ -160,15 +166,19 @@ export default function CourseWelcomeModal({
       setTeacherName(parts.length >= 3 ? parts[2] : 'Ms My');
     }
 
-    // Ngày bắt đầu học (lấy từ lớp học)
-    if (targetClass?.startDate || targetClass?.startDateIso) {
+    // Ngày bắt đầu học (lấy từ lớp học hoặc ngày vào học thử/hôm nay cho lớp tháng)
+    if (isMonthlyClass) {
+      setStartDateText(formatVietnameseDateWithDay(data?.trialStartDate || new Date()));
+    } else if (targetClass?.startDate || targetClass?.startDateIso) {
       setStartDateText(formatVietnameseDateWithDay(targetClass.startDate, targetClass.startDateIso));
     } else {
       setStartDateText(formatVietnameseDateWithDay(new Date()));
     }
 
     // Ngày kết thúc dự kiến (tự động xuất chuẩn xác từ hệ thống)
-    if (targetClass?.expectedEndDate || targetClass?.expectedEndDateIso) {
+    if (isMonthlyClass && !targetClass?.expectedEndDate && !targetClass?.expectedEndDateIso) {
+      setEndDateText('Học liên tục (Tính phí theo tháng)');
+    } else if (targetClass?.expectedEndDate || targetClass?.expectedEndDateIso) {
       setEndDateText(formatEndDateFromClass(targetClass.expectedEndDate, targetClass.expectedEndDateIso));
     } else {
       setEndDateText('Theo lộ trình khóa');
@@ -176,7 +186,9 @@ export default function CourseWelcomeModal({
 
     // Cấp độ / Chương trình
     const level = targetClass?.level || selectedClassCode.split('_')[1] || '';
-    if (level.startsWith('S') || level.includes('Starter')) {
+    if (isMonthlyClass) {
+      setProgramLevel(`${selectedClassCode} (Chương trình Theo Tháng)`);
+    } else if (level.startsWith('S') || level.includes('Starter')) {
       setProgramLevel(`Tiếng Anh Thiếu Nhi Starters (${level})`);
     } else if (level.startsWith('M') || level.includes('Mover')) {
       setProgramLevel(`Tiếng Anh Thiếu Nhi Movers (${level})`);
@@ -189,7 +201,7 @@ export default function CourseWelcomeModal({
     } else {
       setProgramLevel(`Tiếng Anh Chuẩn Cambridge Quốc Tế`);
     }
-  }, [selectedClassCode, classList]);
+  }, [selectedClassCode, classList, data]);
 
   // Cập nhật lời nhắn Zalo soạn sẵn
   useEffect(() => {

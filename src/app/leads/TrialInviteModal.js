@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas';
 import TrialInviteTemplate from '../components/TrialInviteTemplate';
 import { getClassScheduleDetails } from '@/lib/classHelper';
 
-export default function TrialInviteModal({ isOpen, onClose, lead }) {
+export default function TrialInviteModal({ isOpen, onClose, lead, classList = [] }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const templateRef = useRef(null);
 
@@ -49,9 +49,16 @@ export default function TrialInviteModal({ isOpen, onClose, lead }) {
       if (inviteType === 'TRIAL') {
         setClassName(lead.trialClassCode || '');
         if (lead.trialClassCode) {
-          const details = getClassScheduleDetails(lead.trialClassCode);
-          setStudyDays(details.daysDisplay || '');
-          setStudyHours(details.hours || '');
+          const matchedClass = Array.isArray(classList)
+            ? classList.find((c) => c.code === lead.trialClassCode)
+            : null;
+          const details = getClassScheduleDetails(
+            lead.trialClassCode,
+            matchedClass?.scheduleRaw || matchedClass?.schedule || ''
+          );
+          const cleanHours = (details.hours || '').replace(/'/g, '').trim();
+          setStudyDays(matchedClass?.schedule || details.daysDisplay || '');
+          setStudyHours(cleanHours);
         } else {
           setStudyDays('');
           setStudyHours('');

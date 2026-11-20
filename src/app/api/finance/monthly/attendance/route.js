@@ -25,7 +25,7 @@ export async function GET(request) {
   const branchFilter = getBranchFilter(userRole, branchId, selectedBranch, 'finance');
 
   try {
-    // Get active enrollments for monthly billing
+    // 1. Lấy học viên chính thức hệ Học phí tháng
     const enrollments = await prisma.enrollment.findMany({
       where: {
         status: 'Đang học',
@@ -41,22 +41,59 @@ export async function GET(request) {
       },
     });
 
-    const studentIds = enrollments.map(e => e.studentId);
-    const classCodes = enrollments.map(e => e.classCode);
+    // 2. Lấy thêm các lớp hệ MONTHLY để hiển thị luôn Lead đang "Học thử" trong lớp đó
+    const monthlyClasses = await prisma.class.findMany({
+      where: { level: 'MONTHLY' },
+      select: { code: true },
+    });
+    const monthlyClassCodes = Array.from(
+      new Set([...monthlyClasses.map((c) => c.code), ...enrollments.map((e) => e.classCode)])
+    );
 
-    // Get attendance for these students in this month
-    const attendances = await prisma.attendance.findMany({
-      where: {
+    const trialLeads =
+      monthlyClassCodes.length > 0
+        ? await prisma.lead.findMany({
+            where: {
+              status: 'Học thử',
+              trialClassCode: { in: monthlyClassCodes },
+              ...branchFilter,
+            },
+            orderBy: { id: 'desc' },
+          })
+        : [];
+
+    const studentIds = enrollments.map((e) => e.studentId);
+    const classCodes = Array.from(new Set([...enrollments.map((e) => e.classCode), ...monthlyClassCodes]));
+    const trialLeadIds = trialLeads.map((l) => l.id);
+
+    const attendanceConditions = [];
+    if (studentIds.length > 0 && classCodes.length > 0) {
+      attendanceConditions.push({
         studentId: { in: studentIds },
         classCode: { in: classCodes },
-        date: {
-          gte: startDate,
-          lt: endDate,
-        },
-      },
-    });
+      });
+    }
+    if (trialLeadIds.length > 0 && monthlyClassCodes.length > 0) {
+      attendanceConditions.push({
+        leadId: { in: trialLeadIds },
+        classCode: { in: monthlyClassCodes },
+      });
+    }
 
-    return NextResponse.json({ enrollments, attendances });
+    const attendances =
+      attendanceConditions.length > 0
+        ? await prisma.attendance.findMany({
+            where: {
+              OR: attendanceConditions,
+              date: {
+                gte: startDate,
+                lt: endDate,
+              },
+            },
+          })
+        : [];
+
+    return NextResponse.json({ enrollments, trialLeads, attendances });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
@@ -65,17 +102,30 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const { studentId, classCode, date, status } = await request.json();
+    const { studentId, leadId, isTrial, classCode, date, status } = await request.json();
 
     // date is YYYY-MM-DD -> normalize to UTC midnight consistently
     const dateObj = new Date(`${date}T00:00:00.000Z`);
 
+    const isLeadTrial = Boolean(
+      isTrial || leadId || (studentId && String(studentId).startsWith('LEAD_'))
+    );
+    const actualLeadId = leadId
+      ? parseInt(leadId, 10)
+      : isLeadTrial && studentId
+      ? parseInt(String(studentId).replace(/^LEAD_/, ''), 10)
+      : null;
+
+    if (isLeadTrial && (!actualLeadId || Number.isNaN(actualLeadId))) {
+      return NextResponse.json({ error: 'Thiếu mã Lead học thử hợp lệ' }, { status: 400 });
+    }
+
+    const uniqueWhere = isLeadTrial
+      ? { leadId_classCode_date: { leadId: actualLeadId, classCode, date: dateObj } }
+      : { studentId_classCode_date: { studentId, classCode, date: dateObj } };
+
     if (status === 'Trống' || status === '') {
-      const existingAtt = await prisma.attendance.findUnique({
-        where: {
-          studentId_classCode_date: { studentId, classCode, date: dateObj },
-        },
-      });
+      const existingAtt = await prisma.attendance.findUnique({ where: uniqueWhere });
       if (existingAtt) {
         const hasNotesOrHomework =
           Boolean(existingAtt.teacherNotes && existingAtt.teacherNotes.trim()) ||
@@ -85,7 +135,6 @@ export async function POST(request) {
           existingAtt.copyError;
 
         if (hasNotesOrHomework) {
-          // Bảo toàn nhận xét / bài tập giáo viên đã chấm bên /attendance
           await prisma.attendance.update({
             where: { id: existingAtt.id },
             data: { status: 'Chưa điểm danh' },
@@ -100,22 +149,11 @@ export async function POST(request) {
     const classInfo = await prisma.class.findUnique({ where: { code: classCode } });
 
     const attendance = await prisma.attendance.upsert({
-      where: {
-        studentId_classCode_date: {
-          studentId,
-          classCode,
-          date: dateObj,
-        }
-      },
-      update: {
-        status,
-      },
-      create: {
-        studentId,
-        classCode,
-        date: dateObj,
-        status,
-      }
+      where: uniqueWhere,
+      update: { status },
+      create: isLeadTrial
+        ? { leadId: actualLeadId, classCode, date: dateObj, status }
+        : { studentId, classCode, date: dateObj, status },
     });
 
     // Đồng bộ tạo/giữ AttendanceSummary cho buổi học để khớp Bảng lương GV & Nhật ký Báo cáo tháng

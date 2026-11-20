@@ -3,6 +3,7 @@ import prisma from '@/lib/db';
 import { getDateRangeFromPreset } from '@/lib/dateHelpers';
 import { getBranchFilter } from '@/lib/rbac';
 import { encryptStudentId } from '@/lib/token';
+import { migrateLeadHistoryToStudent } from '@/lib/leadMigration';
 
 // Làm tròn xuống hàng 5.000đ, luôn có lợi cho khách hàng
 // VD: 1.103.000 → 1.100.000, 1.358.250 → 1.355.000
@@ -630,70 +631,10 @@ export async function POST(request) {
       }
     }
 
-    // 3.5 Nếu chuyển từ Lead → Học viên, gộp dữ liệu điểm danh cũ (Lead) vào hồ sơ HV mới
+    // 3.5 Nếu chuyển từ Lead → Học viên, gộp dữ liệu điểm danh, test đầu vào & học liệu từ Lead sang HV mới
     if (convertLeadId) {
-      const leadIdInt = parseInt(convertLeadId);
-      if (!isNaN(leadIdInt)) {
-        // 3.5.1 Cập nhật điểm danh
-        const migrated = await prisma.attendance.updateMany({
-          where: { 
-            leadId: leadIdInt,
-            studentId: null  // Chỉ cập nhật những record chưa có studentId
-          },
-          data: { studentId }
-        });
-        console.log(`[Lead→HV] Gộp ${migrated.count} bản ghi điểm danh từ Lead #${leadIdInt} vào HV ${studentId}`);
-
-        // 3.5.2 TỰ ĐỘNG CHUYỂN BÀI TEST ĐẦU VÀO & ĐÁNH GIÁ HỌC THỬ SANG HỒ SƠ HỌC VIÊN
-        const migratedAssessments = await prisma.studentAssessment.updateMany({
-          where: {
-            leadId: leadIdInt,
-            studentId: null
-          },
-          data: { studentId }
-        });
-        console.log(`[Lead→HV] Gộp ${migratedAssessments.count} bài test & đánh giá từ Lead #${leadIdInt} sang HV ${studentId}`);
-        
-        // 3.5.3 Chuyển lịch sử Học liệu số (StudySession, phân quyền sách & trạng thái giữ quyền) từ Lead sang HV mới
-        const leadCwKey = `LEAD_${leadIdInt}`;
-        try {
-          const leadRecord = await prisma.lead.findUnique({ where: { id: leadIdInt } });
-          if (leadRecord) {
-            await prisma.$executeRaw`UPDATE StudySession SET studentId = ${studentId} WHERE studentId = ${leadCwKey} OR studentId = ${String(leadIdInt)}`;
-            const sessStats = await prisma.$queryRaw`SELECT COALESCE(SUM(durationSeconds), 0) AS totalSec, MIN(createdAt) AS firstAt, MAX(createdAt) AS lastAt FROM StudySession WHERE studentId = ${studentId}`;
-            const totalMin = Math.round(Number(sessStats?.[0]?.totalSec || 0) / 60.0);
-
-            if (leadRecord.customBookCodes || leadRecord.retainCoursewareAccess) {
-              await prisma.student.update({
-                where: { id: studentId },
-                data: {
-                  ...(leadRecord.customBookCodes ? { customBookCodes: leadRecord.customBookCodes } : {}),
-                  ...(leadRecord.retainCoursewareAccess ? { retainCoursewareAccess: true } : {}),
-                },
-              });
-            }
-            if (totalMin > 0 || sessStats?.[0]?.firstAt) {
-              await prisma.$executeRaw`
-                UPDATE Student
-                SET coursewareStudyMinutes = ${totalMin},
-                    coursewareActivatedAt = COALESCE(coursewareActivatedAt, ${sessStats[0].firstAt}),
-                    coursewareLastActiveAt = COALESCE(${sessStats[0].lastAt}, coursewareLastActiveAt)
-                WHERE id = ${studentId}
-              `;
-            }
-          }
-        } catch (cwErr) {
-          console.warn('[Lead→HV] Lỗi chuyển dữ liệu học liệu số:', cwErr?.message);
-        }
-
-        // Cập nhật trạng thái Lead thành "Đã chốt"
-        await prisma.lead.update({
-          where: { id: leadIdInt },
-          data: { status: 'Đã chốt' }
-        }).catch(() => {}); // Bỏ qua nếu Lead không tồn tại
-      }
+      await migrateLeadHistoryToStudent(prisma, convertLeadId, studentId);
     }
-
     // 4. Nếu có chọn tặng phẩm/giáo trình đi kèm, thực hiện xuất kho tự động
     const { giftInventoryId, giftQuantity, giftNotes } = body;
     if (giftInventoryId && giftInventoryId !== '') {
