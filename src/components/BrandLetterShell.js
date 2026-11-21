@@ -6,6 +6,7 @@ import { BRAND, CENTER_INFO, FONT_UNIFIED } from '@/lib/brandTheme';
 /**
  * Khung nhận diện thương hiệu chuẩn thống nhất cho mọi Thư Mời, Phiếu Đánh Giá,
  * Thông Báo Học Phí và Kết Quả Học Tập của Hệ thống Anh ngữ Nhật Mỹ.
+ * Hỗ trợ chế độ `compact` cho các phiếu nhận xét / bảng điểm nhiều nội dung.
  */
 const BrandLetterShell = forwardRef(({
   id,
@@ -16,10 +17,12 @@ const BrandLetterShell = forwardRef(({
   title = '',
   subtitleEn = '',
   showTitleBlock = true,
+  compact = false,
   children,
-  footerNote = '',
   style = {},
 }, ref) => {
+  const logoSize = compact ? 64 : 78;
+
   return (
     <div
       ref={ref}
@@ -42,11 +45,11 @@ const BrandLetterShell = forwardRef(({
         ...style,
       }}
     >
-      {/* 1. HEADER NỀN TRẮNG - LOGO 1:1 CHUẨN - VIỀN GOLD NHẬT MỸ */}
+      {/* 1. HEADER NỀN TRẮNG - LOGO 1:1 - TÊN THƯƠNG HIỆU TRÊN / SLOGAN DƯỚI */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          padding: '22px 36px 18px 36px',
+          padding: compact ? '14px 30px 12px 30px' : '20px 34px 16px 34px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -54,16 +57,16 @@ const BrandLetterShell = forwardRef(({
           fontFamily: FONT_UNIFIED,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? '13px' : '16px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
             alt={CENTER_INFO.name}
-            width={80}
-            height={80}
+            width={logoSize}
+            height={logoSize}
             style={{
-              width: '80px',
-              height: '80px',
+              width: `${logoSize}px`,
+              height: `${logoSize}px`,
               objectFit: 'contain',
               display: 'block',
               flexShrink: 0,
@@ -74,7 +77,7 @@ const BrandLetterShell = forwardRef(({
             <div
               style={{
                 fontFamily: FONT_UNIFIED,
-                fontSize: '27px',
+                fontSize: compact ? '23px' : '27px',
                 fontWeight: '900',
                 color: BRAND.blue,
                 letterSpacing: '0.6px',
@@ -87,12 +90,12 @@ const BrandLetterShell = forwardRef(({
             <div
               style={{
                 fontFamily: FONT_UNIFIED,
-                fontSize: '14px',
+                fontSize: compact ? '12.5px' : '14px',
                 fontStyle: 'italic',
                 fontWeight: '600',
                 color: BRAND.goldDark,
                 letterSpacing: '0.4px',
-                marginTop: '3px',
+                marginTop: '2px',
               }}
             >
               {CENTER_INFO.slogan}
@@ -104,7 +107,7 @@ const BrandLetterShell = forwardRef(({
           <div
             style={{
               fontFamily: FONT_UNIFIED,
-              fontSize: '13.5px',
+              fontSize: compact ? '12.5px' : '13.5px',
               fontWeight: '800',
               color: BRAND.goldDark,
               letterSpacing: '1px',
@@ -117,12 +120,12 @@ const BrandLetterShell = forwardRef(({
             <div
               style={{
                 fontFamily: FONT_UNIFIED,
-                fontSize: '12.5px',
+                fontSize: compact ? '11.5px' : '12.5px',
                 fontStyle: 'italic',
                 fontWeight: '600',
                 color: BRAND.muted,
                 letterSpacing: '0.3px',
-                marginTop: '3px',
+                marginTop: '2px',
               }}
             >
               {badgeSub}
@@ -134,23 +137,23 @@ const BrandLetterShell = forwardRef(({
       {/* 2. BODY VÙNG NỘI DUNG CHÍNH */}
       <div
         style={{
-          padding: '26px 36px 24px 36px',
+          padding: compact ? '16px 30px 14px 30px' : '24px 34px 20px 34px',
           backgroundColor: BRAND.surface,
           fontFamily: FONT_UNIFIED,
         }}
       >
         {showTitleBlock && (title || eyebrow) && (
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div style={{ textAlign: 'center', marginBottom: compact ? '13px' : '18px' }}>
             {eyebrow && (
               <div
                 style={{
                   fontFamily: FONT_UNIFIED,
-                  fontSize: '12.5px',
+                  fontSize: compact ? '11.5px' : '12.5px',
                   fontWeight: '800',
                   color: BRAND.blue,
-                  letterSpacing: '2px',
+                  letterSpacing: '1.8px',
                   textTransform: 'uppercase',
-                  marginBottom: '4px',
+                  marginBottom: '3px',
                 }}
               >
                 {eyebrow}
@@ -160,13 +163,13 @@ const BrandLetterShell = forwardRef(({
               <h1
                 style={{
                   fontFamily: FONT_UNIFIED,
-                  fontSize: '26px',
+                  fontSize: compact ? '22.5px' : '26px',
                   fontWeight: '900',
                   color: BRAND.blueDark,
-                  margin: '0 0 4px 0',
+                  margin: '0 0 3px 0',
                   letterSpacing: '0.4px',
                   textTransform: 'uppercase',
-                  lineHeight: 1.25,
+                  lineHeight: 1.2,
                 }}
               >
                 {title}
@@ -176,7 +179,7 @@ const BrandLetterShell = forwardRef(({
               <div
                 style={{
                   fontFamily: FONT_UNIFIED,
-                  fontSize: '13.5px',
+                  fontSize: compact ? '12px' : '13.5px',
                   fontStyle: 'italic',
                   fontWeight: '500',
                   color: BRAND.muted,
@@ -187,10 +190,10 @@ const BrandLetterShell = forwardRef(({
             )}
             <div
               style={{
-                width: '80px',
-                height: '3.5px',
+                width: compact ? '68px' : '80px',
+                height: '3px',
                 backgroundColor: BRAND.gold,
-                margin: '10px auto 0 auto',
+                margin: compact ? '7px auto 0 auto' : '9px auto 0 auto',
                 borderRadius: '2px',
               }}
             />
@@ -200,65 +203,57 @@ const BrandLetterShell = forwardRef(({
         {children}
       </div>
 
-      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ ĐẦY ĐỦ */}
+      {/* 3. FOOTER GỌN ĐỐI XỨNG VỚI HEADER: TRÁI (TÊN THƯƠNG HIỆU 2 DÒNG) - PHẢI (LIÊN HỆ & ĐỊA CHỈ) */}
       <div
         style={{
           backgroundColor: BRAND.blue,
-          padding: '16px 36px',
+          padding: '12px 30px',
           color: BRAND.white,
-          textAlign: 'center',
           borderTop: `3px solid ${BRAND.gold}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
           fontFamily: FONT_UNIFIED,
         }}
       >
-        {footerNote && (
+        <div style={{ flexShrink: 0 }}>
           <div
             style={{
               fontFamily: FONT_UNIFIED,
-              fontSize: '13px',
-              fontStyle: 'italic',
-              fontWeight: '500',
-              color: '#FFFFFF',
-              marginBottom: '8px',
-              opacity: 0.96,
+              fontSize: '15px',
+              fontWeight: '900',
+              letterSpacing: '0.8px',
+              color: BRAND.gold,
+              textTransform: 'uppercase',
+              lineHeight: 1.15,
             }}
           >
-            {footerNote}
+            {CENTER_INFO.name}
           </div>
-        )}
-        <div
-          style={{
-            fontFamily: FONT_UNIFIED,
-            fontSize: '16px',
-            fontWeight: '900',
-            letterSpacing: '1px',
-            color: BRAND.gold,
-            textTransform: 'uppercase',
-            lineHeight: 1.2,
-          }}
-        >
-          {CENTER_INFO.name}
+          <div
+            style={{
+              fontFamily: FONT_UNIFIED,
+              fontSize: '12px',
+              fontStyle: 'italic',
+              fontWeight: '600',
+              color: '#FEF08A',
+              letterSpacing: '0.3px',
+              marginTop: '2px',
+            }}
+          >
+            {CENTER_INFO.slogan}
+          </div>
         </div>
-        <div
-          style={{
-            fontFamily: FONT_UNIFIED,
-            fontSize: '12.5px',
-            fontStyle: 'italic',
-            fontWeight: '500',
-            color: '#FEF08A',
-            letterSpacing: '0.4px',
-            marginTop: '2px',
-            marginBottom: '8px',
-          }}
-        >
-          {CENTER_INFO.slogan}
-        </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', fontWeight: '500', opacity: 0.96 }}>
-          Hotline hỗ trợ phụ huynh: <strong style={{ fontWeight: '800' }}>{CENTER_INFO.hotline}</strong> • Website:{' '}
-          <strong style={{ fontWeight: '800' }}>{CENTER_INFO.website}</strong>
-        </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.92, marginTop: '3px' }}>
-          Địa chỉ: {CENTER_INFO.address}
+
+        <div style={{ textAlign: 'right', lineHeight: 1.45 }}>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.98 }}>
+            Hotline: <strong style={{ fontWeight: '800' }}>{CENTER_INFO.hotline}</strong> • Website:{' '}
+            <strong style={{ fontWeight: '800' }}>{CENTER_INFO.website}</strong>
+          </div>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.2px', fontWeight: '500', opacity: 0.92, marginTop: '2px' }}>
+            {CENTER_INFO.address}
+          </div>
         </div>
       </div>
     </div>

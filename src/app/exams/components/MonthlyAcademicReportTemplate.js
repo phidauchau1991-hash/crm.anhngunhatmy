@@ -44,12 +44,12 @@ const MonthlyAcademicReportTemplate = forwardRef(({ data }, ref) => {
     <BrandLetterShell
       ref={ref}
       id="monthly-academic-report-template"
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub={`Monthly Report • ${monthYear || ''}`}
       eyebrow={`BÁO CÁO TỔNG HỢP THÁNG ${monthYear || ''}`}
       title="PHIẾU BÁO CÁO HỌC TẬP THÁNG"
       subtitleEn="Monthly Attendance &amp; Academic Progress Report"
-      footerNote="Phiếu báo cáo được xuất từ Hệ thống Quản trị Trung tâm Anh ngữ Nhật Mỹ."
       style={{ fontVariantLigatures: 'none', letterSpacing: 'normal' }}
     >
       {/* STUDENT INFO CARD */}
@@ -164,35 +164,34 @@ const MonthlyAcademicReportTemplate = forwardRef(({ data }, ref) => {
         )}
       </div>
 
-      {/* XÁC NHẬN & MỘC ĐỎ */}
+      {/* XÁC NHẬN & MỘC ĐỎ (GỌN) */}
       <div
         style={{
-          backgroundColor: BRAND.white,
-          borderRadius: '12px',
-          border: `1px solid ${BRAND.border}`,
-          padding: '12px 20px',
+          borderTop: `1.5px dashed ${BRAND.border}`,
+          padding: '8px 6px 2px 6px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '16px',
+          gap: '14px',
+          marginTop: '10px',
           fontFamily: FONT_UNIFIED,
         }}
       >
         <div>
-          <div style={{ fontSize: '11.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase' }}>
             Xác nhận báo cáo tháng {monthYear}
           </div>
-          <div style={{ fontSize: '15px', fontWeight: '800', color: BRAND.ink, marginTop: '3px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '800', color: BRAND.ink, marginTop: '2px' }}>
             Giáo viên Chủ nhiệm — Hệ thống Anh ngữ Nhật Mỹ
           </div>
-          <div style={{ fontSize: '12px', fontStyle: 'italic', color: BRAND.muted, marginTop: '2px' }}>
+          <div style={{ fontSize: '11.5px', fontStyle: 'italic', color: BRAND.muted, marginTop: '1px' }}>
             Mọi thắc mắc phụ huynh vui lòng liên hệ trực tiếp Giáo viên chủ nhiệm hoặc Hotline trung tâm.
           </div>
         </div>
         <OfficialRedSeal
           title="XÁC NHẬN THÁNG"
           subtitle="GIÁO VIÊN CHỦ NHIỆM"
-          size={112}
+          size={82}
           date={getTodayVnShortDate()}
         />
       </div>

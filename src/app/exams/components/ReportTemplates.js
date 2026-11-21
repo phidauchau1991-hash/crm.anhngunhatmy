@@ -94,22 +94,20 @@ const SectionHeading = ({ title }) => (
 const SealSignatureCard = ({ label, signer, subnote, sealTitle, sealSubtitle, date }) => (
   <div
     style={{
-      backgroundColor: BRAND.white,
-      borderRadius: '12px',
-      border: `1px solid ${BRAND.border}`,
-      padding: '12px 20px',
+      borderTop: `1.5px dashed ${BRAND.border}`,
+      padding: '8px 6px 2px 6px',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: '16px',
-      marginTop: '14px',
+      gap: '14px',
+      marginTop: '10px',
       fontFamily: FONT_UNIFIED,
     }}
   >
     <div>
       <div
         style={{
-          fontSize: '11.5px',
+          fontSize: '11px',
           fontWeight: '800',
           color: BRAND.subtle,
           textTransform: 'uppercase',
@@ -118,16 +116,16 @@ const SealSignatureCard = ({ label, signer, subnote, sealTitle, sealSubtitle, da
       >
         {label}
       </div>
-      <div style={{ fontSize: '15px', fontWeight: '800', color: BRAND.ink, marginTop: '3px' }}>
+      <div style={{ fontSize: '14px', fontWeight: '800', color: BRAND.ink, marginTop: '2px' }}>
         {signer}
       </div>
       {subnote && (
         <div
           style={{
-            fontSize: '12px',
+            fontSize: '11.5px',
             fontStyle: 'italic',
             color: BRAND.muted,
-            marginTop: '2px',
+            marginTop: '1px',
           }}
         >
           {subnote}
@@ -137,9 +135,30 @@ const SealSignatureCard = ({ label, signer, subnote, sealTitle, sealSubtitle, da
     <OfficialRedSeal
       title={sealTitle}
       subtitle={sealSubtitle}
-      size={112}
+      size={82}
       date={date || getTodayVnShortDate()}
     />
+  </div>
+);
+
+const AccentSkillCard = ({ title, accent, bg, titleColor, children }) => (
+  <div
+    style={{
+      backgroundColor: bg,
+      borderRadius: '10px',
+      border: `1px solid ${BRAND.border}`,
+      overflow: 'hidden',
+      display: 'flex',
+      fontFamily: FONT_UNIFIED,
+    }}
+  >
+    <div style={{ width: '4.5px', backgroundColor: accent, flexShrink: 0 }} />
+    <div style={{ flex: 1, padding: '10px 14px' }}>
+      <div style={{ fontSize: '13.5px', fontWeight: '800', color: titleColor, marginBottom: '5px' }}>
+        {title}
+      </div>
+      {children}
+    </div>
   </div>
 );
 
@@ -248,12 +267,12 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
   return (
     <BrandLetterShell
       id={`score-report-${student.id}`}
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub="Official Academic Transcript"
       eyebrow={`ĐÁNH GIÁ ${String(config.examType || 'CUỐI KHÓA').toUpperCase()}`}
       title="BÁO CÁO KẾT QUẢ HỌC TẬP"
       subtitleEn="Course Assessment &amp; Academic Performance Report"
-      footerNote="Chúc mừng học viên đã hoàn thành kỳ đánh giá và nỗ lực rèn luyện tại Anh ngữ Nhật Mỹ!"
     >
       {/* Khối thông tin học viên + Điểm tổng kết */}
       <div
@@ -503,21 +522,21 @@ export const CommentsReportTemplate = ({ student, result }) => {
   return (
     <BrandLetterShell
       id={`comment-report-${student.id}`}
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub="Teacher's Academic Feedback"
       eyebrow="ĐÁNH GIÁ NĂNG LỰC CHI TIẾT"
       title="NHẬN XÉT CỦA GIÁO VIÊN"
       subtitleEn="Detailed Skill Evaluation &amp; Study Roadmap"
-      footerNote="Quý Phụ huynh vui lòng lưu lại nhận xét để đồng hành cùng con phát triển toàn diện 4 kỹ năng!"
     >
       {/* Thông tin học viên */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: `1.5px solid ${BRAND.blueBorder}`,
-          padding: '14px 20px',
-          marginBottom: '16px',
+          padding: '11px 18px',
+          marginBottom: '12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -526,10 +545,10 @@ export const CommentsReportTemplate = ({ student, result }) => {
         }}
       >
         <div>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             HỌ VÀ TÊN HỌC VIÊN
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px' }}>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '1px' }}>
             {student.name}
           </div>
         </div>
@@ -539,8 +558,8 @@ export const CommentsReportTemplate = ({ student, result }) => {
               backgroundColor: BRAND.blueSoft,
               border: `1.5px solid ${BRAND.blueBorder}`,
               borderRadius: '10px',
-              padding: '8px 14px',
-              fontSize: '13px',
+              padding: '6px 12px',
+              fontSize: '12.5px',
               fontWeight: '800',
               color: BRAND.blueDark,
             }}
@@ -551,26 +570,19 @@ export const CommentsReportTemplate = ({ student, result }) => {
       </div>
 
       {/* 4 khối kỹ năng */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {skillCards.map((card) => (
-          <div
+          <AccentSkillCard
             key={card.title}
-            style={{
-              backgroundColor: card.bg,
-              borderRadius: '12px',
-              border: `1px solid ${BRAND.border}`,
-              borderLeft: `4px solid ${card.accent}`,
-              padding: '12px 16px',
-              fontFamily: FONT_UNIFIED,
-            }}
+            title={card.title}
+            accent={card.accent}
+            bg={card.bg}
+            titleColor={card.titleColor}
           >
-            <div style={{ fontSize: '13.5px', fontWeight: '800', color: card.titleColor, marginBottom: '6px' }}>
-              {card.title}
-            </div>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
               {renderBulletComments(card.content)}
             </ul>
-          </div>
+          </AccentSkillCard>
         ))}
       </div>
 
@@ -1121,21 +1133,21 @@ export const PeriodicReportTemplate = ({ student, result }) => {
   return (
     <BrandLetterShell
       id="review-preview-card"
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub="Periodic Progress Report"
       eyebrow="THEO DÕI TIẾN ĐỘ HỌC TẬP"
       title="NHẬN XÉT ĐỊNH KỲ"
       subtitleEn="Periodic Academic Progress &amp; Skill Feedback"
-      footerNote="Trung tâm Anh ngữ Nhật Mỹ trân trọng sự đồng hành của Quý Phụ huynh trong quá trình tiến bộ của học viên!"
     >
       {/* Thẻ học viên */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: `1.5px solid ${BRAND.blueBorder}`,
-          padding: '15px 20px',
-          marginBottom: '16px',
+          padding: '11px 18px',
+          marginBottom: '12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -1144,10 +1156,10 @@ export const PeriodicReportTemplate = ({ student, result }) => {
         }}
       >
         <div>
-          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             HỌ VÀ TÊN HỌC VIÊN
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px' }}>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '1px' }}>
             {student?.name || 'HỌC VIÊN'}
           </div>
         </div>
@@ -1157,8 +1169,8 @@ export const PeriodicReportTemplate = ({ student, result }) => {
               backgroundColor: BRAND.blueSoft,
               border: `1.5px solid ${BRAND.blueBorder}`,
               borderRadius: '10px',
-              padding: '8px 14px',
-              fontSize: '13px',
+              padding: '6px 12px',
+              fontSize: '12.5px',
               fontWeight: '800',
               color: BRAND.blueDark,
             }}
@@ -1169,31 +1181,24 @@ export const PeriodicReportTemplate = ({ student, result }) => {
       </div>
 
       {/* 4 Khối kỹ năng */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {blocks.map((blk) => (
-          <div
+          <AccentSkillCard
             key={blk.title}
-            style={{
-              backgroundColor: blk.bg,
-              borderRadius: '12px',
-              border: `1px solid ${BRAND.border}`,
-              borderLeft: `4px solid ${blk.accent}`,
-              padding: '12px 16px',
-              fontFamily: FONT_UNIFIED,
-            }}
+            title={blk.title}
+            accent={blk.accent}
+            bg={blk.bg}
+            titleColor={blk.titleColor}
           >
-            <div style={{ fontSize: '13.5px', fontWeight: '800', color: blk.titleColor, marginBottom: '6px' }}>
-              {blk.title}
-            </div>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
               {renderBulletComments(blk.vi)}
             </ul>
             {blk.en && (
               <ul
                 style={{
-                  margin: '8px 0 0 0',
-                  paddingTop: '8px',
-                  paddingLeft: '20px',
+                  margin: '6px 0 0 0',
+                  paddingTop: '6px',
+                  paddingLeft: '18px',
                   borderTop: `1px dashed ${BRAND.border}`,
                   color: BRAND.muted,
                   fontSize: '12.5px',
@@ -1203,7 +1208,7 @@ export const PeriodicReportTemplate = ({ student, result }) => {
                 {renderBulletComments(blk.en)}
               </ul>
             )}
-          </div>
+          </AccentSkillCard>
         ))}
       </div>
 
@@ -1256,37 +1261,37 @@ export const TrialReportTemplate = ({ student, result, sessions }) => {
   return (
     <BrandLetterShell
       id="trial-report-capture"
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub="Trial Class Evaluation"
       eyebrow={`BÁO CÁO SAU ${sessions || 2} BUỔI TRẢI NGHIỆM`}
       title="NHẬN XÉT HỌC THỬ"
       subtitleEn="Trial Class Progress &amp; Roadmap Evaluation"
-      footerNote="Cảm ơn Quý Phụ huynh đã cho học viên trải nghiệm môi trường học tập chuẩn Cambridge tại Anh ngữ Nhật Mỹ!"
     >
       {/* Thẻ thông tin học viên */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: `1.5px solid ${BRAND.blueBorder}`,
-          padding: '16px 22px',
-          marginBottom: '18px',
+          padding: '11px 18px',
+          marginBottom: '12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '16px',
+          gap: '14px',
           fontFamily: FONT_UNIFIED,
         }}
       >
         <div>
-          <div style={{ fontSize: '11.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
             HỌ VÀ TÊN HỌC VIÊN
           </div>
-          <div style={{ fontSize: '23px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '3px', lineHeight: 1.2 }}>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '1px', lineHeight: 1.2 }}>
             {student?.name || 'HỌC VIÊN HỌC THỬ'}
           </div>
           {student?.classCode && (
-            <div style={{ fontSize: '13px', fontWeight: '600', color: BRAND.muted, marginTop: '4px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '600', color: BRAND.muted, marginTop: '3px' }}>
               📚 Lớp trải nghiệm: <strong style={{ color: BRAND.ink }}>{displayClass || student.classCode}</strong>
             </div>
           )}
@@ -1295,42 +1300,35 @@ export const TrialReportTemplate = ({ student, result, sessions }) => {
           style={{
             backgroundColor: BRAND.goldBg,
             border: `2px solid ${BRAND.gold}`,
-            borderRadius: '12px',
-            padding: '10px 16px',
+            borderRadius: '10px',
+            padding: '7px 14px',
             textAlign: 'center',
             flexShrink: 0,
           }}
         >
-          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
             GIAI ĐOẠN
           </div>
-          <div style={{ fontSize: '16px', fontWeight: '900', color: BRAND.blueDark, marginTop: '2px' }}>
+          <div style={{ fontSize: '14.5px', fontWeight: '900', color: BRAND.blueDark, marginTop: '1px' }}>
             {sessions || 2} BUỔI HỌC THỬ
           </div>
         </div>
       </div>
 
       {/* 4 Khối nhận xét */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '4px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {sections.map((sec) => (
-          <div
+          <AccentSkillCard
             key={sec.title}
-            style={{
-              backgroundColor: sec.bg,
-              borderRadius: '12px',
-              border: `1px solid ${BRAND.border}`,
-              borderLeft: `4px solid ${sec.accent}`,
-              padding: '13px 16px',
-              fontFamily: FONT_UNIFIED,
-            }}
+            title={sec.title}
+            accent={sec.accent}
+            bg={sec.bg}
+            titleColor={sec.titleColor}
           >
-            <div style={{ fontSize: '13.5px', fontWeight: '800', color: sec.titleColor, marginBottom: '6px' }}>
-              {sec.title}
-            </div>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500', lineHeight: 1.6 }}>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: BRAND.slate, fontSize: '13px', fontWeight: '500', lineHeight: 1.55 }}>
               {renderBulletComments(sec.content)}
             </ul>
-          </div>
+          </AccentSkillCard>
         ))}
       </div>
 

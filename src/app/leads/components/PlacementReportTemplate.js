@@ -93,26 +93,26 @@ const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiR
     <BrandLetterShell
       ref={ref}
       id="placement-report-capture"
+      compact={true}
       badgeTop="CAMBRIDGE ENGLISH"
       badgeSub="Placement Assessment Report"
       eyebrow="HỒ SƠ ĐÁNH GIÁ ĐẦU VÀO"
       title="KẾT QUẢ ĐÁNH GIÁ NĂNG LỰC"
       subtitleEn="English Placement Assessment &amp; Study Roadmap"
-      footerNote="Cảm ơn Quý Phụ huynh và học viên đã tin tưởng đồng hành cùng Hệ thống Anh ngữ Nhật Mỹ!"
     >
       {/* 1. THÔNG TIN HỌC VIÊN & TỔNG ĐIỂM */}
       <div
         style={{
           backgroundColor: BRAND.white,
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: `1.5px solid ${BRAND.blueBorder}`,
-          padding: '16px 22px',
-          marginBottom: '18px',
+          padding: '12px 18px',
+          marginBottom: '14px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '16px',
-          boxShadow: '0 2px 10px rgba(13, 136, 196, 0.06)',
+          gap: '14px',
+          boxShadow: '0 2px 8px rgba(13, 136, 196, 0.05)',
           fontFamily: FONT_UNIFIED,
         }}
       >
@@ -454,74 +454,77 @@ const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiR
           Nhận Xét Chuyên Môn &amp; Định Hướng (Teacher&apos;s Remarks)
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {remarkCards.map((card) => (
             <div
               key={card.title}
               style={{
                 backgroundColor: card.bg,
-                padding: '12px 15px',
                 borderRadius: '10px',
                 border: `1px solid ${BRAND.border}`,
-                borderLeft: `4px solid ${card.accent}`,
+                overflow: 'hidden',
+                display: 'flex',
+                fontFamily: FONT_UNIFIED,
               }}
             >
-              <div
-                style={{
-                  marginBottom: '5px',
-                  color: card.titleColor,
-                  fontSize: '13px',
-                  fontWeight: '800',
-                  fontFamily: FONT_UNIFIED,
-                }}
-              >
-                {card.title}
-              </div>
-              <div
-                style={{
-                  color: BRAND.slate,
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  lineHeight: 1.65,
-                  whiteSpace: 'pre-line',
-                  fontFamily: FONT_UNIFIED,
-                }}
-              >
-                {card.content}
+              <div style={{ width: '4.5px', backgroundColor: card.accent, flexShrink: 0 }} />
+              <div style={{ flex: 1, padding: '10px 14px' }}>
+                <div
+                  style={{
+                    marginBottom: '4px',
+                    color: card.titleColor,
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {card.title}
+                </div>
+                <div
+                  style={{
+                    color: BRAND.slate,
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-line',
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {card.content}
+                </div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 4. XÁC NHẬN CHUYÊN MÔN & MỘC ĐỎ */}
+      {/* 4. XÁC NHẬN CHUYÊN MÔN & MỘC ĐỎ (GỌN) */}
       <div
         style={{
-          backgroundColor: BRAND.white,
-          borderRadius: '12px',
-          border: `1px solid ${BRAND.border}`,
-          padding: '12px 20px',
+          borderTop: `1.5px dashed ${BRAND.border}`,
+          padding: '8px 6px 2px 6px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '16px',
+          gap: '14px',
+          marginTop: '10px',
         }}
       >
         <div>
-          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '700', color: BRAND.subtle, textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase' }}>
             Xác nhận kết quả khảo sát
           </div>
-          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14.5px', fontWeight: '800', color: BRAND.ink, marginTop: '2px' }}>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14px', fontWeight: '800', color: BRAND.ink, marginTop: '2px' }}>
             Hội đồng Chuyên môn — Hệ thống Anh ngữ Nhật Mỹ
           </div>
-          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontStyle: 'italic', color: BRAND.muted, marginTop: '2px' }}>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontStyle: 'italic', color: BRAND.muted, marginTop: '1px' }}>
             Báo cáo được lập dựa trên bài kiểm tra đầu vào thực tế của học viên.
           </div>
         </div>
         <OfficialRedSeal
           title="ĐÃ ĐÁNH GIÁ"
           subtitle="BAN CHUYÊN MÔN"
-          size={114}
+          size={82}
           date={testDate || getTodayVnShortDate()}
         />
       </div>
