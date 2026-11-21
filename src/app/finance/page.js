@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import PayrollTab from './PayrollTab';
 import ClassSelect from '../components/ClassSelect';
-import PaidStamp from '@/components/PaidStamp';
+import EReceiptTemplate from '@/components/EReceiptTemplate';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState('tuition'); // tuition, payroll
@@ -401,8 +401,7 @@ export default function FinancePage() {
     if (!receiptRef.current || copyingReceipt) return;
     setCopyingReceipt(true);
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+      const canvas = await exportElementToCanvas(receiptRef.current);
       const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG error'))), 'image/png', 1));
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       alert('✅ Đã copy Phiếu thu điện tử vào Clipboard! Bạn có thể dán (Ctrl+V) vào Zalo ngay.');
@@ -415,8 +414,7 @@ export default function FinancePage() {
 
   const handleDownloadReceiptImage = async () => {
     if (!receiptRef.current) return;
-    if (document.fonts?.ready) await document.fonts.ready;
-    const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const canvas = await exportElementToCanvas(receiptRef.current);
     const link = document.createElement('a');
     link.download = `PhieuThu_${eReceiptData?.receiptCode || 'NhatMy'}.png`;
     link.href = canvas.toDataURL('image/png', 1.0);
@@ -1036,80 +1034,7 @@ export default function FinancePage() {
               <h2 style={{ margin: 0, color: '#085E8A' }}><i className="fa-solid fa-receipt"></i> Phiếu Thu Điện Tử</h2>
               <button className="close-btn" onClick={() => setShowEReceiptModal(false)}>&times;</button>
             </div>
-            <div ref={receiptRef} style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.08)', position: 'relative' }}>
-              <div style={{ height: '6px', background: 'linear-gradient(90deg, #0D88C4 0%, #0D88C4 60%, #FFCA29 60%, #FFCA29 100%)' }}></div>
-              <div style={{ padding: '1.5rem 1.75rem 2.25rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif", position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
-                  <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: '54px', objectFit: 'contain' }} crossOrigin="anonymous" />
-                  <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
-                    <h2 style={{ margin: '0 0 0.1rem 0', color: '#085E8A', fontSize: '1.2rem', fontWeight: '900' }}>ANH NGỮ NHẬT MỸ</h2>
-                    <div style={{ fontSize: '0.7rem', fontStyle: 'italic', color: '#64748b', marginBottom: '0.3rem' }}>Dedicated to Excellence</div>
-                    <div style={{ display: 'inline-block', background: '#FFCA29', color: '#085E8A', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '800' }}>
-                      PHIẾU THU ĐIỆN TỬ
-                    </div>
-                    {eReceiptData.receiptCode && (
-                      <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
-                        Số: {eReceiptData.receiptCode}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div style={{ margin: '1rem 0', borderTop: '2px dashed #E2E8F0', borderBottom: '2px dashed #E2E8F0', padding: '0.85rem 0', fontSize: '0.92rem', lineHeight: '1.7' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Học viên:</span>
-                    <strong style={{ color: '#085E8A' }}>{eReceiptData.studentName?.toUpperCase()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Lớp học:</span>
-                    <strong>{eReceiptData.classCode}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Ngày lập:</span>
-                    <span>{eReceiptData.date} {eReceiptData.time}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Hình thức:</span>
-                    <span style={{ fontWeight: '600' }}>{eReceiptData.paymentMethod}</span>
-                  </div>
-                </div>
-                <div style={{ margin: '0.75rem 0', fontSize: '0.92rem', lineHeight: '1.8' }}>
-                  {Number(eReceiptData.discountAmount || 0) > 0 && Number(eReceiptData.originalFee || 0) > 0 && (
-                    <div style={{ marginBottom: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px dashed #E2E8F0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#64748B' }}>Học phí gốc khóa học:</span>
-                        <span style={{ color: '#64748B' }}>{Number(eReceiptData.originalFee).toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#059669', fontWeight: '600' }}>{eReceiptData.discountLabel || 'Ưu đãi / Giảm trừ'}:</span>
-                        <span style={{ fontWeight: '700', color: '#E11D48' }}>- {Number(eReceiptData.discountAmount).toLocaleString('vi-VN')}đ</span>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí chưa hoàn thành:</span>
-                    <span>{Number(eReceiptData.oldDebt || 0).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí đóng đợt này:</span>
-                    <span style={{ fontWeight: 'bold', color: '#0D88C4' }}>+ {Number(eReceiptData.tuitionPaid || 0).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí còn lại:</span>
-                    <span style={{ fontWeight: 'bold', color: Number(eReceiptData.remainingDebt || 0) > 0 ? '#E11D48' : '#10B981' }}>
-                      {Number(eReceiptData.remainingDebt || 0).toLocaleString('vi-VN')}đ {Number(eReceiptData.remainingDebt || 0) === 0 ? '(Đã hoàn tất)' : ''}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ marginTop: '1rem', background: '#FFFBEB', border: '2px solid #FFCA29', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#085E8A' }}>TỔNG THU ĐỢT NÀY:</span>
-                  <span style={{ fontWeight: '900', fontSize: '1.35rem', color: '#0D88C4' }}>{Number(eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: '#64748B', fontStyle: 'italic' }}>
-                  <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh &amp; Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
-                </div>
-                <PaidStamp date={eReceiptData.date} time={eReceiptData.time} receiptCode={eReceiptData.receiptCode} size={138} style={{ right: '10px', bottom: '20px' }} />
-              </div>
-            </div>
+            <EReceiptTemplate ref={receiptRef} data={eReceiptData} mode="course" />
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem' }}>
               <button type="button" className="btn btn-primary" disabled={copyingReceipt} onClick={handleCopyReceiptImage}>
                 <i className="fa-regular fa-copy"></i> {copyingReceipt ? 'Đang copy...' : 'Copy Ảnh Gửi Zalo'}

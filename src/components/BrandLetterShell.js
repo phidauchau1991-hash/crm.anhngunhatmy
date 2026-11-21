@@ -4,6 +4,69 @@ import React, { forwardRef } from 'react';
 import { BRAND, CENTER_INFO, FONT_UNIFIED } from '@/lib/brandTheme';
 
 /**
+ * Chân trang 2 cột đối xứng với Header:
+ * Trái (ANH NGỮ NHẬT MỸ ở trên / Dedicated to Excellence ở dưới — màu trắng trên nền xanh chuẩn nhận diện),
+ * Phải (Hotline • Website ở trên / Địa chỉ ở dưới).
+ */
+export function BrandLetterFooter({ padding = '12px 30px' }) {
+  return (
+    <div
+      style={{
+        backgroundColor: BRAND.blue,
+        padding,
+        color: BRAND.white,
+        borderTop: `3px solid ${BRAND.gold}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '16px',
+        fontFamily: FONT_UNIFIED,
+      }}
+    >
+      <div style={{ flexShrink: 0 }}>
+        <div
+          style={{
+            fontFamily: FONT_UNIFIED,
+            fontSize: '15px',
+            fontWeight: '900',
+            letterSpacing: '0.8px',
+            color: BRAND.white,
+            textTransform: 'uppercase',
+            lineHeight: 1.15,
+          }}
+        >
+          {CENTER_INFO.name}
+        </div>
+        <div
+          style={{
+            fontFamily: FONT_UNIFIED,
+            fontSize: '12px',
+            fontStyle: 'italic',
+            fontWeight: '600',
+            color: BRAND.white,
+            opacity: 0.95,
+            letterSpacing: '0.3px',
+            marginTop: '2px',
+          }}
+        >
+          {CENTER_INFO.slogan}
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'right', lineHeight: 1.45 }}>
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.98 }}>
+          Hotline: <strong style={{ fontWeight: '800' }}>{CENTER_INFO.hotline}</strong> • Website:{' '}
+          <strong style={{ fontWeight: '800' }}>{CENTER_INFO.website}</strong>
+        </div>
+        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.2px', fontWeight: '500', opacity: 0.92, marginTop: '2px' }}>
+          {CENTER_INFO.address}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Khung nhận diện thương hiệu chuẩn thống nhất cho mọi Thư Mời, Phiếu Đánh Giá,
  * Thông Báo Học Phí và Kết Quả Học Tập của Hệ thống Anh ngữ Nhật Mỹ.
  * Hỗ trợ chế độ `compact` cho các phiếu nhận xét / bảng điểm nhiều nội dung.
@@ -203,60 +266,8 @@ const BrandLetterShell = forwardRef(({
         {children}
       </div>
 
-      {/* 3. FOOTER GỌN ĐỐI XỨNG VỚI HEADER: TRÁI (TÊN THƯƠNG HIỆU 2 DÒNG) - PHẢI (LIÊN HỆ & ĐỊA CHỈ) */}
-      <div
-        style={{
-          backgroundColor: BRAND.blue,
-          padding: '12px 30px',
-          color: BRAND.white,
-          borderTop: `3px solid ${BRAND.gold}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          fontFamily: FONT_UNIFIED,
-        }}
-      >
-        <div style={{ flexShrink: 0 }}>
-          <div
-            style={{
-              fontFamily: FONT_UNIFIED,
-              fontSize: '15px',
-              fontWeight: '900',
-              letterSpacing: '0.8px',
-              color: BRAND.white,
-              textTransform: 'uppercase',
-              lineHeight: 1.15,
-            }}
-          >
-            {CENTER_INFO.name}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_UNIFIED,
-              fontSize: '12px',
-              fontStyle: 'italic',
-              fontWeight: '600',
-              color: BRAND.white,
-              opacity: 0.95,
-              letterSpacing: '0.3px',
-              marginTop: '2px',
-            }}
-          >
-            {CENTER_INFO.slogan}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'right', lineHeight: 1.45 }}>
-          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.98 }}>
-            Hotline: <strong style={{ fontWeight: '800' }}>{CENTER_INFO.hotline}</strong> • Website:{' '}
-            <strong style={{ fontWeight: '800' }}>{CENTER_INFO.website}</strong>
-          </div>
-          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.2px', fontWeight: '500', opacity: 0.92, marginTop: '2px' }}>
-            {CENTER_INFO.address}
-          </div>
-        </div>
-      </div>
+      {/* 3. FOOTER GỌN ĐỐI XỨNG VỚI HEADER */}
+      <BrandLetterFooter />
     </div>
   );
 });

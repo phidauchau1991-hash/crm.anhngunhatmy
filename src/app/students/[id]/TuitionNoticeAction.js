@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import TuitionNoticeTemplate from '../../components/TuitionNoticeTemplate';
 import ClassSelect from '../../components/ClassSelect';
 import { formatClassCode, getClassScheduleDetails } from '@/lib/classHelper';
 import { generateVietQRDataURL } from '@/lib/vietqr';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 
 export default function TuitionNoticeAction({ student }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -372,7 +372,7 @@ export default function TuitionNoticeAction({ student }) {
       // Chờ React vẽ ảnh Base64 lên DOM của templateRef
       await new Promise(r => setTimeout(r, 200));
 
-      const canvas = await html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false });
+      const canvas = await exportElementToCanvas(templateRef.current);
       canvas.toBlob(async (blob) => {
         try {
           await navigator.clipboard.write([
@@ -412,7 +412,7 @@ export default function TuitionNoticeAction({ student }) {
       await ensureQrReady();
       await new Promise(r => setTimeout(r, 200));
 
-      const canvas = await html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false });
+      const canvas = await exportElementToCanvas(templateRef.current);
       downloadCanvas(canvas);
     } catch (err) {
       console.error(err);

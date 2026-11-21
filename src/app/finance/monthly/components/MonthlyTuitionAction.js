@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './MonthlyNoticeTemplate';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 
 export default function MonthlyTuitionAction({ record, inlinePreview = false }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
     
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false });
+      const canvas = await exportElementToCanvas(templateRef.current);
       canvas.toBlob(async (blob) => {
         try {
           await navigator.clipboard.write([
@@ -99,7 +99,7 @@ export default function MonthlyTuitionAction({ record, inlinePreview = false }) 
     if (!templateRef.current) return;
     
     setIsGenerating(true);
-    html2canvas(templateRef.current, { scale: 2, useCORS: true, logging: false })
+    exportElementToCanvas(templateRef.current)
       .then(downloadCanvas)
       .catch(err => {
         console.error(err);

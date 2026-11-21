@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import OfficialRedSeal from '@/components/OfficialRedSeal';
+import { BrandLetterFooter } from '@/components/BrandLetterShell';
 import { formatClassCode } from '@/lib/classHelper';
 
 const FONT_UNIFIED = '"Be Vietnam Pro", "Segoe UI", Arial, sans-serif';
@@ -694,53 +695,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
               </div>
             </div>
 
-            {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ */}
-            <div
-              style={{
-                backgroundColor: BRAND.blue,
-                padding: '14px 28px',
-                color: BRAND.white,
-                textAlign: 'center',
-                borderTop: `3px solid ${BRAND.gold}`,
-                fontFamily: FONT_UNIFIED,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: FONT_UNIFIED,
-                  fontSize: '15.5px',
-                  fontWeight: '900',
-                  letterSpacing: '0.8px',
-                  color: BRAND.white,
-                  textTransform: 'uppercase',
-                  lineHeight: 1.2,
-                }}
-              >
-                ANH NGỮ NHẬT MỸ
-              </div>
-              <div
-                style={{
-                  fontFamily: FONT_UNIFIED,
-                  fontSize: '12px',
-                  fontStyle: 'italic',
-                  fontWeight: '500',
-                  color: BRAND.white,
-                  opacity: 0.95,
-                  letterSpacing: '0.35px',
-                  marginTop: '2px',
-                  marginBottom: '6px',
-                }}
-              >
-                Dedicated to Excellence
-              </div>
-              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontWeight: '500', opacity: 0.96 }}>
-                Hotline hỗ trợ phụ huynh: <strong style={{ fontWeight: '800' }}>0911 767 069</strong> • Website:{' '}
-                <strong style={{ fontWeight: '800' }}>anhngunhatmy.edu.vn</strong>
-              </div>
-              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '500', opacity: 0.9, marginTop: '2px' }}>
-                Địa chỉ: {CENTER_ADDRESS}
-              </div>
-            </div>
+            {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ 2 HÀNG ĐỐI XỨNG HEADER */}
+            <BrandLetterFooter padding="12px 28px" />
           </div>
         </div>
 

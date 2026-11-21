@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import MonthlyNoticeTemplate from './components/MonthlyNoticeTemplate';
 import MultiClassSelect from '@/app/components/MultiClassSelect';
 import CourseWelcomeModal from '@/components/CourseWelcomeModal';
-import PaidStamp from '@/components/PaidStamp';
+import EReceiptTemplate from '@/components/EReceiptTemplate';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 import { getShiftTime, parseShift, extractClassShiftCode } from '@/lib/classHelper';
 
 // Helper parse Ngày học và Giờ học từ ClassCode & Schedule (Đồng bộ 100% với SHIFT_HOURS_CONFIG)
@@ -924,19 +924,10 @@ export default function MonthlyBillingPage() {
     }
   };
 
-  // Helper tạo Blob PNG từ một DOM element bằng html2canvas (đồng bộ 100% với TuitionNoticeAction)
+  // Helper tạo Blob PNG từ một DOM element bằng engine chuẩn Retina 2x
   const captureElementToPngBlob = async (el) => {
     if (!el) throw new Error('Không tìm thấy vùng nội dung cần chụp ảnh');
-    if (document.fonts?.ready) {
-      await document.fonts.ready;
-    }
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
+    const canvas = await exportElementToCanvas(el, { allowTaint: true });
     return await new Promise((resolve, reject) => {
       canvas.toBlob((b) => {
         if (b) resolve(b);
@@ -3499,189 +3490,7 @@ export default function MonthlyBillingPage() {
                 </div>
               ) : (
                 <div style={{ textAlign: 'center' }}>
-                  <div
-                    ref={receiptRef}
-                    style={{
-                      background: '#fff',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
-                      position: 'relative',
-                      width: '100%',
-                      margin: '0 auto',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '6px',
-                        background: 'linear-gradient(90deg, #0D88C4 0%, #0D88C4 60%, #FFCA29 60%, #FFCA29 100%)',
-                      }}
-                    ></div>
-
-                    <div
-                      style={{
-                        padding: '1.5rem 1.75rem 2.25rem 1.75rem',
-                        textAlign: 'left',
-                        color: '#1E293B',
-                        fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
-                        position: 'relative',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
-                        <img
-                          src="/logo.png"
-                          alt="Anh ngữ Nhật Mỹ"
-                          style={{ height: '54px', width: '54px', objectFit: 'contain' }}
-                          crossOrigin="anonymous"
-                        />
-                        <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
-                          <h2
-                            style={{
-                              margin: '0 0 0.15rem 0',
-                              color: '#085E8A',
-                              fontSize: '1.25rem',
-                              fontWeight: '900',
-                              letterSpacing: '0.5px',
-                            }}
-                          >
-                            ANH NGỮ NHẬT MỸ
-                          </h2>
-                          <div style={{ fontSize: '0.72rem', fontStyle: 'italic', color: '#64748b', marginBottom: '0.35rem' }}>
-                            Dedicated to Excellence
-                          </div>
-                          <div
-                            style={{
-                              display: 'inline-block',
-                              background: '#FFCA29',
-                              color: '#085E8A',
-                              padding: '0.2rem 0.85rem',
-                              borderRadius: '20px',
-                              fontSize: '0.8rem',
-                              fontWeight: '800',
-                              letterSpacing: '0.5px',
-                            }}
-                          >
-                            PHIẾU THU ĐIỆN TỬ
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
-                            Số: {eReceiptData.receiptCode || `PT-T${(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-${(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}`}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          margin: '1rem 0',
-                          borderTop: '2px dashed #E2E8F0',
-                          borderBottom: '2px dashed #E2E8F0',
-                          padding: '0.85rem 0',
-                          fontSize: '0.95rem',
-                          lineHeight: '1.7',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748B' }}>Học viên:</span>
-                          <strong style={{ color: '#085E8A', fontSize: '1.05rem' }}>
-                            {eReceiptData.studentName.toUpperCase()}
-                          </strong>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748B' }}>Tháng thu:</span>
-                          <strong style={{ color: '#085E8A' }}>Tháng {eReceiptData.monthYear}</strong>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748B' }}>Ngày lập:</span>
-                          <span>
-                            {eReceiptData.date} {eReceiptData.time}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#64748B' }}>Hình thức:</span>
-                          <span style={{ fontWeight: '700', color: '#0f172a' }}>{eReceiptData.paymentMethod}</span>
-                        </div>
-                      </div>
-
-                      <div style={{ margin: '0.75rem 0', fontSize: '0.92rem', lineHeight: '1.85' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#475569' }}>1. Học phí tháng {eReceiptData.monthYear}:</span>
-                          <span style={{ fontWeight: '600' }}>{Number(eReceiptData.currentFee || 0).toLocaleString('vi-VN')}đ</span>
-                        </div>
-
-                        {Number(eReceiptData.previousDebt || 0) > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#B45309' }}>
-                            <span>2. Nợ cũ chuyển sang:</span>
-                            <span style={{ fontWeight: '600' }}>+ {Number(eReceiptData.previousDebt || 0).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        )}
-
-                        {Number(eReceiptData.excessMissing || 0) !== 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#475569' }}>3. Bù trừ dư/thiếu:</span>
-                            <span style={{ fontWeight: '600' }}>{Number(eReceiptData.excessMissing || 0) > 0 ? '+' : ''}{Number(eReceiptData.excessMissing || 0).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: '4px', marginTop: '4px' }}>
-                          <span style={{ color: '#085E8A', fontWeight: '800' }}>TỔNG CẦN THANH TOÁN:</span>
-                          <strong style={{ color: '#085E8A', fontWeight: '900', fontSize: '1.05rem' }}>
-                            {Number(eReceiptData.totalToPay || 0).toLocaleString('vi-VN')}đ
-                          </strong>
-                        </div>
-
-                        {Number(eReceiptData.amountPaidBefore || 0) > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#64748B' }}>Đã nộp trước đó:</span>
-                            <span>{Number(eReceiptData.amountPaidBefore || 0).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: '4px', marginTop: '4px' }}>
-                          <span style={{ color: '#475569', fontWeight: '600' }}>Học phí còn lại:</span>
-                          <span
-                            style={{
-                              fontWeight: 'bold',
-                              color: Number(eReceiptData.remainingDebt || 0) > 0 ? '#E11D48' : '#10B981',
-                            }}
-                          >
-                            {Number(eReceiptData.remainingDebt || 0).toLocaleString('vi-VN')}đ{' '}
-                            {Number(eReceiptData.remainingDebt || 0) === 0 ? '(Đã hoàn tất)' : '(Lưu nợ kỳ sau)'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: '1rem',
-                          background: '#FFFBEB',
-                          border: '2px solid #FFCA29',
-                          borderRadius: '10px',
-                          padding: '0.85rem 1rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span style={{ fontWeight: '800', fontSize: '1rem', color: '#085E8A' }}>THỰC THU ĐỢT NÀY:</span>
-                        <span style={{ fontWeight: '900', fontSize: '1.35rem', color: '#0D88C4' }}>
-                          {Number(eReceiptData.amountThisTime || 0).toLocaleString('vi-VN')}đ
-                        </span>
-                      </div>
-
-                      {/* Footer */}
-                      <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
-                        <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh & Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
-                      </div>
-
-                      {/* CON DẤU MỘC ĐỎ ĐIỆN TỬ "ĐÃ THU TIỀN / PAID" */}
-                      <PaidStamp
-                        date={eReceiptData.date}
-                        time={eReceiptData.time}
-                        receiptCode={`PT-T${(eReceiptData.monthYear || '').replace(/[^0-9]/g, '')}-${(eReceiptData.studentName || 'HV').slice(0, 3).toUpperCase()}`}
-                        size={142}
-                        style={{ right: '12px', bottom: '22px' }}
-                      />
-                    </div>
-                  </div>
+                  <EReceiptTemplate ref={receiptRef} data={eReceiptData} mode="monthly" />
 
                   <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                     <button

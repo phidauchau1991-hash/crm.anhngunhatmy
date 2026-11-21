@@ -2,6 +2,7 @@
 
 import React, { forwardRef } from 'react';
 import OfficialRedSeal from '@/components/OfficialRedSeal';
+import { BrandLetterFooter } from '@/components/BrandLetterShell';
 
 // Cấu hình 2 bộ lưu ý & xưng hô chuẩn mực theo độ tuổi
 export const TONE_PROFILES = {
@@ -588,52 +589,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
 
       </div>
 
-      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ — SLOGAN NẰM DƯỚI CHỮ ANH NGỮ NHẬT MỸ, NHỎ HƠN VÀ IN NGHIÊNG */}
-      <div
-        style={{
-          backgroundColor: BRAND.blue,
-          padding: '16px 36px',
-          color: BRAND.white,
-          textAlign: 'center',
-          borderTop: `3px solid ${BRAND.gold}`,
-          fontFamily: FONT_UNIFIED,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: FONT_UNIFIED,
-            fontSize: '16.5px',
-            fontWeight: '900',
-            letterSpacing: '1px',
-            color: BRAND.white,
-            textTransform: 'uppercase',
-            lineHeight: 1.2,
-          }}
-        >
-          ANH NGỮ NHẬT MỸ
-        </div>
-        <div
-          style={{
-            fontFamily: FONT_UNIFIED,
-            fontSize: '12.5px',
-            fontStyle: 'italic',
-            fontWeight: '500',
-            color: BRAND.white,
-            opacity: 0.95,
-            letterSpacing: '0.4px',
-            marginTop: '2px',
-            marginBottom: '8px',
-          }}
-        >
-          Dedicated to Excellence
-        </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13px', fontWeight: '500', opacity: 0.96 }}>
-          Hotline hỗ trợ phụ huynh: <strong style={{ fontWeight: '800' }}>0911 767 069</strong> • Website: <strong style={{ fontWeight: '800' }}>anhngunhatmy.edu.vn</strong>
-        </div>
-        <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '500', opacity: 0.9, marginTop: '3px' }}>
-          Địa chỉ: {CENTER_ADDRESS}
-        </div>
-      </div>
+      {/* 3. FOOTER THƯƠNG HIỆU NHẬT MỸ 2 HÀNG ĐỐI XỨNG HEADER */}
+      <BrandLetterFooter padding="13px 34px" />
     </div>
   );
 });

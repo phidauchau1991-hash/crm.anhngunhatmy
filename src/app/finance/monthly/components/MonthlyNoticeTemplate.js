@@ -1,5 +1,9 @@
 'use client';
+
 import React, { forwardRef } from 'react';
+import BrandLetterShell from '@/components/BrandLetterShell';
+import OfficialRedSeal from '@/components/OfficialRedSeal';
+import { BRAND, FONT_UNIFIED, getTodayVnShortDate } from '@/lib/brandTheme';
 
 const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
   const {
@@ -10,7 +14,6 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
     billingType = '',
     committedSessions = 0,
     actualSessions = 0,
-    feePerSession = 0,
     currentFee = 0,
     excessMissing = 0,
     previousDebt = 0,
@@ -18,14 +21,12 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
     qrUrl = '',
     datesPresent = [],
     datesAbsent = [],
-    debtMonth = ''
+    debtMonth = '',
   } = noticeData || {};
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
-  };
+  const formatCurrency = (amount) =>
+    `${new Intl.NumberFormat('vi-VN').format(Math.round(amount || 0))} đ`;
 
-  // Tính toán tháng trước, tháng hiện tại và tháng tiếp theo
   const getAdjacentMonths = (my) => {
     if (!my || !my.includes('/')) return { current: my || '', prev: '', next: '' };
     const [mm, yyyy] = my.split('/');
@@ -33,16 +34,24 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
     const y = parseInt(yyyy, 10);
     if (isNaN(m) || isNaN(y)) return { current: my, prev: '', next: '' };
 
-    let pm = m - 1, py = y;
-    if (pm === 0) { pm = 12; py -= 1; }
+    let pm = m - 1;
+    let py = y;
+    if (pm === 0) {
+      pm = 12;
+      py -= 1;
+    }
 
-    let nm = m + 1, ny = y;
-    if (nm === 13) { nm = 1; ny += 1; }
+    let nm = m + 1;
+    let ny = y;
+    if (nm === 13) {
+      nm = 1;
+      ny += 1;
+    }
 
     return {
       current: my,
       prev: `${pm.toString().padStart(2, '0')}/${py}`,
-      next: `${nm.toString().padStart(2, '0')}/${ny}`
+      next: `${nm.toString().padStart(2, '0')}/${ny}`,
     };
   };
 
@@ -50,170 +59,198 @@ const MonthlyNoticeTemplate = forwardRef(({ noticeData }, ref) => {
   const targetNoticeMonth = billingType === 'MONTHLY_PREPAID' ? nextMonth : reviewedMonth;
   const actualDebtMonth = debtMonth || defaultDebtMonth;
 
-  const nameNoAccent = studentName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
-  const firstName = nameNoAccent.trim().split(' ').pop().toUpperCase();
+  const nameNoAccent = studentName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+  const firstName = (nameNoAccent.trim().split(' ').pop() || 'HV').toUpperCase();
   const transferContent = `${firstName} HP THANG ${targetNoticeMonth.replace('/', '')}`;
 
   return (
-    <div
+    <BrandLetterShell
       ref={ref}
-      style={{
-        width: '800px',
-        backgroundColor: 'white',
-        color: '#1e293b',
-        fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
-        lineHeight: '1.6',
-        fontSize: '15px',
-        textAlign: 'left',
-        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-      }}
+      id="monthly-tuition-notice-capture"
+      compact={true}
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub={`Monthly Tuition • ${targetNoticeMonth}`}
+      eyebrow={`V/V ĐÓNG HỌC PHÍ THÁNG ${targetNoticeMonth}`}
+      title="THƯ THÔNG BÁO HỌC PHÍ THÁNG"
+      subtitleEn={`Monthly Tuition Fee & Attendance Statement • ${targetNoticeMonth}`}
     >
-      {/* Header Band */}
-      <div style={{ height: '8px', width: '100%', backgroundColor: '#0d88c4' }}></div>
-
-      <div style={{ padding: '36px 46px', position: 'relative', zIndex: 1 }}>
-        {/* Header Content */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', borderBottom: '2px solid #e2e8f0', paddingBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <img 
-              src="/logo.png" 
-              alt="ANH NGỮ NHẬT MỸ" 
-              style={{ width: '76px', height: '76px', objectFit: 'contain', flexShrink: 0 }} 
-              crossOrigin="anonymous"
-              loading="eager"
-              decoding="sync"
-            />
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: '900', color: '#085E8A', letterSpacing: '0.5px', lineHeight: '1.2' }}>
-                ANH NGỮ NHẬT MỸ
-              </div>
-              <div style={{ fontSize: '13px', fontStyle: 'italic', color: '#64748b', fontWeight: '500', marginTop: '2px' }}>
-                Dedicated to Excellence
-              </div>
-            </div>
+      {/* 1. THÔNG TIN HỌC VIÊN & TỔNG CẦN ĐÓNG */}
+      <div
+        style={{
+          marginBottom: '14px',
+          padding: '13px 18px',
+          backgroundColor: BRAND.white,
+          borderRadius: '12px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '14px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            KÍNH GỬI PHỤ HUYNH EM
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900', textTransform: 'uppercase', color: '#0d88c4', letterSpacing: '0.8px' }}>THƯ THÔNG BÁO</h1>
-            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '15px', color: '#475569', marginTop: '3px', fontWeight: '600' }}>
-              V/v đóng học phí tháng {targetNoticeMonth}
-            </p>
+          <div style={{ fontSize: '21px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px' }}>
+            {studentName.toUpperCase()}
+          </div>
+          <div style={{ fontSize: '13px', color: BRAND.slate, marginTop: '4px' }}>
+            <span>🏫 Lớp: <strong style={{ color: BRAND.blueDark }}>{classCode}</strong></span>
+            {teacherName && <span style={{ marginLeft: '12px' }}>• 👩‍🏫 GVCN: <strong>{teacherName}</strong></span>}
           </div>
         </div>
 
-        {/* Info Box */}
-        <div style={{ marginBottom: '25px', paddingLeft: '20px', borderLeft: '4px solid #0d88c4' }}>
-          <ul style={{ listStyleType: 'none', padding: 0, margin: 0, textAlign: 'left' }}>
-            <li style={{ marginBottom: '4px' }}><strong>Kính gửi:</strong> Phụ huynh em <strong style={{ color: '#0d88c4', fontSize: '16px' }}>{studentName.toUpperCase()}</strong></li>
-            <li style={{ marginBottom: '4px' }}><strong>Lớp:</strong> {classCode}</li>
-            {teacherName && <li><strong>GVCN:</strong> {teacherName}</li>}
-          </ul>
-        </div>
-
-        {/* Intro */}
-        <div style={{ textAlign: 'justify', marginBottom: '25px', lineHeight: '1.6', color: '#334155' }}>
-          <p style={{ margin: '0 0 0.5rem 0' }}>
-            Anh ngữ Nhật Mỹ xin gửi lời chào, lời biết ơn đến ba mẹ/đại diện Học viên đã tin tưởng và đồng hành cùng Trung tâm trong thời gian vừa qua.
-            <br/>
-            Trung tâm xin gửi đến ba mẹ thông tin học phí tháng {targetNoticeMonth} của lớp <strong>{classCode}</strong> như sau:
-          </p>
-        </div>
-
-        {/* Fee details */}
-        <div style={{ background: '#f8fafc', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
-          <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, textAlign: 'left' }}>
-            <li style={{ marginBottom: '8px' }}>Số buổi đã học trong tháng {reviewedMonth}: <strong>{actualSessions} buổi</strong></li>
-            
-            {previousDebt > 0 && (
-              <li style={{ marginBottom: '8px', color: '#ea580c' }}>Học phí chưa hoàn thành của tháng {actualDebtMonth}: <strong>{formatCurrency(previousDebt)}</strong></li>
-            )}
-            
-            {billingType === 'MONTHLY_PREPAID' ? (
-              <>
-                {Number(excessMissing) !== 0 && (
-                  <li style={{ marginBottom: '8px' }}>Học phí dư/thiếu sau tháng {reviewedMonth}: <strong style={{ color: excessMissing > 0 ? '#ea580c' : excessMissing < 0 ? '#16a34a' : '#475569' }}>{formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : excessMissing < 0 ? '(Dư)' : ''}</strong></li>
-                )}
-                <li style={{ marginBottom: '8px' }}>Học phí {committedSessions} buổi của tháng {targetNoticeMonth}: <strong>{formatCurrency(currentFee)}</strong></li>
-              </>
-            ) : (
-              <>
-                <li style={{ marginBottom: '8px' }}>Học phí của số buổi học trong tháng {reviewedMonth}: <strong>{formatCurrency(currentFee)}</strong></li>
-              </>
-            )}
-          </ul>
-        </div>
-
-        {/* Attendance details */}
-        {(datesPresent.length > 0 || datesAbsent.length > 0) && (
-          <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-            <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>Chi tiết điểm danh tháng {reviewedMonth}:</p>
-            {datesPresent.length > 0 && (
-              <p style={{ margin: '0 0 5px 0' }}>
-                <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Ngày có mặt:</span> {datesPresent.join(', ')}
-              </p>
-            )}
-            {datesAbsent.length > 0 && (
-              <p style={{ margin: 0 }}>
-                <span style={{ color: '#dc2626', fontWeight: 'bold' }}>Ngày vắng:</span> {datesAbsent.join(', ')}
-              </p>
-            )}
+        <div
+          style={{
+            backgroundColor: BRAND.goldBg,
+            border: `2px solid ${BRAND.gold}`,
+            borderRadius: '10px',
+            padding: '8px 14px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: '10.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+            TỔNG CẦN ĐÓNG
           </div>
-        )}
-
-        {/* Total */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #e2e8f0', paddingBottom: '15px', marginBottom: '25px' }}>
-          <div>
-            <div style={{ fontSize: '18px' }}><strong>Tổng cộng cần đóng:</strong> <strong style={{ color: '#dc2626', fontSize: '22px', marginLeft: '5px' }}>{formatCurrency(totalToPay)}</strong></div>
+          <div style={{ fontSize: '19px', fontWeight: '900', color: totalToPay > 0 ? '#DC2626' : BRAND.greenBadge, marginTop: '2px' }}>
+            {formatCurrency(totalToPay)}
           </div>
         </div>
+      </div>
 
-        {/* Payment details */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, paddingRight: '30px' }}>
-            <p style={{ marginBottom: '15px', fontWeight: 'bold', color: '#0d88c4' }}>Thông tin chuyển khoản:</p>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: 0, lineHeight: '2' }}>
-              <li>Ngân hàng: <strong>NH quân Đội - MB Bank</strong></li>
-              <li>Số TK: <strong style={{ fontSize: '18px', color: '#0d88c4' }}>61 1991 6886</strong></li>
-              <li>Người nhận: <strong>CÔNG TY TNHH NGOAI NGU TRI THUC VIET</strong></li>
-              <li>Nội dung: <strong style={{ backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>{transferContent}</strong></li>
-            </ul>
-            <div style={{ marginTop: '20px', padding: '12px', background: '#f0fdf4', borderLeft: '4px solid #22c55e', borderRadius: '4px', fontSize: '13px', fontStyle: 'italic', color: '#166534' }}>
-              <i className="fa-solid fa-shield-check" style={{ marginRight: '5px' }}></i> 
-              Mã quét bên cạnh là mã thanh toán tự động, sẽ dẫn đến chính xác tài khoản công ty của Trung tâm Anh ngữ Nhật Mỹ, phụ huynh có thể hoàn toàn an tâm quét mã này.
-            </div>
-          </div>
-          
-          <div style={{ width: '220px', textAlign: 'center' }}>
-            <div style={{ border: '2px solid #0d88c4', borderRadius: '12px', padding: '15px', background: '#fff', boxShadow: '0 4px 6px -1px rgba(13, 136, 196, 0.2)' }}>
-              <div style={{ fontWeight: 'bold', color: '#0d88c4', marginBottom: '10px', fontSize: '13px' }}>
-                QUÉT ĐỂ THANH TOÁN
-              </div>
-              {qrUrl ? (
-                <img
-                  src={qrUrl}
-                  alt="QR Code"
-                  style={{ width: '100%', height: 'auto', display: 'block' }}
-                  loading="eager"
-                  decoding="sync"
-                />
-              ) : (
-                <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '13px', color: '#475569', padding: '10px', boxSizing: 'border-box' }}>
-                  {totalToPay > 0 ? 'Đang tạo mã QR...' : 'Không phát sinh khoản cần thanh toán'}
-                </div>
+      {/* 2. LỜI CHÀO */}
+      <div style={{ textAlign: 'justify', marginBottom: '14px', lineHeight: 1.6, color: BRAND.slate, fontSize: '13.5px', fontFamily: FONT_UNIFIED }}>
+        Anh ngữ Nhật Mỹ xin gửi lời cảm ơn chân thành đến Quý Phụ huynh đã luôn đồng hành cùng Trung tâm. Trung tâm kính gửi thông tin điểm danh và học phí tháng{' '}
+        <strong>{targetNoticeMonth}</strong> của lớp <strong>{classCode}</strong> như sau:
+      </div>
+
+      {/* 3. CHI TIẾT HỌC PHÍ */}
+      <div style={{ backgroundColor: BRAND.white, padding: '13px 18px', borderRadius: '12px', border: `1.5px solid ${BRAND.border}`, marginBottom: '12px', fontSize: '13.5px', fontFamily: FONT_UNIFIED }}>
+        <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: 0, lineHeight: 1.8 }}>
+          <li>
+            Số buổi đã học trong tháng {reviewedMonth}: <strong>{actualSessions} buổi</strong>
+          </li>
+          {previousDebt > 0 && (
+            <li style={{ color: '#EA580C' }}>
+              Học phí chưa hoàn thành của tháng {actualDebtMonth}: <strong>{formatCurrency(previousDebt)}</strong>
+            </li>
+          )}
+          {billingType === 'MONTHLY_PREPAID' ? (
+            <>
+              {Number(excessMissing) !== 0 && (
+                <li>
+                  Học phí dư/thiếu sau tháng {reviewedMonth}:{' '}
+                  <strong style={{ color: excessMissing > 0 ? '#EA580C' : BRAND.greenBadge }}>
+                    {formatCurrency(Math.abs(excessMissing))} {excessMissing > 0 ? '(Thiếu)' : '(Dư)'}
+                  </strong>
+                </li>
               )}
+              <li>
+                Học phí {committedSessions} buổi của tháng {targetNoticeMonth}: <strong>{formatCurrency(currentFee)}</strong>
+              </li>
+            </>
+          ) : (
+            <li>
+              Học phí của số buổi học trong tháng {reviewedMonth}: <strong>{formatCurrency(currentFee)}</strong>
+            </li>
+          )}
+        </ul>
+      </div>
+
+      {/* 4. CHI TIẾT ĐIỂM DANH */}
+      {(datesPresent.length > 0 || datesAbsent.length > 0) && (
+        <div style={{ marginBottom: '14px', padding: '12px 16px', backgroundColor: BRAND.greenBadgeBg, borderRadius: '10px', border: `1px solid ${BRAND.greenBorder}`, fontSize: '13px', fontFamily: FONT_UNIFIED }}>
+          <div style={{ marginBottom: '5px', fontWeight: '800', color: '#065F46' }}>
+            📋 Chi tiết điểm danh tháng {reviewedMonth}:
+          </div>
+          {datesPresent.length > 0 && (
+            <div style={{ marginBottom: datesAbsent.length > 0 ? '4px' : 0 }}>
+              <span style={{ color: BRAND.greenBadge, fontWeight: '800' }}>Ngày có mặt:</span> {datesPresent.join(', ')}
             </div>
+          )}
+          {datesAbsent.length > 0 && (
+            <div>
+              <span style={{ color: '#DC2626', fontWeight: '800' }}>Ngày vắng:</span> {datesAbsent.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 5. CHUYỂN KHOẢN, VIETQR & MỘC ĐỎ */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.border}`,
+          padding: '14px 18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '18px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '13.5px', fontWeight: '800', color: BRAND.blueDark, marginBottom: '6px', textTransform: 'uppercase' }}>
+            🏦 Thông tin chuyển khoản:
+          </div>
+          <ul style={{ listStyleType: 'none', padding: 0, margin: 0, lineHeight: 1.85, fontSize: '13px', color: BRAND.slate }}>
+            <li>Ngân hàng: <strong>NH Quân Đội - MB Bank</strong></li>
+            <li>Số TK: <strong style={{ fontSize: '16px', color: BRAND.blueDark }}>61 1991 6886</strong></li>
+            <li>Người nhận: <strong>CÔNG TY TNHH NGOAI NGU TRI THUC VIET</strong></li>
+            <li>
+              Nội dung CK:{' '}
+              <strong style={{ backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '5px', color: '#92400E' }}>
+                {transferContent}
+              </strong>
+            </li>
+          </ul>
+          <div style={{ marginTop: '8px', padding: '7px 11px', backgroundColor: BRAND.greenBadgeBg, borderLeft: `4px solid ${BRAND.greenBadge}`, borderRadius: '5px', fontSize: '12px', fontStyle: 'italic', color: '#065F46' }}>
+            ✓ Mã VietQR bên cạnh là mã thanh toán tự động, dẫn trực tiếp đến tài khoản công ty của Trung tâm Anh ngữ Nhật Mỹ.
+          </div>
+
+          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <OfficialRedSeal title="THÔNG BÁO HỌC PHÍ" subtitle="PHÒNG TÀI CHÍNH" size={82} date={getTodayVnShortDate()} />
+            <span style={{ fontSize: '11.5px', color: BRAND.muted, fontStyle: 'italic' }}>
+              Xác nhận học phí tháng {targetNoticeMonth} từ Phòng Tài chính.
+            </span>
+          </div>
+        </div>
+
+        <div style={{ width: '196px', textAlign: 'center', flexShrink: 0 }}>
+          <div style={{ border: `2px solid ${BRAND.blue}`, borderRadius: '12px', padding: '11px', backgroundColor: BRAND.white, boxShadow: '0 4px 10px rgba(13, 136, 196, 0.14)' }}>
+            <div style={{ fontWeight: '800', color: BRAND.blueDark, marginBottom: '6px', fontSize: '12px' }}>
+              QUÉT ĐỂ THANH TOÁN
+            </div>
+            {qrUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={qrUrl}
+                alt="QR Code"
+                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }}
+                loading="eager"
+                decoding="sync"
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '12px', color: BRAND.subtle, padding: '10px', boxSizing: 'border-box' }}>
+                {totalToPay > 0 ? 'Đang tạo mã QR...' : 'Không phát sinh khoản cần thanh toán'}
+              </div>
+            )}
+            <div style={{ marginTop: '5px', fontSize: '11px', fontWeight: '800', color: BRAND.blue }}>NAPAS 24/7</div>
           </div>
         </div>
       </div>
-
-      {/* Footer Band */}
-      <div style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '20px 50px', textAlign: 'center', borderBottom: '8px solid #0d88c4' }}>
-        <p style={{ margin: '0 0 5px 0', fontSize: '14px' }}>Mọi thắc mắc vui lòng liên hệ hotline Trung tâm <strong style={{ color: '#0d88c4', fontSize: '16px' }}>0911 767 069</strong>.</p>
-        <p style={{ margin: 0, fontWeight: 'bold', color: '#475569' }}>Trân trọng thông báo!</p>
-      </div>
-    </div>
+    </BrandLetterShell>
   );
 });
 
 MonthlyNoticeTemplate.displayName = 'MonthlyNoticeTemplate';
-
 export default MonthlyNoticeTemplate;

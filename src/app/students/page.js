@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import ClassSelect from '../components/ClassSelect';
 import MultiClassSelect from '../components/MultiClassSelect';
-import PaidStamp from '@/components/PaidStamp';
+import EReceiptTemplate from '@/components/EReceiptTemplate';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 import CoursewareNoticeModal from '@/components/CoursewareNoticeModal';
 import CourseWelcomeModal from '@/components/CourseWelcomeModal';
 import { AVAILABLE_COURSEWARE_BOOKS, parseCustomBookCodes } from '@/lib/coursewareBooks';
@@ -747,16 +747,7 @@ export default function StudentsPage() {
 
   const captureReceiptCanvas = async () => {
     if (!receiptRef.current) return null;
-    if (document.fonts?.ready) {
-      await document.fonts.ready;
-    }
-    return await html2canvas(receiptRef.current, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
+    return await exportElementToCanvas(receiptRef.current, { allowTaint: false });
   };
 
   const copyReceiptImage = async () => {
@@ -3673,160 +3664,7 @@ export default function StudentsPage() {
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
           <div className="modal-content" style={{ maxWidth: '440px', padding: '1.25rem', background: '#f1f5f9', borderRadius: '16px' }}>
             
-            <div ref={receiptRef} style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.08)', position: 'relative' }}>
-              {/* Dải line nhận diện thương hiệu Xanh & Vàng */}
-              <div style={{ height: '6px', background: 'linear-gradient(90deg, #0D88C4 0%, #0D88C4 60%, #FFCA29 60%, #FFCA29 100%)' }}></div>
-              
-              <div style={{ padding: '1.5rem 1.75rem 2.25rem 1.75rem', textAlign: 'left', color: '#1E293B', fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif", position: 'relative' }}>
-                {/* Header: Logo bên trái, Tiêu đề ở giữa */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
-                  <img src="/logo.png" alt="Anh ngữ Nhật Mỹ" style={{ height: '54px', width: '54px', objectFit: 'contain' }} crossOrigin="anonymous" />
-                  <div style={{ flex: 1, textAlign: 'center', paddingRight: '10px' }}>
-                    <h2 style={{ margin: '0 0 0.1rem 0', color: '#085E8A', fontSize: '1.25rem', fontWeight: '900', letterSpacing: '0.5px' }}>ANH NGỮ NHẬT MỸ</h2>
-                    <div style={{ fontSize: '0.7rem', fontStyle: 'italic', color: '#64748b', marginBottom: '0.3rem' }}>Dedicated to Excellence</div>
-                    <div style={{ display: 'inline-block', background: '#FFCA29', color: '#085E8A', padding: '0.2rem 0.85rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
-                      PHIẾU THU ĐIỆN TỬ
-                    </div>
-                    {eReceiptData.receiptCode && (
-                      <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '700', marginTop: '0.25rem' }}>
-                        Số: {eReceiptData.receiptCode}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Thông tin học viên */}
-                <div style={{ margin: '1rem 0', borderTop: '2px dashed #E2E8F0', borderBottom: '2px dashed #E2E8F0', padding: '0.85rem 0', fontSize: '0.95rem', lineHeight: '1.7' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Học viên:</span>
-                    <strong style={{ color: '#085E8A', fontSize: '1.05rem' }}>{eReceiptData.studentName.toUpperCase()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Ngày lập:</span>
-                    <span>{eReceiptData.date} {eReceiptData.time}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748B' }}>Hình thức:</span>
-                    <span style={{ fontWeight: '600' }}>{eReceiptData.paymentMethod}</span>
-                  </div>
-                </div>
-                
-                {/* Khối chi tiết Học phí */}
-                <div style={{ margin: '0.75rem 0', fontSize: '0.95rem', lineHeight: '1.8' }}>
-                  {Number(eReceiptData.discountAmount || 0) > 0 && Number(eReceiptData.originalFee || 0) > 0 && (
-                    <div style={{ marginBottom: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px dashed #E2E8F0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#64748B' }}>Học phí gốc khóa học:</span>
-                        <span style={{ color: '#64748B' }}>{Number(eReceiptData.originalFee).toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#059669', fontWeight: '600' }}>{eReceiptData.discountLabel || 'Ưu đãi / Giảm trừ'}:</span>
-                        <span style={{ fontWeight: '700', color: '#E11D48' }}>- {Number(eReceiptData.discountAmount).toLocaleString('vi-VN')}đ</span>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí chưa hoàn thành:</span>
-                    <span>{Number(eReceiptData.oldDebt || 0).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí đóng đợt này:</span>
-                    <span style={{ fontWeight: 'bold', color: '#0D88C4' }}>+ {Number(eReceiptData.tuitionPaid || 0).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#475569' }}>Học phí còn lại:</span>
-                    <span style={{ fontWeight: 'bold', color: Number(eReceiptData.remainingDebt || 0) > 0 ? '#E11D48' : '#10B981' }}>
-                      {Number(eReceiptData.remainingDebt || 0).toLocaleString('vi-VN')}đ {Number(eReceiptData.remainingDebt || 0) === 0 ? '(Đã hoàn tất)' : ''}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Khối Giáo trình & Quà tặng đi kèm (Hiển thị đầy đủ cả khi 0đ hoặc có giá) */}
-                {((eReceiptData.items && eReceiptData.items.length > 0) || eReceiptData.bookName) && (
-                  <div style={{ margin: '0.85rem 0 0.5rem 0', borderTop: '1px dashed #CBD5E1', paddingTop: '0.75rem', fontSize: '0.92rem' }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#085E8A', textTransform: 'uppercase', marginBottom: '0.45rem', letterSpacing: '0.5px' }}>
-                      Giáo trình & Tặng phẩm đi kèm
-                    </div>
-                    {eReceiptData.items && eReceiptData.items.length > 0 ? (
-                      eReceiptData.items.map((item, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', borderBottom: idx < eReceiptData.items.length - 1 ? '1px dotted #E2E8F0' : 'none' }}>
-                          <div style={{ paddingRight: '0.5rem' }}>
-                            <div style={{ fontWeight: '600', color: '#1E293B', fontSize: '0.9rem' }}>{item.name}</div>
-                            <span style={{ 
-                              display: 'inline-block', 
-                              fontSize: '0.68rem', 
-                              fontWeight: '800', 
-                              padding: '0.15rem 0.5rem', 
-                              borderRadius: '4px', 
-                              background: item.badgeColor ? `${item.badgeColor}15` : '#ECFDF5', 
-                              color: item.badgeColor || '#059669',
-                              border: `1px solid ${item.badgeColor || '#059669'}40`,
-                              marginTop: '0.2rem'
-                            }}>
-                              {item.badge}
-                            </span>
-                          </div>
-                          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            {item.originalPrice != null && Number(item.originalPrice) > 0 && (
-                              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textDecoration: 'line-through' }}>
-                                {Number(item.originalPrice).toLocaleString('vi-VN')}đ
-                              </div>
-                            )}
-                            <div style={{ fontWeight: '800', fontSize: '0.92rem', color: item.price === 0 ? '#059669' : '#0D88C4' }}>
-                              {item.price === 0 ? '0đ (Miễn phí)' : `+ ${Number(item.price).toLocaleString('vi-VN')}đ`}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
-                        <div style={{ paddingRight: '0.5rem' }}>
-                          <div style={{ fontWeight: '600', color: '#1E293B', fontSize: '0.9rem' }}>{eReceiptData.bookName}</div>
-                          <span style={{ 
-                            display: 'inline-block', 
-                            fontSize: '0.68rem', 
-                            fontWeight: '800', 
-                            padding: '0.15rem 0.5rem', 
-                            borderRadius: '4px', 
-                            background: Number(eReceiptData.bookCost || 0) > 0 ? '#EFF6FF' : '#ECFDF5', 
-                            color: Number(eReceiptData.bookCost || 0) > 0 ? '#0D88C4' : '#059669',
-                            border: `1px solid ${Number(eReceiptData.bookCost || 0) > 0 ? '#0D88C4' : '#059669'}40`,
-                            marginTop: '0.2rem'
-                          }}>
-                            {Number(eReceiptData.bookCost || 0) > 0 ? 'GIÁO TRÌNH BÁN' : 'TẶNG KÈM THEO KHÓA HỌC'}
-                          </span>
-                        </div>
-                        <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontWeight: '800', fontSize: '0.92rem', color: Number(eReceiptData.bookCost || 0) === 0 ? '#059669' : '#0D88C4' }}>
-                            {Number(eReceiptData.bookCost || 0) === 0 ? '0đ (Miễn phí)' : `+ ${Number(eReceiptData.bookCost || 0).toLocaleString('vi-VN')}đ`}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Khung Tổng thu đợt này với điểm nhấn Vàng & Xanh */}
-                <div style={{ marginTop: '1rem', background: '#FFFBEB', border: '2px solid #FFCA29', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
-                  <span style={{ fontWeight: '800', fontSize: '1rem', color: '#085E8A' }}>TỔNG THU ĐỢT NÀY:</span>
-                  <span style={{ fontWeight: '900', fontSize: '1.4rem', color: '#0D88C4' }}>{Number(eReceiptData.totalPaid || 0).toLocaleString('vi-VN')}đ</span>
-                </div>
-                
-                {/* Footer */}
-                <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
-                  <p style={{ margin: 0 }}>Cảm ơn Quý phụ huynh & Học viên đã tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!</p>
-                </div>
-
-                {/* CON DẤU MỘC ĐỎ ĐIỆN TỬ "ĐÃ THU TIỀN / PAID" */}
-                <PaidStamp 
-                  date={eReceiptData.date}
-                  time={eReceiptData.time}
-                  receiptCode={eReceiptData.receiptCode}
-                  size={142}
-                  style={{ right: '12px', bottom: '22px' }}
-                />
-              </div>
-            </div>
+            <EReceiptTemplate ref={receiptRef} data={eReceiptData} mode="course" />
             
             <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button className="btn btn-secondary" onClick={() => { setEReceiptData(null); setIsEditModalOpen(false); }}>
