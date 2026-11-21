@@ -6,6 +6,7 @@ import TrialInviteModal from './TrialInviteModal';
 import PlacementTestModal from './components/PlacementTestModal';
 import ReviewModal from '@/components/ReviewModal';
 import CourseWelcomeModal from '@/components/CourseWelcomeModal';
+import { toVnDateInputValue } from '@/lib/coursewareAccess';
 import ClassSelect from '../components/ClassSelect';
 import { formatClassCode } from '@/lib/classHelper';
 
@@ -105,15 +106,15 @@ export default function LeadsPage() {
       setForm({
         name: lead.name || '',
         phone: lead.phone || '',
-        dob: lead.dob ? lead.dob.substring(0, 10) : '',
+        dob: toVnDateInputValue(lead.dob),
         email: lead.email || '',
         address: lead.address || '',
         painPoints: lead.painPoints || '',
         goals: lead.goals || '',
         status: lead.status || 'Mới',
         trialClassCode: lead.trialClassCode || '',
-        trialStartDate: lead.trialStartDate ? lead.trialStartDate.substring(0, 10) : '',
-        followUpDate: lead.followUpDate ? lead.followUpDate.substring(0, 10) : '',
+        trialStartDate: toVnDateInputValue(lead.trialStartDate),
+        followUpDate: toVnDateInputValue(lead.followUpDate),
         followUpNote: lead.followUpNote || '',
         salesRep: lead.salesRep || '',
         notes: lead.notes || '',
@@ -392,7 +393,7 @@ export default function LeadsPage() {
                       {lead.status === 'Học thử' && lead.trialClassCode && (
                         <div style={{ fontSize: '0.75rem', color: 'var(--color-primary-dark)', marginTop: '0.25rem', fontWeight: '600' }}>
                           <i className="fa-solid fa-graduation-cap"></i> {formatClassCode(lead.trialClassCode)}
-                          {lead.trialStartDate && <><br /><span>từ {new Date(lead.trialStartDate).toLocaleDateString('vi-VN')}</span></>}
+                          {lead.trialStartDate && <><br /><span>từ {new Date(lead.trialStartDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</span></>}
                         </div>
                       )}
                     </td>

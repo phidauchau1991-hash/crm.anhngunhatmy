@@ -2,36 +2,45 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import html2canvas from 'html2canvas';
-import CourseWelcomeTemplate, { FIXED_NOTE_1, FIXED_NOTE_2 } from '@/app/components/CourseWelcomeTemplate';
+import CourseWelcomeTemplate, {
+  FIXED_NOTE_1,
+  FIXED_NOTE_2,
+  TONE_PROFILES,
+} from '@/app/components/CourseWelcomeTemplate';
 import { getClassScheduleDetails, formatClassCode, isClassEnded } from '@/lib/classHelper';
+import { toVnDateInputValue } from '@/lib/coursewareAccess';
 
 /**
- * Helper parse chuỗi ngày (hỗ trợ cả ISO "2026-11-14", Date object, lẫn chuỗi vi-VN "14/11/2026")
+ * Helper parse chuỗi ngày chuẩn múi giờ Việt Nam (Asia/Ho_Chi_Minh),
+ * tránh lỗi lệch -1 ngày khi DB lưu ISO UTC dạng YYYY-MM-DDT17:00:00.000Z.
  */
 function parseAnyDate(rawDate, isoDate) {
   const candidate = isoDate || rawDate;
   if (!candidate) return null;
 
-  const str = String(candidate).trim();
-  // Kiểm tra định dạng YYYY-MM-DD
-  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (isoMatch) {
-    const y = Number(isoMatch[1]);
-    const m = Number(isoMatch[2]) - 1;
-    const d = Number(isoMatch[3]);
-    return new Date(y, m, d, 12, 0, 0);
+  if (!(candidate instanceof Date)) {
+    const str = String(candidate).trim();
+    // 1. Chuỗi thuần YYYY-MM-DD (không có phần giờ UTC)
+    const pureIso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (pureIso) {
+      return new Date(Number(pureIso[1]), Number(pureIso[2]) - 1, Number(pureIso[3]), 12, 0, 0);
+    }
+
+    // 2. Chuỗi DD/MM/YYYY
+    const vnMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (vnMatch) {
+      return new Date(Number(vnMatch[3]), Number(vnMatch[2]) - 1, Number(vnMatch[1]), 12, 0, 0);
+    }
   }
 
-  // Kiểm tra định dạng DD/MM/YYYY
-  const vnMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (vnMatch) {
-    const d = Number(vnMatch[1]);
-    const m = Number(vnMatch[2]) - 1;
-    const y = Number(vnMatch[3]);
-    return new Date(y, m, d, 12, 0, 0);
+  // 3. Date object hoặc full ISO timestamp -> quy đổi về lịch Việt Nam (Asia/Ho_Chi_Minh)
+  const vnYmd = toVnDateInputValue(candidate);
+  if (vnYmd) {
+    const [y, m, d] = vnYmd.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
   }
 
-  const parsed = new Date(str);
+  const parsed = new Date(candidate);
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -102,7 +111,21 @@ export default function CourseWelcomeModal({
   const [scheduleDays, setScheduleDays] = useState('');
   const [studyHours, setStudyHours] = useState('');
   const [endDateText, setEndDateText] = useState('');
+  const [toneMode, setToneMode] = useState('KIDS'); // 'KIDS' | 'TEEN'
+  const [arrivalBannerNote, setArrivalBannerNote] = useState(TONE_PROFILES.KIDS.arrivalBannerNote);
+  const [noteTitle, setNoteTitle] = useState(TONE_PROFILES.KIDS.noteTitle);
+  const [note1, setNote1] = useState(FIXED_NOTE_1);
+  const [note2, setNote2] = useState(FIXED_NOTE_2);
   const [suggestedMessage, setSuggestedMessage] = useState('');
+
+  const applyToneProfile = (mode) => {
+    const profile = TONE_PROFILES[mode] || TONE_PROFILES.KIDS;
+    setToneMode(mode);
+    setArrivalBannerNote(profile.arrivalBannerNote);
+    setNoteTitle(profile.noteTitle);
+    setNote1(profile.note1);
+    setNote2(profile.note2);
+  };
 
   const showToast = (msg, type = 'success') => {
     setToastMessage({ text: msg, type });
@@ -184,8 +207,15 @@ export default function CourseWelcomeModal({
       setEndDateText('Theo lộ trình khóa');
     }
 
-    // Cấp độ / Chương trình
+    // Cấp độ / Chương trình & Tự động chọn văn phong Thiếu nhi vs Thiếu niên / Lớp Tháng
     const level = targetClass?.level || selectedClassCode.split('_')[1] || '';
+    const isTeenTarget =
+      isMonthlyClass ||
+      /KET|PET|B1|TOEIC|ĐẠI HỌC|DAI HOC|CẤP 3|CAP 3|HỌC KÈM|HOC KEM|THIẾU NIÊN|THIEU NIEN/i.test(
+        `${level} ${targetClass?.capDo || ''} ${selectedClassCode}`
+      );
+    applyToneProfile(isTeenTarget ? 'TEEN' : 'KIDS');
+
     if (isMonthlyClass) {
       setProgramLevel(`${selectedClassCode} (Chương trình Theo Tháng)`);
     } else if (level.startsWith('S') || level.includes('Starter')) {
@@ -203,18 +233,27 @@ export default function CourseWelcomeModal({
     }
   }, [selectedClassCode, classList, data]);
 
-  // Cập nhật lời nhắn Zalo soạn sẵn
+  // Cập nhật lời nhắn Zalo soạn sẵn phù hợp với độ tuổi (Thiếu nhi vs Thiếu niên / Lớp Tháng)
   useEffect(() => {
-    const msg =
-      `Dạ Trung tâm Anh ngữ Nhật Mỹ xin kính gửi Quý Phụ huynh Thư Chào Mừng & Thông Báo Lịch Học Chính Thức của bé ${studentName}.\n\n` +
-      `📅 Ngày bắt đầu học: ${startDateText}\n` +
-      `⏰ Giờ học: ${studyHours} (${scheduleDays})\n` +
-      `🎯 Dự kiến kết thúc khóa: ${endDateText}\n` +
-      `🏫 ${className} • GV: ${teacherName} • ${room}\n\n` +
-      `Ba mẹ lưu lại hình ảnh thư này để nhớ lịch đưa đón con nhé. Trung tâm và thầy cô đã chuẩn bị sẵn sàng chào đón bé rồi ạ! ❤️\n` +
-      `Hotline hỗ trợ: 0911 767 069`;
+    const cleanHoursInline = String(studyHours || '').replace(/\r?\n+/g, '; ').trim();
+    const isTeen = toneMode === 'TEEN';
+    const msg = isTeen
+      ? `Dạ Trung tâm Anh ngữ Nhật Mỹ xin kính gửi Quý Phụ huynh & em ${studentName} Thư Thông Báo Lịch Học Chính Thức.\n\n` +
+        `📅 Ngày bắt đầu học: ${startDateText}\n` +
+        `⏰ Giờ học: ${cleanHoursInline} (${scheduleDays})\n` +
+        `🎯 Dự kiến lộ trình: ${endDateText}\n` +
+        `🏫 ${className} • GV: ${teacherName} • ${room}\n\n` +
+        `Kính mong Quý Phụ huynh nhắc nhở em lưu lại hình ảnh thư này và đến lớp đúng giờ để buổi học đạt hiệu quả tốt nhất ạ! ❤️\n` +
+        `Hotline hỗ trợ: 0911 767 069`
+      : `Dạ Trung tâm Anh ngữ Nhật Mỹ xin kính gửi Quý Phụ huynh Thư Chào Mừng & Thông Báo Lịch Học Chính Thức của bé ${studentName}.\n\n` +
+        `📅 Ngày bắt đầu học: ${startDateText}\n` +
+        `⏰ Giờ học: ${cleanHoursInline} (${scheduleDays})\n` +
+        `🎯 Dự kiến kết thúc khóa: ${endDateText}\n` +
+        `🏫 ${className} • GV: ${teacherName} • ${room}\n\n` +
+        `Ba mẹ lưu lại hình ảnh thư này để nhớ lịch đưa đón con nhé. Trung tâm và thầy cô đã chuẩn bị sẵn sàng chào đón bé rồi ạ! ❤️\n` +
+        `Hotline hỗ trợ: 0911 767 069`;
     setSuggestedMessage(msg);
-  }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours, endDateText]);
+  }, [studentName, className, teacherName, room, startDateText, scheduleDays, studyHours, endDateText, toneMode]);
 
   // Lọc chỉ lấy các lớp ĐANG HOẠT ĐỘNG (dùng helper chuẩn thống nhất toàn hệ thống)
   const activeClassList = useMemo(() => {
@@ -253,7 +292,11 @@ export default function CourseWelcomeModal({
     scheduleDays,
     studyHours,
     endDateText,
-    issuedDate: new Date().toLocaleDateString('vi-VN'),
+    arrivalBannerNote,
+    noteTitle,
+    note1,
+    note2,
+    issuedDate: new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
   };
 
   // Helper chung đảm bảo load đầy đủ font tiếng Việt Be Vietnam Pro trước khi chụp Retina 2x
@@ -579,40 +622,95 @@ export default function CourseWelcomeModal({
               </div>
             </div>
 
-            {/* Lịch học & Khung giờ học */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '10px' }}>
+            {/* Lịch học & Khung giờ học (hỗ trợ Enter xuống dòng tách nhiều buổi) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '0.95fr 1.35fr', gap: '10px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                   Lịch học trong tuần
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={scheduleDays}
                   onChange={e => setScheduleDays(e.target.value)}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                  Khung giờ học
+                  Khung giờ học <span style={{ fontWeight: '500', color: '#64748B' }}>(Enter xuống dòng)</span>
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={studyHours}
                   onChange={e => setStudyHours(e.target.value)}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                  placeholder="VD:&#10;Thứ 6: 17:30 - 19:30&#10;Thứ 7: 18:30 - 20:30"
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
                 />
               </div>
             </div>
 
-            {/* Khung hiển thị 2 lưu ý cố định */}
-            <div style={{ backgroundColor: '#F0F9FF', padding: '10px 12px', borderRadius: '8px', border: '1px solid #BAE6FD', fontSize: '12px', color: '#0369A1' }}>
-              <div style={{ fontWeight: '800', marginBottom: '4px' }}>📌 2 Lưu ý cố định trên thư:</div>
-              <div style={{ marginBottom: '4px', lineHeight: 1.4 }}>
-                <strong>1. Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
+            {/* Khung tùy chỉnh xưng hô & 2 lưu ý theo độ tuổi */}
+            <div style={{ backgroundColor: '#F0F9FF', padding: '10px 12px', borderRadius: '8px', border: '1px solid #BAE6FD', fontSize: '12px', color: '#0369A1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: '800' }}>📌 Văn phong &amp; 2 Lưu ý trên thư:</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => applyToneProfile('KIDS')}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      border: toneMode === 'KIDS' ? '1.5px solid #0D88C4' : '1px solid #CBD5E1',
+                      background: toneMode === 'KIDS' ? '#0D88C4' : '#FFFFFF',
+                      color: toneMode === 'KIDS' ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    Thiếu nhi (bé)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyToneProfile('TEEN')}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      border: toneMode === 'TEEN' ? '1.5px solid #059669' : '1px solid #CBD5E1',
+                      background: toneMode === 'TEEN' ? '#059669' : '#FFFFFF',
+                      color: toneMode === 'TEEN' ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    Lớp 6+ / Tháng (học viên)
+                  </button>
+                </div>
               </div>
-              <div style={{ lineHeight: 1.4 }}>
-                <strong>2. Thời gian có mặt:</strong> {FIXED_NOTE_2}
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '700', marginBottom: '3px', color: '#08557B' }}>
+                  1. Trang phục &amp; Đồ dùng:
+                </label>
+                <textarea
+                  rows={2}
+                  value={note1}
+                  onChange={(e) => setNote1(e.target.value)}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #BAE6FD', fontSize: '12px', color: '#1E293B', background: '#FFFFFF', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '700', marginBottom: '3px', color: '#08557B' }}>
+                  2. Thời gian có mặt:
+                </label>
+                <textarea
+                  rows={2}
+                  value={note2}
+                  onChange={(e) => setNote2(e.target.value)}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #BAE6FD', fontSize: '12px', color: '#1E293B', background: '#FFFFFF', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+                />
               </div>
             </div>
 

@@ -87,12 +87,12 @@ const TrialInviteTemplate = forwardRef(({ data }, ref) => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', backgroundColor: middleBoxBgColor, padding: '15px', borderRadius: '8px', borderLeft: `4px solid ${accentColor}` }}>
             <div style={{ flex: '1 1 30%' }}>
               <p style={{ color: accentColor, fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>{labelDate}</p>
-              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{data.studyDays || 'Đang cập nhật'}</p>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, whiteSpace: 'pre-line', lineHeight: 1.4 }}>{data.studyDays || 'Đang cập nhật'}</p>
             </div>
             
             <div style={{ flex: '1 1 30%' }}>
               <p style={{ color: accentColor, fontSize: '14px', marginBottom: '4px', fontWeight: 'bold' }}>{labelTime}</p>
-              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>{data.studyHours || 'Đang cập nhật'}</p>
+              <p style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, whiteSpace: 'pre-line', lineHeight: 1.4 }}>{data.studyHours || 'Đang cập nhật'}</p>
             </div>
 
             <div style={{ flex: '1 1 30%' }}>

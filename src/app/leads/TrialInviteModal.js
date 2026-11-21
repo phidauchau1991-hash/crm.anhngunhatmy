@@ -36,15 +36,15 @@ export default function TrialInviteModal({ isOpen, onClose, lead, classList = []
       if (lead.trialStartDate) {
          const dateObj = new Date(lead.trialStartDate);
          if (!isNaN(dateObj.getTime())) {
-             formattedDate = dateObj.toLocaleDateString('vi-VN');
+             formattedDate = dateObj.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
          }
       } else if (lead.followUpDate) {
          const dateObj = new Date(lead.followUpDate);
          if (!isNaN(dateObj.getTime())) {
-             formattedDate = dateObj.toLocaleDateString('vi-VN');
+             formattedDate = dateObj.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
          }
       }
-      setStartDate(formattedDate || new Date().toLocaleDateString('vi-VN'));
+      setStartDate(formattedDate || new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }));
       
       if (inviteType === 'TRIAL') {
         setClassName(lead.trialClassCode || '');
@@ -220,12 +220,12 @@ export default function TrialInviteModal({ isOpen, onClose, lead, classList = []
               </div>
               <div>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>{inviteType === 'ASSESSMENT' ? 'Giờ Đánh Giá' : 'Giờ Học'}</label>
-                <input 
-                  type="text" 
+                <textarea
+                  rows={2}
                   value={studyHours} 
                   onChange={e => setStudyHours(e.target.value)}
-                  placeholder="VD: 17:30 - 19:00"
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  placeholder="VD: Thứ 6: 17:30 - 19:30 (Enter xuống dòng)"
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', lineHeight: 1.4 }}
                 />
               </div>
             </div>

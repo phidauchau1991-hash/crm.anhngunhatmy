@@ -3,11 +3,30 @@
 import React, { forwardRef } from 'react';
 import OfficialRedSeal from '@/components/OfficialRedSeal';
 
-// Cố định 2 lưu ý chuẩn mực của Trung tâm Anh ngữ Nhật Mỹ
-export const FIXED_NOTE_1 =
-  'Bé mặc trang phục gọn gàng/đồng phục, mang theo tập vở trắng, bút chì & màu tô. Giáo trình chính khóa và Thẻ học liệu số sẽ được thầy cô trao tận tay bé tại lớp.';
-export const FIXED_NOTE_2 =
-  'Ba mẹ vui lòng đưa bé đến trước giờ học 05 - 10 phút để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học giúp bé học tập hiệu quả hơn.';
+// Cấu hình 2 bộ lưu ý & xưng hô chuẩn mực theo độ tuổi
+export const TONE_PROFILES = {
+  KIDS: {
+    label: 'Thiếu nhi (bé / ba mẹ)',
+    arrivalBannerNote: '(Học viên có mặt tại sảnh trung tâm trước giờ học để thầy cô đón vào lớp)',
+    noteTitle: 'LƯU Ý ĐỒNG HÀNH CÙNG BÉ:',
+    note1:
+      'Bé mặc trang phục gọn gàng/đồng phục, mang theo tập vở trắng, bút chì & màu tô. Giáo trình chính khóa và Thẻ học liệu số sẽ được thầy cô trao tận tay bé tại lớp.',
+    note2:
+      'Ba mẹ vui lòng đưa bé đến trước giờ học 05 - 10 phút để thầy cô đón bé, ổn định chỗ ngồi và làm quen không khí lớp học giúp bé học tập hiệu quả hơn.',
+  },
+  TEEN: {
+    label: 'Thiếu niên / Lớp Tháng (học viên / em)',
+    arrivalBannerNote: '(Học viên có mặt tại trung tâm trước giờ học 05 - 10 phút để ổn định chỗ ngồi)',
+    noteTitle: 'LƯU Ý CHUẨN BỊ & NỘI QUY LỚP HỌC:',
+    note1:
+      'Học viên mặc trang phục gọn gàng, lịch sự; mang theo đầy đủ tập vở, bút viết (bút xanh/đỏ/highlight) và tài liệu được hướng dẫn. Giáo trình và tài khoản Học liệu số sẽ được giáo viên bàn giao trực tiếp tại lớp.',
+    note2:
+      'Học viên chủ động đến lớp trước giờ học 05 - 10 phút để ổn định chỗ ngồi, chuẩn bị bài cũ và trao đổi cùng giáo viên trước khi bắt đầu buổi học chính thức.',
+  },
+};
+
+export const FIXED_NOTE_1 = TONE_PROFILES.KIDS.note1;
+export const FIXED_NOTE_2 = TONE_PROFILES.KIDS.note2;
 
 // Địa chỉ chính thức duy nhất của Trung tâm Anh ngữ Nhật Mỹ
 export const CENTER_ADDRESS =
@@ -27,7 +46,16 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
     studyHours = '07:45 - 09:15 (Ca 1)',
     endDateText = '28/02/2027',
     issuedDate = '',
+    arrivalBannerNote = TONE_PROFILES.KIDS.arrivalBannerNote,
+    noteTitle = TONE_PROFILES.KIDS.noteTitle,
+    note1 = FIXED_NOTE_1,
+    note2 = FIXED_NOTE_2,
   } = data || {};
+
+  const hourLines = String(studyHours || '')
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   // Palette màu sắc thương hiệu Nhật - Mỹ
   const BRAND = {
@@ -382,7 +410,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               {startDateText}
             </div>
             <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontWeight: '500', opacity: 0.94, marginTop: '3px', fontStyle: 'italic' }}>
-              (Học viên có mặt tại sảnh trung tâm trước giờ học để thầy cô đón vào lớp)
+              {arrivalBannerNote}
             </div>
           </div>
 
@@ -390,13 +418,14 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1.15fr 1.25fr 1fr',
+              gridTemplateColumns: '0.9fr 1.65fr 0.95fr',
               gap: '12px',
               backgroundColor: '#FFFBEB',
               border: `1.5px dashed ${BRAND.gold}`,
               borderRadius: '10px',
               padding: '12px 16px',
               textAlign: 'center',
+              alignItems: 'center',
               fontFamily: FONT_UNIFIED,
             }}
           >
@@ -404,7 +433,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 📅 Lịch Học Tuần
               </div>
-              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.ink, marginTop: '4px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15px', fontWeight: '800', color: BRAND.ink, marginTop: '4px', whiteSpace: 'pre-line', lineHeight: 1.4 }}>
                 {scheduleDays}
               </div>
             </div>
@@ -413,8 +442,38 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 ⏰ Giờ Học Chi Tiết
               </div>
-              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.blueDark, marginTop: '4px' }}>
-                {studyHours}
+              <div
+                style={{
+                  fontFamily: FONT_UNIFIED,
+                  fontSize: hourLines.length > 1 ? '13.5px' : '15.5px',
+                  fontWeight: '800',
+                  color: BRAND.blueDark,
+                  marginTop: '5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  alignItems: 'center',
+                }}
+              >
+                {hourLines.length > 1 ? (
+                  hourLines.map((line, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        whiteSpace: 'nowrap',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))
+                ) : (
+                  <span>{hourLines[0] || studyHours}</span>
+                )}
               </div>
             </div>
 
@@ -422,7 +481,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
               <div style={{ fontFamily: FONT_UNIFIED, fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
                 🎯 Dự Kiến Kết Thúc
               </div>
-              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15.5px', fontWeight: '800', color: BRAND.ink, marginTop: '4px' }}>
+              <div style={{ fontFamily: FONT_UNIFIED, fontSize: '15px', fontWeight: '800', color: BRAND.ink, marginTop: '4px', lineHeight: 1.4 }}>
                 {endDateText}
               </div>
             </div>
@@ -458,11 +517,11 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 gap: '8px',
               }}
             >
-              <span>📌</span> LƯU Ý ĐỒNG HÀNH CÙNG BÉ:
+              <span>📌</span> {noteTitle}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Lưu ý 1 cố định */}
+              {/* Lưu ý 1 */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                 <div
                   style={{
@@ -483,12 +542,12 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 >
                   1
                 </div>
-                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55 }}>
-                  <strong style={{ fontWeight: '800' }}>Trang phục &amp; Đồ dùng:</strong> {FIXED_NOTE_1}
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55, whiteSpace: 'pre-line' }}>
+                  <strong style={{ fontWeight: '800' }}>Trang phục &amp; Đồ dùng:</strong> {note1}
                 </div>
               </div>
 
-              {/* Lưu ý 2 cố định */}
+              {/* Lưu ý 2 */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                 <div
                   style={{
@@ -509,8 +568,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
                 >
                   2
                 </div>
-                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55 }}>
-                  <strong style={{ fontWeight: '800' }}>Thời gian có mặt:</strong> {FIXED_NOTE_2}
+                <div style={{ fontFamily: FONT_UNIFIED, fontSize: '13.5px', fontWeight: '500', color: '#1E293B', lineHeight: 1.55, whiteSpace: 'pre-line' }}>
+                  <strong style={{ fontWeight: '800' }}>Thời gian có mặt:</strong> {note2}
                 </div>
               </div>
             </div>
