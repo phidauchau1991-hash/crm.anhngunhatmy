@@ -1,91 +1,23 @@
 'use client';
-import React, { useRef, useState, useEffect } from 'react';
-import * as htmlToImage from 'html-to-image';
-import { generateVietQRDataURL } from '@/lib/vietqr';
-import { computeExpectedEndDateVn } from '@/lib/classHelper';
 
-// Thư viện hỗ trợ lưu file ảnh
+import React, { useState, useEffect } from 'react';
+import { generateVietQRDataURL } from '@/lib/vietqr';
+import { computeExpectedEndDateVn, formatClassCode } from '@/lib/classHelper';
+import BrandLetterShell from '@/components/BrandLetterShell';
+import OfficialRedSeal from '@/components/OfficialRedSeal';
+import {
+  BRAND,
+  FONT_UNIFIED,
+  exportElementToCanvas,
+  formatVnShortDate,
+  getTodayVnShortDate,
+} from '@/lib/brandTheme';
+
 const downloadImage = (dataUrl, filename) => {
   const link = document.createElement('a');
   link.download = filename;
   link.href = dataUrl;
   link.click();
-};
-
-const styles = {
-  container: {
-    width: '794px', // A4 width at 96 DPI
-    backgroundColor: '#ffffff',
-    fontFamily: 'Arial, sans-serif',
-    color: '#333333',
-    padding: '40px',
-    boxSizing: 'border-box',
-    position: 'relative',
-    overflow: 'hidden',
-    textAlign: 'left',
-    fontVariantLigatures: 'none',
-    textRendering: 'geometricPrecision',
-    letterSpacing: 'normal',
-    wordSpacing: 'normal'
-  },
-  headerBlue: {
-    backgroundColor: '#0D88C4',
-    color: 'white',
-    padding: '10px 15px',
-    fontWeight: 'bold',
-    fontSize: '18px',
-    textTransform: 'uppercase'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    marginBottom: '20px'
-  },
-  td: {
-    border: '1px solid #cbd5e1',
-    padding: '10px',
-    fontSize: '16px'
-  },
-  th: {
-    border: '1px solid #cbd5e1',
-    padding: '10px',
-    fontSize: '16px',
-    backgroundColor: '#f8fafc',
-    fontWeight: 'bold'
-  },
-  commentBox: {
-    border: '2px solid #0D88C4',
-    borderRadius: '12px',
-    padding: '22px 20px 18px 20px',
-    marginBottom: '28px',
-    position: 'relative',
-    marginTop: '20px',
-    textAlign: 'left'
-  },
-  commentTitle: {
-    position: 'absolute',
-    top: '-18px',
-    left: '20px',
-    backgroundColor: '#0D88C4',
-    color: 'white',
-    padding: '5px 15px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '18px'
-  },
-  logoPlaceholder: {
-    width: '120px',
-    height: '120px',
-    margin: '0 auto 20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  logoImage: {
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain'
-  }
 };
 
 export const formatClassCodeForParent = (code) => {
@@ -94,18 +26,11 @@ export const formatClassCodeForParent = (code) => {
   if (parts.length >= 4) {
     const level = parts[1];
     let teacher = parts[2];
-    
-    // Nếu tên giáo viên dính liền và không có tiền tố (e.g., PhanThiTrucMy), thử tách hoặc chỉ hiện phần đầu
-    // Tuy nhiên, tốt nhất là hiển thị y nguyên nhưng cách điệu hoặc dùng nickname.
-    // Nếu tên > 15 ký tự, có thể rút gọn.
+
     if (teacher.length > 12 && !teacher.includes(' ')) {
-        // Rút gọn tên cúng cơm dài (PhanThiTrucMy -> Ms/Mr ...) 
-        // Nhưng vì không biết giới tính, có thể chỉ lấy tên cuối, hoặc ẩn.
-        // Tốt nhất là ẩn hẳn hoặc hiển thị "GV"
-        teacher = "";
+      teacher = '';
     } else {
-        // Tách chữ hoa (MsMy -> Ms My)
-        teacher = teacher.replace(/([A-Z])/g, ' $1').trim();
+      teacher = teacher.replace(/([A-Z])/g, ' $1').trim();
     }
 
     let schedule = parts[3];
@@ -118,7 +43,7 @@ export const formatClassCodeForParent = (code) => {
     }
     return `${level} - ${schedule}`;
   }
-  
+
   let formatted = code.replace(/^CN\d+_/i, '');
   formatted = formatted.replace(/(_Ca\d+|_\d+)$/i, '');
   return formatted;
@@ -137,566 +62,95 @@ export const extractTeacherNickname = (code) => {
   return '';
 };
 
-// ==========================================
-// ẢNH 2: BẢNG ĐIỂM KẾT QUẢ CUỐI KHÓA
-// ==========================================
-export const ScoreReportTemplate = ({ student, config, result }) => {
-  if (!student || !config || !result) return null;
+const SectionHeading = ({ title }) => (
+  <div
+    style={{
+      color: BRAND.blueDark,
+      fontSize: '13.5px',
+      textTransform: 'uppercase',
+      fontWeight: '800',
+      marginBottom: '10px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      letterSpacing: '0.3px',
+      fontFamily: FONT_UNIFIED,
+    }}
+  >
+    <span
+      style={{
+        display: 'inline-block',
+        width: '5px',
+        height: '15px',
+        backgroundColor: BRAND.gold,
+        borderRadius: '3px',
+        flexShrink: 0,
+      }}
+    />
+    {title}
+  </div>
+);
 
-  const attendanceScore = parseFloat(result.attendanceScore) || 0;
-  const hwScore = parseFloat(result.hwScore) || 0;
-  const activityScore = parseFloat(result.activityScore) || 0;
-  const pronunciationScore = parseFloat(result.pronunciationScore) || 0;
-  const communicationScore = parseFloat(result.communicationScore) || 0;
-  
-  const processTotal = (attendanceScore + hwScore + activityScore + pronunciationScore + communicationScore) / 5;
-  const processContribution = (processTotal / 10) * (config.processWeight ?? 10);
-
-  const speakingScore = parseFloat(result.speakingScore) || 0;
-  const listeningScore = parseFloat(result.listeningScore) || 0;
-  const rwScore = parseFloat(result.rwScore) || 0;
-
-  const speakingMax = config.speakingMax > 0 ? config.speakingMax : 40;
-  const listeningMax = config.listeningMax > 0 ? config.listeningMax : 26;
-  const rwMax = config.rwMax > 0 ? config.rwMax : 36;
-
-  const speakingPercent = (speakingScore / speakingMax) * (config.speakingWeight ?? 30);
-  const listeningPercent = (listeningScore / listeningMax) * (config.listeningWeight ?? 20);
-  const rwPercent = (rwScore / rwMax) * (config.rwWeight ?? 40);
-
-  const examContribution = speakingPercent + listeningPercent + rwPercent;
-  const totalScore = processContribution + examContribution;
-
-  let grade = 'D';
-  if (totalScore >= 98) grade = 'A+';
-  else if (totalScore >= 95) grade = 'A';
-  else if (totalScore >= 90) grade = 'B+';
-  else if (totalScore >= 80) grade = 'B';
-  else if (totalScore >= 75) grade = 'C+';
-  else if (totalScore >= 65) grade = 'C';
-
-  const displayClassCode = formatClassCodeForParent(result.classCode || student.classCode || "Chưa có");
-  const displayDate = result.examDate ? new Date(result.examDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN');
-  
-  const teacherNickname = extractTeacherNickname(result.classCode) || 'Giáo viên phụ trách';
-  const teacherFullName = result.class?.teacherName || '';
-
-  return (
-    <div style={styles.container} id={`score-report-${student.id}`}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <div style={styles.logoPlaceholder}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
-        </div>
-        <h1 style={{ color: '#0D88C4', fontSize: '28px', margin: '0 0 5px 0' }}>BÁO CÁO KẾT QUẢ HỌC TẬP {config.examType.toUpperCase()}</h1>
-        <p style={{ color: '#64748b', fontSize: '18px', margin: 0 }}>(COURSE REPORT)</p>
-      </div>
-
-      {/* Info Table */}
-      <table style={styles.table}>
-        <tbody>
-          <tr>
-            <td style={{ ...styles.td, width: '60%' }}><b>Tên Học viên:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold', textTransform: 'uppercase' }}>{student.name}</span></td>
-            <td style={{ ...styles.td, width: '40%' }}><b>Lớp:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{displayClassCode}</span></td>
-          </tr>
-          <tr>
-            <td style={{ ...styles.td }}><b>Giáo viên:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{teacherNickname}</span></td>
-            <td style={{ ...styles.td }}><b>Ngày thi:</b> <span style={{ color: '#0D88C4', fontWeight: 'bold' }}>{displayDate}</span></td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Process Score */}
-      <div style={styles.headerBlue}>1. ĐÁNH GIÁ CỦA GIÁO VIÊN TRONG QUÁ TRÌNH HỌC ({config.processWeight}%)</div>
-      <table style={styles.table}>
-        <tbody>
-          <tr>
-            <td rowSpan="5" style={{ ...styles.td, width: '30%', textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
-              Chuyên cần<br/>
-              <span style={{ fontSize: '14px', fontWeight: 'normal' }}>(Class participation)</span>
-            </td>
-            <td style={{ ...styles.td, width: '30%' }}>Điểm danh</td>
-            <td style={{ ...styles.td, width: '20%', textAlign: 'center', color: '#0D88C4' }}>{result.attendanceScore}/10</td>
-            <td rowSpan="5" style={{ ...styles.td, width: '20%', textAlign: 'center', fontWeight: 'bold', verticalAlign: 'middle' }}>
-              Điểm TB chuyên cần<br/><br/>
-              <span style={{ color: '#ef4444', fontSize: '24px' }}>{processTotal.toFixed(1)}%</span>
-            </td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Bài tập về nhà</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.hwScore}/10</td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Hoạt động</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.activityScore}/10</td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Phát âm</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.pronunciationScore}/10</td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Giao tiếp</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.communicationScore}/10</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Exam Score */}
-      <div style={styles.headerBlue}>2. KẾT QUẢ BÀI THI ({config.examWeight}%)</div>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={{ ...styles.th, width: '50%' }}>Kỹ năng</th>
-            <th style={{ ...styles.th, width: '25%', textAlign: 'center' }}>Điểm thi<br/><span style={{ fontSize: '12px', fontWeight: 'normal' }}>(Test score)</span></th>
-            <th style={{ ...styles.th, width: '25%', textAlign: 'center' }}>Kết quả<br/><span style={{ fontSize: '12px', fontWeight: 'normal' }}>(Result in Percentage)</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={styles.td}>Nói (Speaking): {config.speakingWeight}%</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.speakingScore}/{config.speakingMax}</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }}>{speakingPercent.toFixed(2)}%</td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Nghe (Listening): {config.listeningWeight}%</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.listeningScore}/{config.listeningMax}</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }}>{listeningPercent.toFixed(2)}%</td>
-          </tr>
-          <tr>
-            <td style={styles.td}>Đọc & Viết (Reading & Writing): {config.rwWeight}%</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4' }}>{result.rwScore}/{config.rwMax}</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }}>{rwPercent.toFixed(2)}%</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Final Score */}
-      <div style={styles.headerBlue}>3. KẾT QUẢ CUỐI KHÓA</div>
-      <table style={{ ...styles.table, marginBottom: 0 }}>
-        <tbody>
-          <tr>
-            <td colSpan="2" style={{ ...styles.td, textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>Tổng cộng: 100%</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '24px' }}>{totalScore.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td colSpan="2" style={{ ...styles.td, textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>Xếp loại:</td>
-            <td style={{ ...styles.td, textAlign: 'center', fontWeight: 'bold', fontSize: '24px' }}>{grade}</td>
-          </tr>
-          <tr>
-            <td style={{ ...styles.td, backgroundColor: '#FFCA29', fontSize: '14px', width: '33%' }}>
-              <u>Ghi chú:</u><br/>
-              A+: 98 - 100 (Xuất sắc)<br/>
-              A: 95 - 97 (Rất giỏi)<br/>
-              B+: 90 - 94 (Giỏi)
-            </td>
-            <td colSpan="2" style={{ ...styles.td, backgroundColor: '#FFCA29', fontSize: '14px' }}>
-              <br/>
-              B: 80 - 89 (Khá)<br/>
-              C+: 75 - 79 (Trung bình khá)<br/>
-              C: 65 - 74 (Cần cố gắng hơn)<br/>
-              D: &lt; 65 (Không đạt)
-            </td>
-          </tr>
-          <tr>
-            <td style={{ ...styles.td, fontWeight: 'bold' }}>Nhận xét chung</td>
-            <td colSpan="2" style={{ ...styles.td, fontStyle: 'italic', color: '#64748b' }}>
-              (Quý Phụ huynh vui lòng xem ảnh nhận xét được đính kèm)
-            </td>
-          </tr>
-          <tr>
-            <td style={{ ...styles.td, fontWeight: 'bold' }}>Chữ ký GVCN</td>
-            <td colSpan="2" style={{ ...styles.td, textAlign: 'center' }}>
-              <b>{teacherFullName}</b>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-// ==========================================
-// ẢNH 1: NHẬN XÉT AI
-// ==========================================
-export const CommentsReportTemplate = ({ student, result }) => {
-  
-  const parseComment = (text) => {
-    if (!text) return <li style={{ textAlign: 'left', listStyleType: 'disc' }}>Không có dữ liệu</li>;
-    return text.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.startsWith('-') || line.startsWith('*') || line.startsWith('•'))
-      .map((line, idx) => {
-        const cleanText = line.replace(/^[-*•]\s*/, '').trim();
-        return (
-          <li key={idx} style={{ marginBottom: '8px', lineHeight: '1.6', textAlign: 'left', listStyleType: 'disc', listStylePosition: 'outside' }}>
-            {cleanText}
-          </li>
-        );
-      });
-  };
-
-  return (
-    <div style={styles.container} id={`comment-report-${student.id}`}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <div style={{ ...styles.logoPlaceholder, width: '80px', height: '80px', margin: '0 20px 0 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
-        </div>
-        <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student.name}</h1>
-          <h2 style={{ color: '#0D88C4', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>NHẬN XÉT CỦA GIÁO VIÊN</h2>
-        </div>
-      </div>
-      <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '40px' }} />
-
-      {/* Speaking */}
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Speaking (Nói)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.commentSpeaking)}
-        </ul>
-      </div>
-
-      {/* Listening */}
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Listening (Nghe)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.commentListening)}
-        </ul>
-      </div>
-
-      {/* R&W */}
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Reading & Writing (Đọc & Viết)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.commentRW)}
-        </ul>
-      </div>
-
-      {/* Dev */}
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Định hướng phát triển</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {parseComment(result.commentDev)}
-        </ul>
-      </div>
-    </div>
-  );
-};
-
-// Component Wrapper để chứa các hàm xuất ảnh
-import html2canvas from 'html2canvas';
-
-export const ExportImageWrapper = ({ children, targetId, filename }) => {
-  const [isExporting, setIsExporting] = React.useState(false);
-
-  const handleExport = async () => {
-    const element = document.getElementById(targetId);
-    if (!element) return;
-    
-    const parent = element.parentElement; const ot = parent?parent.style.transform:""; const oh = parent?parent.style.height:""; if(parent){parent.style.transform="none"; parent.style.height="auto";} setIsExporting(true); try {
-      // Sử dụng html2canvas thay vì html-to-image để tránh lỗi tràn bộ nhớ (paralyzed button)
-      const canvas = await html2canvas(element, { 
-        scale: 2, 
-        useCORS: true, 
-        backgroundColor: '#ffffff',
-        logging: false
-      });
-      const dataUrl = canvas.toDataURL('image/png');
-      downloadImage(dataUrl, filename);
-    } catch (error) {
-      console.error('Lỗi xuất ảnh:', error);
-      alert('Không thể xuất ảnh, vui lòng thử lại');
-    } finally { if(parent){parent.style.transform=ot; parent.style.height=oh;} setIsExporting(false);
-    }
-  };
-
-  return (
+const SealSignatureCard = ({ label, signer, subnote, sealTitle, sealSubtitle, date }) => (
+  <div
+    style={{
+      backgroundColor: BRAND.white,
+      borderRadius: '12px',
+      border: `1px solid ${BRAND.border}`,
+      padding: '12px 20px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '16px',
+      marginTop: '14px',
+      fontFamily: FONT_UNIFIED,
+    }}
+  >
     <div>
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        {children}
-      </div>
-      <button 
-        onClick={handleExport}
-        disabled={isExporting}
-        style={{ 
-          background: '#f59e0b', 
-          color: 'white', 
-          border: 'none', 
-          padding: '0.5rem 1rem', 
-          borderRadius: '8px', 
-          cursor: isExporting ? 'wait' : 'pointer',
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
+      <div
+        style={{
+          fontSize: '11.5px',
+          fontWeight: '800',
+          color: BRAND.subtle,
+          textTransform: 'uppercase',
+          letterSpacing: '0.4px',
         }}
       >
-        {isExporting ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
-        Tải Ảnh {filename.includes('Diem') ? 'Điểm' : 'Nhận Xét'}
-      </button>
+        {label}
+      </div>
+      <div style={{ fontSize: '15px', fontWeight: '800', color: BRAND.ink, marginTop: '3px' }}>
+        {signer}
+      </div>
+      {subnote && (
+        <div
+          style={{
+            fontSize: '12px',
+            fontStyle: 'italic',
+            color: BRAND.muted,
+            marginTop: '2px',
+          }}
+        >
+          {subnote}
+        </div>
+      )}
     </div>
-  );
-};
+    <OfficialRedSeal
+      title={sealTitle}
+      subtitle={sealSubtitle}
+      size={112}
+      date={date || getTodayVnShortDate()}
+    />
+  </div>
+);
 
-// ==========================================
-// ẢNH 3: THƯ THÔNG BÁO LỊCH THI
-// ==========================================
-export const ExamNoticeTemplate = ({ className, examStage = 'final', examDates, notes }) => {
-  const displayClassCode = formatClassCodeForParent(className || "");
-  const isMidterm = examStage === 'midterm';
-  
-  return (
-    <div style={styles.container} id="exam-notice-report">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <div style={{ ...styles.logoPlaceholder, width: '100px', height: '100px', margin: '0 20px 0 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
-        </div>
-        <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>THƯ THÔNG BÁO</h1>
-          <h2 style={{ color: '#64748b', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>V/v: Đánh giá {isMidterm ? 'giữa' : 'cuối'} khóa học lớp {displayClassCode}</h2>
-        </div>
-      </div>
-      <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '30px' }} />
-
-      <p style={{ fontSize: '18px', lineHeight: '1.6' }}>Kính gửi Quý Phụ huynh,</p>
-      <p style={{ fontSize: '18px', lineHeight: '1.6' }}>
-        Trung tâm Anh ngữ Nhật Mỹ xin chân thành cảm ơn sự đồng hành của Quý Phụ huynh và sự cố gắng của các con trong suốt khóa học vừa qua.
-        {isMidterm ? (
-          <> Khóa học của lớp <b>{displayClassCode}</b> đã đi được nửa chặng đường, Trung tâm xin thông báo lịch kiểm tra giữa khóa để đánh giá năng lực của các con như sau:</>
-        ) : (
-          <> Khóa học của lớp <b>{displayClassCode}</b> sắp kết thúc, Trung tâm xin thông báo lịch kiểm tra cuối khóa để đánh giá năng lực của các con như sau:</>
-        )}
-      </p>
-
-      <table style={{ ...styles.table, marginTop: '20px', marginBottom: '30px' }}>
-        <thead>
-          <tr>
-            <th style={{ ...styles.th, backgroundColor: '#0D88C4', color: 'white', width: '30%', textAlign: 'center' }}>KỸ NĂNG</th>
-            <th style={{ ...styles.th, backgroundColor: '#0D88C4', color: 'white', textAlign: 'center' }}>THỜI GIAN KIỂM TRA</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ ...styles.td, fontWeight: 'bold', textAlign: 'center' }}>Speaking (Nói)</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4', fontWeight: 'bold', fontSize: '18px' }}>{examDates?.speaking}</td>
-          </tr>
-          <tr>
-            <td style={{ ...styles.td, fontWeight: 'bold', textAlign: 'center' }}>Reading & Writing<br/>(Đọc & Viết)</td>
-            <td style={{ ...styles.td, textAlign: 'center', color: '#0D88C4', fontWeight: 'bold', fontSize: '18px' }}>{examDates?.rw}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style={{ backgroundColor: '#fef3c7', padding: '20px', borderRadius: '12px', borderLeft: '5px solid #FFCA29' }}>
-        <h3 style={{ margin: '0 0 10px 0', color: '#d97706' }}><i className="fa-solid fa-bell"></i> Dặn dò từ Giáo viên:</h3>
-        <p style={{ margin: 0, fontSize: '16px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{notes}</p>
-      </div>
-
-      <p style={{ fontSize: '18px', lineHeight: '1.6', marginTop: '30px', textAlign: 'center' }}>
-        Trân trọng,<br/>
-        <b>Trung tâm Anh ngữ Nhật Mỹ</b>
-      </p>
-    </div>
-  );
-};
-
-// ==========================================
-// ẢNH 4: THƯ THÔNG BÁO KHÓA MỚI & QR THANH TOÁN
-// ==========================================
-export const PromotionNoticeTemplate = ({ className, newCourse, startDate, endDate, schedule, holidays, discount, isGiftBook, hasBook, studentName, isPersonalized, qrDataUrl }) => {
-  const displayClassCode = formatClassCodeForParent(className || "");
-  const targetName = studentName ? studentName.toUpperCase() : `LỚP ${displayClassCode}`;
-  const bankMemoName = studentName 
-    ? studentName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toUpperCase() 
-    : "[Ten be]";
-
-  // Tính ngày kết thúc dự kiến chuẩn xác theo đúng engine tịnh tiến từng buổi + trừ ngày nghỉ toàn hệ thống
-  const computedEndDate = endDate || computeExpectedEndDateVn({
-    startDate,
-    totalSessions: newCourse?.totalSessions || 32,
-    classCode: className || '',
-    schedule: schedule || '',
-    holidays: holidays || [],
-  });
-
-  const basePrice = newCourse?.price || 0;
-  const bookPrice = (isPersonalized && (isGiftBook || hasBook)) ? 0 : (newCourse?.bookPrice || 0);
-  const discountVal = (isPersonalized && discount > 0) ? parseInt(discount) : 0;
-  const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
-  const transferAddInfo = `${bankMemoName} dong hoc phi lop ${newCourse?.level || ''}`.trim();
-
-  const [localQrDataUrl, setLocalQrDataUrl] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    if (qrDataUrl || finalPrice <= 0) {
-      setLocalQrDataUrl('');
-      return () => { active = false; };
-    }
-    generateVietQRDataURL({ amount: finalPrice, addInfo: transferAddInfo, width: 400 })
-      .then((url) => {
-        if (active) setLocalQrDataUrl(url);
-      })
-      .catch((err) => console.error('Local VietQR preview error:', err));
-    return () => {
-      active = false;
-    };
-  }, [qrDataUrl, finalPrice, transferAddInfo]);
-
-  const resolvedQrSrc = qrDataUrl || localQrDataUrl;
-
-  return (
-    <div style={styles.container} id="promotion-notice-report">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <div style={{ ...styles.logoPlaceholder, width: '100px', height: '100px', margin: '0 20px 0 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
-        </div>
-        <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>THÔNG TIN KHÓA HỌC MỚI</h1>
-          <h2 style={{ color: '#64748b', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>Dành cho học viên: <b>{targetName}</b></h2>
-        </div>
-      </div>
-      <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '30px' }} />
-
-      <p style={{ fontSize: '18px', lineHeight: '1.6', marginBottom: '20px' }}>
-        Chúc mừng {studentName ? `học viên ${studentName}` : 'các con'} đã hoàn thành xuất sắc khóa học của lớp <b>{displayClassCode}</b>! Để tiếp tục lộ trình học tập hiệu quả, Trung tâm xin gửi đến Quý Phụ huynh thông tin khóa học tiếp theo:
-      </p>
-
-      <table style={{ ...styles.table, marginBottom: '30px' }}>
-        <tbody>
-          {/* Row 1: Cấp độ mới */}
-          <tr>
-            <td style={{ ...styles.td, width: '22%', backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Cấp độ mới</td>
-            <td colSpan={3} style={{ ...styles.td, color: '#0D88C4', fontWeight: 'bold', fontSize: '20px' }}>{newCourse?.level} - {newCourse?.capDo}</td>
-          </tr>
-          {/* Row 2: Ngày khai giảng & Dự kiến kết thúc */}
-          <tr>
-            <td style={{ ...styles.td, width: '22%', backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Ngày khai giảng</td>
-            <td style={{ ...styles.td, width: '18%', fontWeight: 'bold', fontSize: '18px', color: '#0D88C4' }}>{startDate}</td>
-            <td style={{ ...styles.td, width: '35%', backgroundColor: '#f8fafc', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Dự kiến kết thúc</td>
-            <td style={{ ...styles.td, width: '25%', fontWeight: 'bold', fontSize: '18px', color: '#0369a1' }}>{computedEndDate}</td>
-          </tr>
-          {/* Row 3: Thời lượng khóa học */}
-          <tr>
-            <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Thời lượng</td>
-            <td colSpan={3} style={{ ...styles.td, fontWeight: 'bold' }}>{newCourse?.totalSessions} buổi</td>
-          </tr>
-          {/* Row 4: Giáo trình & Giá giáo trình */}
-          <tr>
-            <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Giáo trình</td>
-            <td style={{ ...styles.td, fontWeight: '500' }}>{newCourse?.bookName || 'Theo chuẩn quốc tế'}</td>
-            <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Giá giáo trình</td>
-            <td style={{ ...styles.td, fontWeight: 'bold' }}>
-              {isPersonalized && hasBook ? (
-                <div style={{ color: '#0ea5e9', fontWeight: 'bold', fontSize: '17px' }}>
-                  Đã có giáo trình
-                </div>
-              ) : isPersonalized && isGiftBook ? (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ textDecoration: 'line-through', color: '#94a3b8', fontWeight: 'normal', fontSize: '15px' }}>
-                    {(newCourse?.bookPrice || 0).toLocaleString('vi-VN')}đ
-                  </div>
-                  <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '17px', marginTop: '2px' }}>
-                    Tặng giáo trình
-                  </div>
-                </div>
-              ) : (
-                <span>{(newCourse?.bookPrice || 0).toLocaleString('vi-VN')}đ</span>
-              )}
-            </td>
-          </tr>
-          {/* Row 5: Học phí gốc & Ưu đãi học phí */}
-          {isPersonalized && discountVal > 0 ? (
-            <tr>
-              <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Học phí gốc</td>
-              <td style={{ ...styles.td, textDecoration: 'line-through', color: '#94a3b8' }}>{basePrice.toLocaleString('vi-VN')}đ</td>
-              <td style={{ ...styles.td, backgroundColor: '#fef2f2', fontWeight: 'bold', color: '#ef4444' }}>
-                <div>Ưu đãi dành cho</div>
-                <div style={{ color: '#0D88C4', fontSize: '17px', marginTop: '2px', fontWeight: 'bold' }}>
-                  {studentName ? studentName.trim().split(/\s+/).slice(-2).join(' ') : 'Học viên'}
-                </div>
-              </td>
-              <td style={{ ...styles.td, backgroundColor: '#fef2f2', color: '#ef4444', fontWeight: 'bold', fontSize: '18px' }}>- {discountVal.toLocaleString('vi-VN')}đ</td>
-            </tr>
-          ) : (
-            <tr>
-              <td style={{ ...styles.td, backgroundColor: '#f8fafc', fontWeight: 'bold' }}>Học phí gốc</td>
-              <td colSpan={3} style={{ ...styles.td, fontWeight: 'bold' }}>{basePrice.toLocaleString('vi-VN')}đ</td>
-            </tr>
-          )}
-          {/* Row 6: TỔNG CỘNG */}
-          <tr>
-            <td style={{ ...styles.td, backgroundColor: '#FFCA29', fontWeight: 'bold', fontSize: '18px', color: '#92400e' }}>TỔNG CỘNG</td>
-            <td colSpan={3} style={{ ...styles.td, backgroundColor: '#FFCA29', color: '#b45309', fontWeight: 'bold', fontSize: '24px' }}>{finalPrice.toLocaleString('vi-VN')}đ</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Payment details */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '20px' }}>
-        <div style={{ flex: 1, paddingRight: '30px' }}>
-          <p style={{ marginBottom: '15px', fontWeight: 'bold', color: '#0d88c4' }}>Thông tin chuyển khoản:</p>
-          <ul style={{ listStyleType: 'none', padding: 0, margin: 0, lineHeight: '2' }}>
-            <li>Ngân hàng: <strong>NH quân Đội - MB Bank</strong></li>
-            <li>Số TK: <strong style={{ fontSize: '18px', color: '#0d88c4' }}>61 1991 6886</strong></li>
-            <li>Người nhận: <strong>CÔNG TY TNHH NGOAI NGU TRI THUC VIET</strong></li>
-            <li>Nội dung: <strong style={{ backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>{bankMemoName} dong hoc phi lop {newCourse?.level}</strong></li>
-          </ul>
-          <div style={{ marginTop: '20px', padding: '12px', background: '#f0fdf4', borderLeft: '4px solid #22c55e', borderRadius: '4px', fontSize: '13px', fontStyle: 'italic', color: '#166534' }}>
-            <i className="fa-solid fa-shield-check" style={{ marginRight: '5px' }}></i> 
-            Mã quét bên cạnh là mã thanh toán tự động, sẽ dẫn đến chính xác tài khoản công ty của Trung tâm Anh ngữ Nhật Mỹ, phụ huynh có thể hoàn toàn an tâm quét mã này.
-          </div>
-        </div>
-        
-        <div style={{ width: '220px', textAlign: 'center' }}>
-          <div style={{ border: '2px solid #0d88c4', borderRadius: '12px', padding: '15px', background: '#fff', boxShadow: '0 4px 6px -1px rgba(13, 136, 196, 0.2)' }}>
-            <div style={{ fontWeight: 'bold', color: '#0d88c4', marginBottom: '10px', fontSize: '13px' }}>
-              QUÉT ĐỂ THANH TOÁN
-            </div>
-            {finalPrice <= 0 ? (
-              <div style={{ padding: '24px 10px', background: '#ecfdf5', borderRadius: '8px', color: '#059669', fontWeight: 'bold', fontSize: '14px' }}>
-                0đ — Đã hoàn tất ưu đãi
-              </div>
-            ) : resolvedQrSrc ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img 
-                src={resolvedQrSrc} 
-                alt="QR Code" 
-                style={{ width: '100%', height: 'auto', display: 'block' }} 
-              />
-            ) : (
-              <div style={{ padding: '40px 10px', color: '#64748b', fontSize: '13px' }}>
-                Đang tạo mã QR...
-              </div>
-            )}
-            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0d88c4' }}>NAPAS 247</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <p style={{ fontSize: '18px', lineHeight: '1.6', marginTop: '30px', textAlign: 'center' }}>
-        Trân trọng,<br/>
-        <b>Trung tâm Anh ngữ Nhật Mỹ</b>
-      </p>
-    </div>
-  );
-};
-
-// Helper hiển thị nhận xét bullet linh hoạt: chấp nhận cả văn bản tự do, có gạch đầu dòng hoặc không có gạch đầu dòng
+// Helper hiển thị nhận xét bullet linh hoạt: chấp nhận cả văn bản tự do, có hoặc không có gạch đầu dòng
 const renderBulletComments = (text) => {
   const normalized = typeof text === 'string' ? text : '';
   const lines = normalized
     .replace(/\r\n/g, '\n')
     .split('\n')
-    .map(line => line.trim())
-    .map(line => line.replace(/^[-*•]\s*/, '').trim())
+    .map((line) => line.trim())
+    .map((line) => line.replace(/^[-*•]\s*/, '').trim())
     .filter(Boolean);
 
   if (lines.length === 0) {
@@ -711,8 +165,8 @@ const renderBulletComments = (text) => {
     <li
       key={idx}
       style={{
-        marginBottom: '8px',
-        lineHeight: '1.6',
+        marginBottom: '6px',
+        lineHeight: 1.6,
         textAlign: 'left',
         listStyleType: 'disc',
         listStylePosition: 'outside',
@@ -726,103 +180,1166 @@ const renderBulletComments = (text) => {
 const getRecommendationText = (result) => result?.recommendation ?? result?.advice ?? '';
 
 // ==========================================
-// ẢNH 5: NHẬN XÉT ĐỊNH KỲ (PERIODIC REPORT)
+// ẢNH 2: BẢNG ĐIỂM KẾT QUẢ CUỐI KHÓA / GIỮA KHÓA
 // ==========================================
-export const PeriodicReportTemplate = ({ student, result }) => {
+export const ScoreReportTemplate = ({ student, config, result }) => {
+  if (!student || !config || !result) return null;
+
+  const attendanceScore = parseFloat(result.attendanceScore) || 0;
+  const hwScore = parseFloat(result.hwScore) || 0;
+  const activityScore = parseFloat(result.activityScore) || 0;
+  const pronunciationScore = parseFloat(result.pronunciationScore) || 0;
+  const communicationScore = parseFloat(result.communicationScore) || 0;
+
+  const processTotal =
+    (attendanceScore + hwScore + activityScore + pronunciationScore + communicationScore) / 5;
+
+  const speakingScore = parseFloat(result.speakingScore) || 0;
+  const listeningScore = parseFloat(result.listeningScore) || 0;
+  const rwScore = parseFloat(result.rwScore) || 0;
+
+  const speakingMax = config.speakingMax > 0 ? config.speakingMax : 40;
+  const listeningMax = config.listeningMax > 0 ? config.listeningMax : 26;
+  const rwMax = config.rwMax > 0 ? config.rwMax : 36;
+
+  const processContribution = (processTotal / 10) * (config.processWeight ?? 10);
+  const speakingPercent = (speakingScore / speakingMax) * (config.speakingWeight ?? 30);
+  const listeningPercent = (listeningScore / listeningMax) * (config.listeningWeight ?? 20);
+  const rwPercent = (rwScore / rwMax) * (config.rwWeight ?? 40);
+
+  const examContribution = speakingPercent + listeningPercent + rwPercent;
+  const totalScore = processContribution + examContribution;
+
+  let grade = 'D';
+  let gradeDesc = 'Không đạt';
+  if (totalScore >= 98) { grade = 'A+'; gradeDesc = 'Xuất sắc'; }
+  else if (totalScore >= 95) { grade = 'A'; gradeDesc = 'Rất giỏi'; }
+  else if (totalScore >= 90) { grade = 'B+'; gradeDesc = 'Giỏi'; }
+  else if (totalScore >= 80) { grade = 'B'; gradeDesc = 'Khá'; }
+  else if (totalScore >= 75) { grade = 'C+'; gradeDesc = 'Trung bình khá'; }
+  else if (totalScore >= 65) { grade = 'C'; gradeDesc = 'Cần cố gắng hơn'; }
+
+  const displayClassCode = formatClassCodeForParent(result.classCode || student.classCode || 'Chưa có');
+  const displayDate = result.examDate
+    ? formatVnShortDate(result.examDate) || getTodayVnShortDate()
+    : getTodayVnShortDate();
+
+  const teacherNickname = extractTeacherNickname(result.classCode) || 'Giáo viên phụ trách';
+  const teacherFullName = result.class?.teacherName || teacherNickname;
+
+  const thStyle = {
+    padding: '9px 12px',
+    fontSize: '12.5px',
+    fontWeight: '800',
+    color: BRAND.white,
+    fontFamily: FONT_UNIFIED,
+    borderRight: '1px solid rgba(255,255,255,0.18)',
+  };
+
+  const tdStyle = {
+    padding: '8px 12px',
+    borderTop: `1px solid ${BRAND.border}`,
+    borderRight: `1px solid ${BRAND.border}`,
+    fontSize: '13px',
+    color: BRAND.slate,
+    fontFamily: FONT_UNIFIED,
+  };
+
   return (
-    <div style={styles.container} id="review-preview-card">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <div style={{ ...styles.logoPlaceholder, width: '80px', height: '80px', margin: '0 20px 0 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
+    <BrandLetterShell
+      id={`score-report-${student.id}`}
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Official Academic Transcript"
+      eyebrow={`ĐÁNH GIÁ ${String(config.examType || 'CUỐI KHÓA').toUpperCase()}`}
+      title="BÁO CÁO KẾT QUẢ HỌC TẬP"
+      subtitleEn="Course Assessment &amp; Academic Performance Report"
+      footerNote="Chúc mừng học viên đã hoàn thành kỳ đánh giá và nỗ lực rèn luyện tại Anh ngữ Nhật Mỹ!"
+    >
+      {/* Khối thông tin học viên + Điểm tổng kết */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '15px 20px',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            HỌ VÀ TÊN HỌC VIÊN
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px', lineHeight: 1.2 }}>
+            {student.name}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '6px', fontSize: '12.5px', color: BRAND.muted, fontWeight: '600' }}>
+            <span>🏫 Lớp: <strong style={{ color: BRAND.ink }}>{displayClassCode}</strong></span>
+            <span>👩‍🏫 GV: <strong style={{ color: BRAND.ink }}>{teacherNickname}</strong></span>
+            <span>📅 Ngày thi: <strong style={{ color: BRAND.ink }}>{displayDate}</strong></span>
+          </div>
         </div>
+
+        <div
+          style={{
+            backgroundColor: BRAND.goldBg,
+            border: `2px solid ${BRAND.gold}`,
+            borderRadius: '12px',
+            padding: '10px 18px',
+            textAlign: 'center',
+            flexShrink: 0,
+            minWidth: '142px',
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+            TỔNG ĐIỂM ({gradeDesc})
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: '900', color: '#DC2626', lineHeight: 1.15, marginTop: '2px' }}>
+            {totalScore.toFixed(2)}
+          </div>
+          <div
+            style={{
+              display: 'inline-block',
+              marginTop: '4px',
+              padding: '2px 12px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: '900',
+              backgroundColor: BRAND.blue,
+              color: BRAND.white,
+            }}
+          >
+            Xếp loại: {grade}
+          </div>
+        </div>
+      </div>
+
+      {/* 1. QUÁ TRÌNH HỌC */}
+      <div style={{ marginBottom: '16px' }}>
+        <SectionHeading title={`1. Đánh giá quá trình học (${config.processWeight}%)`} />
+        <div style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${BRAND.blueBorder}`, backgroundColor: BRAND.white }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {[
+                { label: 'Điểm danh (Attendance)', score: result.attendanceScore },
+                { label: 'Bài tập về nhà (Homework)', score: result.hwScore },
+                { label: 'Hoạt động lớp (Class Activity)', score: result.activityScore },
+                { label: 'Phát âm (Pronunciation)', score: result.pronunciationScore },
+                { label: 'Giao tiếp (Communication)', score: result.communicationScore },
+              ].map((item, idx) => (
+                <tr key={item.label} style={{ backgroundColor: idx % 2 === 1 ? '#F8FBFE' : BRAND.white }}>
+                  {idx === 0 && (
+                    <td
+                      rowSpan={5}
+                      style={{
+                        ...tdStyle,
+                        borderTop: 'none',
+                        width: '28%',
+                        textAlign: 'center',
+                        fontWeight: '800',
+                        color: BRAND.blueDark,
+                        backgroundColor: BRAND.blueSoft,
+                      }}
+                    >
+                      Chuyên cần
+                      <div style={{ fontSize: '11.5px', fontWeight: '500', color: BRAND.muted, marginTop: '2px' }}>
+                        (Class Participation)
+                      </div>
+                    </td>
+                  )}
+                  <td style={{ ...tdStyle, borderTop: idx === 0 ? 'none' : tdStyle.borderTop, width: '34%', fontWeight: '600' }}>
+                    {item.label}
+                  </td>
+                  <td
+                    style={{
+                      ...tdStyle,
+                      borderTop: idx === 0 ? 'none' : tdStyle.borderTop,
+                      width: '18%',
+                      textAlign: 'center',
+                      fontWeight: '800',
+                      color: BRAND.blue,
+                    }}
+                  >
+                    {item.score}/10
+                  </td>
+                  {idx === 0 && (
+                    <td
+                      rowSpan={5}
+                      style={{
+                        ...tdStyle,
+                        borderTop: 'none',
+                        borderRight: 'none',
+                        width: '20%',
+                        textAlign: 'center',
+                        backgroundColor: BRAND.goldBg,
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <div style={{ fontSize: '11.5px', fontWeight: '700', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+                        TB Chuyên Cần
+                      </div>
+                      <div style={{ color: '#DC2626', fontSize: '22px', fontWeight: '900', marginTop: '6px' }}>
+                        {processTotal.toFixed(1)}%
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2. KẾT QUẢ BÀI THI */}
+      <div style={{ marginBottom: '16px' }}>
+        <SectionHeading title={`2. Kết quả bài thi (${config.examWeight}%)`} />
+        <div style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${BRAND.blueBorder}`, backgroundColor: BRAND.white }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: `linear-gradient(135deg, ${BRAND.blue} 0%, ${BRAND.blueDark} 100%)` }}>
+                <th style={{ ...thStyle, textAlign: 'left', width: '48%' }}>Kỹ năng (Skill)</th>
+                <th style={{ ...thStyle, textAlign: 'center', width: '26%' }}>Điểm thi (Test Score)</th>
+                <th style={{ ...thStyle, textAlign: 'center', width: '26%', borderRight: 'none' }}>Điểm quy đổi (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: `Nói (Speaking): ${config.speakingWeight}%`, val: `${result.speakingScore}/${config.speakingMax}`, pct: speakingPercent },
+                { label: `Nghe (Listening): ${config.listeningWeight}%`, val: `${result.listeningScore}/${config.listeningMax}`, pct: listeningPercent },
+                { label: `Đọc & Viết (Reading & Writing): ${config.rwWeight}%`, val: `${result.rwScore}/${config.rwMax}`, pct: rwPercent },
+              ].map((row, idx) => (
+                <tr key={row.label} style={{ backgroundColor: idx % 2 === 1 ? '#F8FBFE' : BRAND.white }}>
+                  <td style={{ ...tdStyle, fontWeight: '700', color: BRAND.ink }}>{row.label}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '700', color: BRAND.blue }}>{row.val}</td>
+                  <td style={{ ...tdStyle, borderRight: 'none', textAlign: 'center', fontWeight: '800', color: '#DC2626' }}>
+                    {row.pct.toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 3. KẾT QUẢ CUỐI KHÓA & QUY ĐỔI XẾP LOẠI */}
+      <div
+        style={{
+          backgroundColor: BRAND.goldBg,
+          border: `1.5px solid ${BRAND.goldBorder}`,
+          borderRadius: '12px',
+          padding: '12px 16px',
+          marginBottom: '6px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ fontSize: '12px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase', marginBottom: '6px' }}>
+          📌 Thang quy đổi xếp loại &amp; Nhận xét đính kèm
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: BRAND.slate, fontWeight: '500', lineHeight: 1.55 }}>
+          <div>
+            • <strong>A+:</strong> 98 - 100 (Xuất sắc) • <strong>A:</strong> 95 - 97 (Rất giỏi)<br />
+            • <strong>B+:</strong> 90 - 94 (Giỏi) • <strong>B:</strong> 80 - 89 (Khá)
+          </div>
+          <div>
+            • <strong>C+:</strong> 75 - 79 (TB Khá) • <strong>C:</strong> 65 - 74 (Cần cố gắng)<br />
+            • <strong>D:</strong> &lt; 65 (Chưa đạt) • <em>Xem chi tiết ở Phiếu Nhận Xét đính kèm</em>
+          </div>
+        </div>
+      </div>
+
+      <SealSignatureCard
+        label="Xác nhận kết quả khóa học"
+        signer={`GVCN: ${teacherFullName}`}
+        subnote="Phiếu điểm chính thức từ Hệ thống Quản lý Đào tạo Anh ngữ Nhật Mỹ."
+        sealTitle="ĐÃ CHỨNG NHẬN"
+        sealSubtitle="BAN HỌC VỤ"
+        date={displayDate}
+      />
+    </BrandLetterShell>
+  );
+};
+
+// ==========================================
+// ẢNH 1: NHẬN XÉT AI (PERIODIC EXAM / END OF COURSE)
+// ==========================================
+export const CommentsReportTemplate = ({ student, result }) => {
+  const displayClass = formatClassCodeForParent(result?.classCode || student?.classCode || '');
+
+  const skillCards = [
+    {
+      title: 'Speaking (Kỹ năng Nói)',
+      content: result?.commentSpeaking,
+      accent: BRAND.blue,
+      bg: '#F8FBFF',
+      titleColor: BRAND.blueDark,
+    },
+    {
+      title: 'Listening (Kỹ năng Nghe)',
+      content: result?.commentListening,
+      accent: '#0284C7',
+      bg: '#F0F9FF',
+      titleColor: '#0369A1',
+    },
+    {
+      title: 'Reading & Writing (Đọc & Viết)',
+      content: result?.commentRW,
+      accent: BRAND.goldDark,
+      bg: BRAND.goldBg,
+      titleColor: '#92400E',
+    },
+    {
+      title: 'Định hướng phát triển (Development Plan)',
+      content: result?.commentDev,
+      accent: BRAND.greenBadge,
+      bg: '#F3FCF7',
+      titleColor: '#065F46',
+    },
+  ];
+
+  return (
+    <BrandLetterShell
+      id={`comment-report-${student.id}`}
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Teacher's Academic Feedback"
+      eyebrow="ĐÁNH GIÁ NĂNG LỰC CHI TIẾT"
+      title="NHẬN XÉT CỦA GIÁO VIÊN"
+      subtitleEn="Detailed Skill Evaluation &amp; Study Roadmap"
+      footerNote="Quý Phụ huynh vui lòng lưu lại nhận xét để đồng hành cùng con phát triển toàn diện 4 kỹ năng!"
+    >
+      {/* Thông tin học viên */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '14px 20px',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '14px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
         <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student?.name}</h1>
-          <h2 style={{ color: '#0D88C4', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>NHẬN XÉT ĐỊNH KỲ</h2>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            HỌ VÀ TÊN HỌC VIÊN
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px' }}>
+            {student.name}
+          </div>
         </div>
-      </div>
-      <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '40px' }} />
-
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Speaking (Nói)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.speaking)}
-          {result?.speaking_en && renderBulletComments(result.speaking_en)}
-        </ul>
-      </div>
-
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Listening (Nghe)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.listening)}
-          {result?.listening_en && renderBulletComments(result.listening_en)}
-        </ul>
+        {displayClass && (
+          <div
+            style={{
+              backgroundColor: BRAND.blueSoft,
+              border: `1.5px solid ${BRAND.blueBorder}`,
+              borderRadius: '10px',
+              padding: '8px 14px',
+              fontSize: '13px',
+              fontWeight: '800',
+              color: BRAND.blueDark,
+            }}
+          >
+            🏫 Lớp: {displayClass}
+          </div>
+        )}
       </div>
 
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Reading & Writing (Đọc & Viết)</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.rw)}
-          {result?.rw_en && renderBulletComments(result.rw_en)}
-        </ul>
+      {/* 4 khối kỹ năng */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+        {skillCards.map((card) => (
+          <div
+            key={card.title}
+            style={{
+              backgroundColor: card.bg,
+              borderRadius: '12px',
+              border: `1px solid ${BRAND.border}`,
+              borderLeft: `4px solid ${card.accent}`,
+              padding: '12px 16px',
+              fontFamily: FONT_UNIFIED,
+            }}
+          >
+            <div style={{ fontSize: '13.5px', fontWeight: '800', color: card.titleColor, marginBottom: '6px' }}>
+              {card.title}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
+              {renderBulletComments(card.content)}
+            </ul>
+          </div>
+        ))}
       </div>
 
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Thái độ & Định hướng</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.dev)}
-          {result?.dev_en && renderBulletComments(result.dev_en)}
-        </ul>
+      <SealSignatureCard
+        label="Xác nhận chuyên môn"
+        signer="Giáo viên Chủ nhiệm — Hệ thống Anh ngữ Nhật Mỹ"
+        sealTitle="ĐÃ ĐÁNH GIÁ"
+        sealSubtitle="GIÁO VIÊN CHỦ NHIỆM"
+      />
+    </BrandLetterShell>
+  );
+};
+
+// Component Wrapper để chứa các hàm xuất ảnh dùng engine thống nhất Retina 2x
+export const ExportImageWrapper = ({ children, targetId, filename }) => {
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  const handleExport = async () => {
+    const element = document.getElementById(targetId);
+    if (!element) return;
+
+    const parent = element.parentElement;
+    const ot = parent ? parent.style.transform : '';
+    const oh = parent ? parent.style.height : '';
+    if (parent) {
+      parent.style.transform = 'none';
+      parent.style.height = 'auto';
+    }
+    setIsExporting(true);
+    try {
+      const canvas = await exportElementToCanvas(element);
+      const dataUrl = canvas.toDataURL('image/png');
+      downloadImage(dataUrl, filename);
+    } catch (error) {
+      console.error('Lỗi xuất ảnh:', error);
+      alert('Không thể xuất ảnh, vui lòng thử lại');
+    } finally {
+      if (parent) {
+        parent.style.transform = ot;
+        parent.style.height = oh;
+      }
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        {children}
       </div>
+      <button
+        onClick={handleExport}
+        disabled={isExporting}
+        style={{
+          background: '#f59e0b',
+          color: 'white',
+          border: 'none',
+          padding: '0.5rem 1rem',
+          borderRadius: '8px',
+          cursor: isExporting ? 'wait' : 'pointer',
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        {isExporting ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
+        Tải Ảnh {filename.includes('Diem') ? 'Điểm' : 'Nhận Xét'}
+      </button>
     </div>
   );
 };
 
 // ==========================================
-// ẢNH 6: NHẬN XÉT HỌC THỬ (TRIAL REPORT)
+// ẢNH 3: THƯ THÔNG BÁO LỊCH THI
+// ==========================================
+export const ExamNoticeTemplate = ({ className, examStage = 'final', examDates, notes }) => {
+  const displayClassCode = formatClassCodeForParent(className || '');
+  const isMidterm = examStage === 'midterm';
+
+  return (
+    <BrandLetterShell
+      id="exam-notice-report"
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub={isMidterm ? 'Midterm Assessment Notice' : 'Final Exam Schedule Notice'}
+      eyebrow="THÔNG BÁO HỌC VỤ CHÍNH THỨC"
+      title={isMidterm ? 'LỊCH KIỂM TRA GIỮA KHÓA' : 'LỊCH KIỂM TRA CUỐI KHÓA'}
+      subtitleEn={isMidterm ? 'Midterm Progress Assessment Schedule' : 'Final Course Examination Schedule'}
+      footerNote="Kính chúc các em học viên bình tĩnh, tự tin và đạt kết quả cao nhất trong kỳ kiểm tra!"
+    >
+      {/* Thẻ lớp & Lời mở đầu */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '18px 22px',
+          marginBottom: '18px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-block',
+            backgroundColor: BRAND.blueSoft,
+            border: `1px solid ${BRAND.blueBorder}`,
+            color: BRAND.blueDark,
+            padding: '5px 14px',
+            borderRadius: '20px',
+            fontSize: '13px',
+            fontWeight: '800',
+            marginBottom: '10px',
+          }}
+        >
+          🏫 LỚP HỌC: {displayClassCode || className}
+        </div>
+        <p style={{ margin: '0 0 8px 0', fontSize: '14.5px', fontWeight: '700', color: BRAND.ink }}>
+          Kính gửi Quý Phụ huynh,
+        </p>
+        <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.65, color: BRAND.slate }}>
+          Trung tâm Anh ngữ Nhật Mỹ xin chân thành cảm ơn sự đồng hành của Quý Phụ huynh và sự nỗ lực của các em trong suốt thời gian qua.{' '}
+          {isMidterm ? (
+            <>Khóa học của lớp <strong>{displayClassCode}</strong> đã đi được nửa chặng đường, Trung tâm trân trọng thông báo lịch kiểm tra giữa khóa để đánh giá tiến độ học tập như sau:</>
+          ) : (
+            <>Khóa học của lớp <strong>{displayClassCode}</strong> sắp hoàn thành, Trung tâm trân trọng thông báo lịch kiểm tra cuối khóa để tổng kết năng lực của học viên như sau:</>
+          )}
+        </p>
+      </div>
+
+      {/* Bảng lịch kiểm tra */}
+      <div style={{ marginBottom: '18px' }}>
+        <SectionHeading title="Chi tiết thời gian kiểm tra các kỹ năng" />
+        <div style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${BRAND.blueBorder}`, backgroundColor: BRAND.white }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT_UNIFIED }}>
+            <thead>
+              <tr style={{ background: `linear-gradient(135deg, ${BRAND.blue} 0%, ${BRAND.blueDark} 100%)` }}>
+                <th style={{ padding: '11px 14px', color: BRAND.white, fontSize: '13px', fontWeight: '800', width: '36%', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                  KỸ NĂNG (SKILL)
+                </th>
+                <th style={{ padding: '11px 14px', color: BRAND.white, fontSize: '13px', fontWeight: '800', textAlign: 'center' }}>
+                  THỜI GIAN KIỂM TRA
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ padding: '14px', borderTop: `1px solid ${BRAND.border}`, borderRight: `1px solid ${BRAND.border}`, fontWeight: '800', textAlign: 'center', color: BRAND.ink, fontSize: '14px' }}>
+                  Speaking (Kỹ năng Nói)
+                </td>
+                <td style={{ padding: '14px', borderTop: `1px solid ${BRAND.border}`, textAlign: 'center', color: BRAND.blueDark, fontWeight: '800', fontSize: '16px' }}>
+                  {examDates?.speaking || 'Theo lịch thông báo'}
+                </td>
+              </tr>
+              <tr style={{ backgroundColor: '#F8FBFE' }}>
+                <td style={{ padding: '14px', borderTop: `1px solid ${BRAND.border}`, borderRight: `1px solid ${BRAND.border}`, fontWeight: '800', textAlign: 'center', color: BRAND.ink, fontSize: '14px' }}>
+                  Reading &amp; Writing (Đọc &amp; Viết)
+                </td>
+                <td style={{ padding: '14px', borderTop: `1px solid ${BRAND.border}`, textAlign: 'center', color: BRAND.blueDark, fontWeight: '800', fontSize: '16px' }}>
+                  {examDates?.rw || 'Theo lịch thông báo'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Dặn dò giáo viên */}
+      <div
+        style={{
+          backgroundColor: BRAND.goldBg,
+          padding: '15px 18px',
+          borderRadius: '12px',
+          border: `1px solid ${BRAND.goldBorder}`,
+          borderLeft: `5px solid ${BRAND.gold}`,
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ fontSize: '14px', fontWeight: '800', color: BRAND.goldDark, marginBottom: '6px' }}>
+          🔔 Dặn dò từ Giáo viên chủ nhiệm:
+        </div>
+        <div style={{ margin: 0, fontSize: '13.5px', lineHeight: 1.65, color: BRAND.slate, whiteSpace: 'pre-wrap', fontWeight: '500' }}>
+          {notes || 'Học viên ôn tập lại từ vựng và mẫu câu đã học, đi học đầy đủ và có mặt đúng giờ thi.'}
+        </div>
+      </div>
+
+      <SealSignatureCard
+        label="Thông báo chính thức"
+        signer="Phòng Học Vụ — Hệ thống Anh ngữ Nhật Mỹ"
+        sealTitle="THÔNG BÁO THI"
+        sealSubtitle="BAN HỌC VỤ"
+      />
+    </BrandLetterShell>
+  );
+};
+
+// ==========================================
+// ẢNH 4: THƯ THÔNG BÁO KHÓA MỚI & QR THANH TOÁN
+// ==========================================
+export const PromotionNoticeTemplate = ({
+  className,
+  newCourse,
+  startDate,
+  endDate,
+  schedule,
+  holidays,
+  discount,
+  isGiftBook,
+  hasBook,
+  studentName,
+  isPersonalized,
+  qrDataUrl,
+}) => {
+  const displayClassCode = formatClassCodeForParent(className || '');
+  const targetName = studentName ? studentName.toUpperCase() : `LỚP ${displayClassCode}`;
+  const bankMemoName = studentName
+    ? studentName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toUpperCase()
+    : '[Ten be]';
+
+  const computedEndDate =
+    endDate ||
+    computeExpectedEndDateVn({
+      startDate,
+      totalSessions: newCourse?.totalSessions || 32,
+      classCode: className || '',
+      schedule: schedule || '',
+      holidays: holidays || [],
+    });
+
+  const basePrice = newCourse?.price || 0;
+  const bookPrice = isPersonalized && (isGiftBook || hasBook) ? 0 : newCourse?.bookPrice || 0;
+  const discountVal = isPersonalized && discount > 0 ? parseInt(discount, 10) : 0;
+  const finalPrice = Math.max(0, basePrice + bookPrice - discountVal);
+  const transferAddInfo = `${bankMemoName} dong hoc phi lop ${newCourse?.level || ''}`.trim();
+
+  const [localQrDataUrl, setLocalQrDataUrl] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (qrDataUrl || finalPrice <= 0) {
+      setLocalQrDataUrl('');
+      return () => {
+        active = false;
+      };
+    }
+    generateVietQRDataURL({ amount: finalPrice, addInfo: transferAddInfo, width: 400 })
+      .then((url) => {
+        if (active) setLocalQrDataUrl(url);
+      })
+      .catch((err) => console.error('Local VietQR preview error:', err));
+    return () => {
+      active = false;
+    };
+  }, [qrDataUrl, finalPrice, transferAddInfo]);
+
+  const resolvedQrSrc = qrDataUrl || localQrDataUrl;
+
+  const thCell = {
+    padding: '10px 12px',
+    borderTop: `1px solid ${BRAND.border}`,
+    borderRight: `1px solid ${BRAND.border}`,
+    backgroundColor: '#F8FBFE',
+    fontWeight: '700',
+    fontSize: '13px',
+    color: BRAND.slate,
+    fontFamily: FONT_UNIFIED,
+  };
+
+  const valCell = {
+    padding: '10px 12px',
+    borderTop: `1px solid ${BRAND.border}`,
+    borderRight: `1px solid ${BRAND.border}`,
+    fontSize: '13.5px',
+    color: BRAND.ink,
+    fontFamily: FONT_UNIFIED,
+  };
+
+  return (
+    <BrandLetterShell
+      id="promotion-notice-report"
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Course Continuation &amp; Tuition Notice"
+      eyebrow="CHÚC MỪNG HOÀN THÀNH KHÓA HỌC"
+      title="THÔNG TIN KHÓA HỌC MỚI"
+      subtitleEn="Next Level Enrollment &amp; Tuition Guide"
+      footerNote="Cảm ơn Quý Phụ huynh đã luôn tin tưởng và đồng hành cùng Anh ngữ Nhật Mỹ!"
+    >
+      {/* Đối tượng áp dụng + lời chúc */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '16px 20px',
+          marginBottom: '16px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase' }}>
+              {studentName ? 'DÀNH CHO HỌC VIÊN' : 'DÀNH CHO TẬP THỂ LỚP'}
+            </div>
+            <div style={{ fontSize: '21px', fontWeight: '900', color: BRAND.blueDark, marginTop: '2px' }}>
+              {targetName}
+            </div>
+          </div>
+          <div
+            style={{
+              backgroundColor: BRAND.greenBadgeBg,
+              color: BRAND.greenBadge,
+              border: `1.5px solid ${BRAND.greenBorder}`,
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: '800',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🎓 Lộ trình tiếp theo
+          </div>
+        </div>
+        <p style={{ margin: 0, fontSize: '13.5px', lineHeight: 1.6, color: BRAND.slate }}>
+          Chúc mừng {studentName ? `học viên ${studentName}` : 'các em'} đã hoàn thành xuất sắc khóa học của lớp{' '}
+          <strong>{displayClassCode}</strong>! Trung tâm trân trọng gửi đến Quý Phụ huynh thông tin khóa học tiếp theo:
+        </p>
+      </div>
+
+      {/* Bảng thông tin khóa mới & học phí */}
+      <div style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${BRAND.blueBorder}`, backgroundColor: BRAND.white, marginBottom: '18px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ ...thCell, borderTop: 'none', width: '22%' }}>Cấp độ mới</td>
+              <td colSpan={3} style={{ ...valCell, borderTop: 'none', borderRight: 'none', color: BRAND.blueDark, fontWeight: '900', fontSize: '16px' }}>
+                {newCourse?.level} - {newCourse?.capDo}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ ...thCell, width: '22%' }}>Ngày khai giảng</td>
+              <td style={{ ...valCell, width: '22%', fontWeight: '800', color: BRAND.blue }}>{startDate}</td>
+              <td style={{ ...thCell, width: '28%', whiteSpace: 'nowrap' }}>Dự kiến kết thúc</td>
+              <td style={{ ...valCell, borderRight: 'none', width: '28%', fontWeight: '800', color: BRAND.blueDark }}>{computedEndDate}</td>
+            </tr>
+            <tr>
+              <td style={thCell}>Thời lượng</td>
+              <td colSpan={3} style={{ ...valCell, borderRight: 'none', fontWeight: '700' }}>
+                {newCourse?.totalSessions} buổi học chuẩn giáo trình quốc tế
+              </td>
+            </tr>
+            <tr>
+              <td style={thCell}>Giáo trình</td>
+              <td style={{ ...valCell, fontWeight: '600' }}>{newCourse?.bookName || 'Theo chuẩn quốc tế'}</td>
+              <td style={thCell}>Giá giáo trình</td>
+              <td style={{ ...valCell, borderRight: 'none', fontWeight: '800' }}>
+                {isPersonalized && hasBook ? (
+                  <span style={{ color: BRAND.blue }}>Đã có giáo trình</span>
+                ) : isPersonalized && isGiftBook ? (
+                  <div>
+                    <span style={{ textDecoration: 'line-through', color: '#94A3B8', fontWeight: '500', fontSize: '12.5px', marginRight: '8px' }}>
+                      {(newCourse?.bookPrice || 0).toLocaleString('vi-VN')}đ
+                    </span>
+                    <span style={{ color: BRAND.greenBadge, fontWeight: '800' }}>Tặng giáo trình</span>
+                  </div>
+                ) : (
+                  <span>{(newCourse?.bookPrice || 0).toLocaleString('vi-VN')}đ</span>
+                )}
+              </td>
+            </tr>
+            {isPersonalized && discountVal > 0 ? (
+              <tr>
+                <td style={thCell}>Học phí gốc</td>
+                <td style={{ ...valCell, textDecoration: 'line-through', color: '#94A3B8' }}>
+                  {basePrice.toLocaleString('vi-VN')}đ
+                </td>
+                <td style={{ ...thCell, backgroundColor: '#FEF2F2', color: '#DC2626' }}>
+                  Ưu đãi ({studentName ? studentName.trim().split(/\s+/).slice(-2).join(' ') : 'Học viên'})
+                </td>
+                <td style={{ ...valCell, borderRight: 'none', backgroundColor: '#FEF2F2', color: '#DC2626', fontWeight: '900', fontSize: '15px' }}>
+                  - {discountVal.toLocaleString('vi-VN')}đ
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <td style={thCell}>Học phí gốc</td>
+                <td colSpan={3} style={{ ...valCell, borderRight: 'none', fontWeight: '800' }}>
+                  {basePrice.toLocaleString('vi-VN')}đ
+                </td>
+              </tr>
+            )}
+            <tr style={{ backgroundColor: '#FEF3C7' }}>
+              <td style={{ ...thCell, backgroundColor: '#FEF3C7', borderTop: `2px solid ${BRAND.gold}`, color: '#92400E', fontWeight: '900', fontSize: '14.5px' }}>
+                TỔNG CỘNG
+              </td>
+              <td colSpan={3} style={{ ...valCell, borderRight: 'none', borderTop: `2px solid ${BRAND.gold}`, color: '#B45309', fontWeight: '900', fontSize: '20px' }}>
+                {finalPrice.toLocaleString('vi-VN')}đ
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Thanh toán & Mã VietQR + Mộc Đỏ */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.border}`,
+          padding: '16px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '20px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '14px', fontWeight: '800', color: BRAND.blueDark, marginBottom: '8px', textTransform: 'uppercase' }}>
+            🏦 Thông tin chuyển khoản học phí:
+          </div>
+          <ul style={{ listStyleType: 'none', padding: 0, margin: 0, lineHeight: 1.9, fontSize: '13.5px', color: BRAND.slate }}>
+            <li>
+              Ngân hàng: <strong>NH Quân Đội - MB Bank</strong>
+            </li>
+            <li>
+              Số tài khoản: <strong style={{ fontSize: '16px', color: BRAND.blueDark }}>61 1991 6886</strong>
+            </li>
+            <li>
+              Chủ tài khoản: <strong>CÔNG TY TNHH NGOAI NGU TRI THUC VIET</strong>
+            </li>
+            <li>
+              Nội dung CK:{' '}
+              <strong style={{ backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '5px', color: '#92400E' }}>
+                {transferAddInfo}
+              </strong>
+            </li>
+          </ul>
+          <div
+            style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              backgroundColor: BRAND.greenBadgeBg,
+              borderLeft: `4px solid ${BRAND.greenBadge}`,
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontStyle: 'italic',
+              color: '#065F46',
+            }}
+          >
+            ✓ Mã VietQR bên cạnh đã điền sẵn số tiền &amp; nội dung chuyển khoản vào tài khoản công ty Anh ngữ Nhật Mỹ.
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <OfficialRedSeal
+              title="THÔNG BÁO HỌC PHÍ"
+              subtitle="PHÒNG TÀI CHÍNH"
+              size={98}
+            />
+            <span style={{ fontSize: '12px', color: BRAND.muted, fontWeight: '600' }}>
+              Xác nhận mức học phí &amp; ưu đãi chính thức của khóa mới.
+            </span>
+          </div>
+        </div>
+
+        <div style={{ width: '200px', textAlign: 'center', flexShrink: 0 }}>
+          <div
+            style={{
+              border: `2px solid ${BRAND.blue}`,
+              borderRadius: '12px',
+              padding: '12px',
+              backgroundColor: BRAND.white,
+              boxShadow: '0 4px 10px rgba(13, 136, 196, 0.14)',
+            }}
+          >
+            <div style={{ fontWeight: '800', color: BRAND.blueDark, marginBottom: '8px', fontSize: '12.5px' }}>
+              QUÉT MÃ VIETQR
+            </div>
+            {finalPrice <= 0 ? (
+              <div style={{ padding: '24px 8px', backgroundColor: BRAND.greenBadgeBg, borderRadius: '8px', color: BRAND.greenBadge, fontWeight: '800', fontSize: '13.5px' }}>
+                0đ — Đã hoàn tất ưu đãi
+              </div>
+            ) : resolvedQrSrc ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={resolvedQrSrc}
+                alt="QR Code"
+                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '6px' }}
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div style={{ padding: '36px 10px', color: BRAND.subtle, fontSize: '12.5px' }}>
+                Đang tạo mã QR...
+              </div>
+            )}
+            <div style={{ marginTop: '6px', fontSize: '11.5px', fontWeight: '800', color: BRAND.blue }}>
+              NAPAS 24/7
+            </div>
+          </div>
+        </div>
+      </div>
+    </BrandLetterShell>
+  );
+};
+
+// ==========================================
+// ẢNH 5: NHẬN XÉT ĐỊNH KỲ (PERIODIC REPORT)
+// ==========================================
+export const PeriodicReportTemplate = ({ student, result }) => {
+  const displayClass = student?.classCode ? formatClassCode(student.classCode) : '';
+  const blocks = [
+    {
+      title: '1. Speaking (Kỹ năng Nói)',
+      vi: result?.speaking,
+      en: result?.speaking_en,
+      accent: BRAND.blue,
+      bg: '#F8FBFF',
+      titleColor: BRAND.blueDark,
+    },
+    {
+      title: '2. Listening (Kỹ năng Nghe)',
+      vi: result?.listening,
+      en: result?.listening_en,
+      accent: '#0284C7',
+      bg: '#F0F9FF',
+      titleColor: '#0369A1',
+    },
+    {
+      title: '3. Reading & Writing (Đọc & Viết)',
+      vi: result?.rw,
+      en: result?.rw_en,
+      accent: BRAND.goldDark,
+      bg: BRAND.goldBg,
+      titleColor: '#92400E',
+    },
+    {
+      title: '4. Thái Độ & Định Hướng Phát Triển',
+      vi: result?.dev,
+      en: result?.dev_en,
+      accent: BRAND.greenBadge,
+      bg: '#F3FCF7',
+      titleColor: '#065F46',
+    },
+  ];
+
+  return (
+    <BrandLetterShell
+      id="review-preview-card"
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Periodic Progress Report"
+      eyebrow="THEO DÕI TIẾN ĐỘ HỌC TẬP"
+      title="NHẬN XÉT ĐỊNH KỲ"
+      subtitleEn="Periodic Academic Progress &amp; Skill Feedback"
+      footerNote="Trung tâm Anh ngữ Nhật Mỹ trân trọng sự đồng hành của Quý Phụ huynh trong quá trình tiến bộ của học viên!"
+    >
+      {/* Thẻ học viên */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '15px 20px',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '14px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            HỌ VÀ TÊN HỌC VIÊN
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '2px' }}>
+            {student?.name || 'HỌC VIÊN'}
+          </div>
+        </div>
+        {student?.classCode && (
+          <div
+            style={{
+              backgroundColor: BRAND.blueSoft,
+              border: `1.5px solid ${BRAND.blueBorder}`,
+              borderRadius: '10px',
+              padding: '8px 14px',
+              fontSize: '13px',
+              fontWeight: '800',
+              color: BRAND.blueDark,
+            }}
+          >
+            📚 Lớp: {displayClass || student.classCode}
+          </div>
+        )}
+      </div>
+
+      {/* 4 Khối kỹ năng */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+        {blocks.map((blk) => (
+          <div
+            key={blk.title}
+            style={{
+              backgroundColor: blk.bg,
+              borderRadius: '12px',
+              border: `1px solid ${BRAND.border}`,
+              borderLeft: `4px solid ${blk.accent}`,
+              padding: '12px 16px',
+              fontFamily: FONT_UNIFIED,
+            }}
+          >
+            <div style={{ fontSize: '13.5px', fontWeight: '800', color: blk.titleColor, marginBottom: '6px' }}>
+              {blk.title}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500' }}>
+              {renderBulletComments(blk.vi)}
+            </ul>
+            {blk.en && (
+              <ul
+                style={{
+                  margin: '8px 0 0 0',
+                  paddingTop: '8px',
+                  paddingLeft: '20px',
+                  borderTop: `1px dashed ${BRAND.border}`,
+                  color: BRAND.muted,
+                  fontSize: '12.5px',
+                  fontStyle: 'italic',
+                }}
+              >
+                {renderBulletComments(blk.en)}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <SealSignatureCard
+        label="Xác nhận đánh giá định kỳ"
+        signer="Giáo viên Chủ nhiệm — Hệ thống Anh ngữ Nhật Mỹ"
+        sealTitle="ĐÃ ĐÁNH GIÁ"
+        sealSubtitle="GIÁO VIÊN CHỦ NHIỆM"
+      />
+    </BrandLetterShell>
+  );
+};
+
+// ==========================================
+// ẢNH 6: NHẬN XÉT HỌC THỬ (TRIAL REPORT) - CHUẨN NHẬN DIỆN MỚI
 // ==========================================
 export const TrialReportTemplate = ({ student, result, sessions }) => {
+  const displayClass = student?.classCode ? formatClassCode(student.classCode) : '';
+  const sections = [
+    {
+      title: '1. Thái Độ & Khả Năng Hòa Nhập',
+      content: result?.attitude,
+      accent: BRAND.blue,
+      bg: '#F8FBFF',
+      titleColor: BRAND.blueDark,
+    },
+    {
+      title: '2. Kỹ Năng Ngôn Ngữ (Nghe - Nói - Phản Xạ)',
+      content: result?.skills,
+      accent: BRAND.goldDark,
+      bg: BRAND.goldBg,
+      titleColor: '#92400E',
+    },
+    {
+      title: '3. Tiềm Năng & Định Hướng Lộ Trình',
+      content: result?.potential,
+      accent: '#7C3AED',
+      bg: '#FAF5FF',
+      titleColor: '#5B21B6',
+    },
+    {
+      title: '4. Lời Khuyên Dành Cho Quý Phụ Huynh',
+      content: getRecommendationText(result),
+      accent: BRAND.greenBadge,
+      bg: '#F3FCF7',
+      titleColor: '#065F46',
+    },
+  ];
+
   return (
-    <div style={styles.container} id="review-preview-card">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <div style={{ ...styles.logoPlaceholder, width: '80px', height: '80px', margin: '0 20px 0 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Logo" style={styles.logoImage} />
-        </div>
+    <BrandLetterShell
+      id="trial-report-capture"
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Trial Class Evaluation"
+      eyebrow={`BÁO CÁO SAU ${sessions || 2} BUỔI TRẢI NGHIỆM`}
+      title="NHẬN XÉT HỌC THỬ"
+      subtitleEn="Trial Class Progress &amp; Roadmap Evaluation"
+      footerNote="Cảm ơn Quý Phụ huynh đã cho học viên trải nghiệm môi trường học tập chuẩn Cambridge tại Anh ngữ Nhật Mỹ!"
+    >
+      {/* Thẻ thông tin học viên */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '16px 22px',
+          marginBottom: '18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
         <div>
-          <h1 style={{ color: '#0D88C4', fontSize: '32px', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{student?.name}</h1>
-          <h2 style={{ color: '#0D88C4', fontSize: '20px', margin: 0, fontWeight: 'normal' }}>NHẬN XÉT HỌC THỬ ({sessions} BUỔI)</h2>
+          <div style={{ fontSize: '11.5px', fontWeight: '800', color: BRAND.subtle, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            HỌ VÀ TÊN HỌC VIÊN
+          </div>
+          <div style={{ fontSize: '23px', fontWeight: '900', color: BRAND.blueDark, textTransform: 'uppercase', marginTop: '3px', lineHeight: 1.2 }}>
+            {student?.name || 'HỌC VIÊN HỌC THỬ'}
+          </div>
+          {student?.classCode && (
+            <div style={{ fontSize: '13px', fontWeight: '600', color: BRAND.muted, marginTop: '4px' }}>
+              📚 Lớp trải nghiệm: <strong style={{ color: BRAND.ink }}>{displayClass || student.classCode}</strong>
+            </div>
+          )}
+        </div>
+        <div
+          style={{
+            backgroundColor: BRAND.goldBg,
+            border: `2px solid ${BRAND.gold}`,
+            borderRadius: '12px',
+            padding: '10px 16px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+            GIAI ĐOẠN
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: '900', color: BRAND.blueDark, marginTop: '2px' }}>
+            {sessions || 2} BUỔI HỌC THỬ
+          </div>
         </div>
       </div>
-      <hr style={{ borderTop: '2px solid #0D88C4', marginBottom: '40px' }} />
 
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Thái độ & Hòa nhập</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.attitude)}
-        </ul>
+      {/* 4 Khối nhận xét */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '4px' }}>
+        {sections.map((sec) => (
+          <div
+            key={sec.title}
+            style={{
+              backgroundColor: sec.bg,
+              borderRadius: '12px',
+              border: `1px solid ${BRAND.border}`,
+              borderLeft: `4px solid ${sec.accent}`,
+              padding: '13px 16px',
+              fontFamily: FONT_UNIFIED,
+            }}
+          >
+            <div style={{ fontSize: '13.5px', fontWeight: '800', color: sec.titleColor, marginBottom: '6px' }}>
+              {sec.title}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: BRAND.slate, fontSize: '13px', fontWeight: '500', lineHeight: 1.6 }}>
+              {renderBulletComments(sec.content)}
+            </ul>
+          </div>
+        ))}
       </div>
 
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Kỹ năng Ngôn ngữ</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.skills)}
-        </ul>
-      </div>
-
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Tiềm năng & Định hướng</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(result?.potential)}
-        </ul>
-      </div>
-
-      <div style={styles.commentBox}>
-        <div style={styles.commentTitle}>Lời khuyên cho Phụ huynh</div>
-        <ul style={{ margin: 0, paddingLeft: '24px', textAlign: 'left', listStylePosition: 'outside' }}>
-          {renderBulletComments(getRecommendationText(result))}
-        </ul>
-      </div>
-    </div>
+      <SealSignatureCard
+        label="Xác nhận nhận xét học thử"
+        signer="Giáo viên Phụ trách — Hệ thống Anh ngữ Nhật Mỹ"
+        sealTitle="ĐÃ ĐÁNH GIÁ"
+        sealSubtitle="BAN CHUYÊN MÔN"
+      />
+    </BrandLetterShell>
   );
 };

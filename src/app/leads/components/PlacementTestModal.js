@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import * as htmlToImage from 'html-to-image';
 import PlacementReportTemplate from './PlacementReportTemplate';
+import { copyElementPng, downloadElementPng, formatVnShortDate, getTodayVnShortDate } from '@/lib/brandTheme';
 
 const DEFAULT_WEIGHTS = { listening: 30, speaking: 30, rw: 40 };
 
@@ -26,7 +26,7 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
   const [saveStatus, setSaveStatus]     = useState('');
   const [hasExisting, setHasExisting]   = useState(false);
 
-  const templateRef = useRef(null);
+  const captureRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -39,7 +39,7 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
       setLsKeywords(''); setRwKeywords(''); setDevKeywords('');
       setAiResult(null); setError('');
       setAssessmentId(null); setSaveStatus(''); setHasExisting(false);
-      setTestDate(new Date().toLocaleDateString('vi-VN'));
+      setTestDate(getTodayVnShortDate());
 
       // Tự động nạp dữ liệu kiểm tra năng lực đã lưu trước đó nếu có
       if (lead?.id) {
@@ -51,10 +51,8 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
               setAssessmentId(prev.id);
               setHasExisting(true);
               if (prev.assessmentDate) {
-                try {
-                  const d = new Date(prev.assessmentDate);
-                  if (!isNaN(d.getTime())) setTestDate(d.toLocaleDateString('vi-VN'));
-                } catch {}
+                const formatted = formatVnShortDate(prev.assessmentDate);
+                if (formatted) setTestDate(formatted);
               }
               if (prev.scoresData && typeof prev.scoresData === 'object') {
                 setScores({
@@ -167,20 +165,17 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
     setLoading(false);
   };
 
-  const getDataUrl = async () => {
-    const el = templateRef.current;
-    if (!el) throw new Error('Template element not found');
-    return await htmlToImage.toPng(el, { quality: 1, pixelRatio: 2 });
-  };
+  const exportFilename = `KQ_Test_${(lead?.name || 'HocVien').replace(/\s+/g, '_')}.png`;
 
   const handleCopyImage = async () => {
     setDownloading(true);
     try {
-      const dataUrl = await getDataUrl();
-      const res   = await fetch(dataUrl);
-      const blob  = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      alert('Đã copy ảnh! Dán Ctrl+V vào Zalo nhé!');
+      const result = await copyElementPng(captureRef.current, exportFilename);
+      if (result.status === 'COPIED') {
+        alert('Đã copy ảnh! Dán Ctrl+V vào Zalo nhé!');
+      } else {
+        alert('Trình duyệt không bật quyền dán ảnh trực tiếp nên hệ thống đã tải ảnh PNG về máy.');
+      }
     } catch (err) {
       console.error(err);
       alert('Lỗi copy ảnh: ' + err.message + '. Hãy thử nút Tải Ảnh Xuống.');
@@ -191,11 +186,7 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
   const handleDownloadImage = async () => {
     setDownloading(true);
     try {
-      const dataUrl = await getDataUrl();
-      const link = document.createElement('a');
-      link.download = `KQ_Test_${lead?.name || 'HocVien'}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadElementPng(captureRef.current, exportFilename);
     } catch (err) {
       console.error(err);
       alert('Có lỗi khi tạo ảnh: ' + err.message);
@@ -393,10 +384,15 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                 ))}
               </div>
 
+              {/* Bản ẩn full 800px để xuất ảnh Retina 2x sắc nét */}
+              <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '800px', pointerEvents: 'none' }}>
+                <PlacementReportTemplate ref={captureRef} studentName={lead?.name} testDate={testDate} scores={scores} aiResult={aiResult} />
+              </div>
+
               {/* Preview */}
               <div style={{ background: '#e2e8f0', padding: '18px', borderRadius: '12px', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center' }}>
-                  <PlacementReportTemplate ref={templateRef} studentName={lead?.name} testDate={testDate} scores={scores} aiResult={aiResult} />
+                <div style={{ transform: 'scale(0.76)', transformOrigin: 'top center', marginBottom: '-180px' }}>
+                  <PlacementReportTemplate studentName={lead?.name} testDate={testDate} scores={scores} aiResult={aiResult} />
                 </div>
               </div>
             </div>

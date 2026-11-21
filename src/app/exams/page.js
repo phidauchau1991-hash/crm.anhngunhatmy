@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import * as htmlToImage from 'html-to-image';
 import Link from 'next/link';
 import ClassSelect from '../components/ClassSelect';
 import MonthlyReportTab from './components/MonthlyReportTab';
 import { ExportImageWrapper, ScoreReportTemplate, CommentsReportTemplate, ExamNoticeTemplate, PromotionNoticeTemplate } from './components/ReportTemplates';
 import { generateVietQRDataURL } from '@/lib/vietqr';
 import { computeExpectedEndDateVn } from '@/lib/classHelper';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 
 export default function ExamsPage() {
   const [activeTab, setActiveTab] = useState('config');
@@ -386,7 +386,6 @@ export default function ExamsPage() {
     }
     setIsBatchExporting(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
       const JSZip = (await import('jszip')).default;
       const { saveAs } = await import('file-saver');
       const { createRoot } = await import('react-dom/client');
@@ -401,7 +400,7 @@ export default function ExamsPage() {
         container.style.position = 'absolute';
         container.style.left = '-9999px';
         container.style.top = '0';
-        container.style.width = '794px';
+        container.style.width = '800px';
         document.body.appendChild(container);
         
         const root = createRoot(container);
@@ -456,13 +455,8 @@ export default function ExamsPage() {
         // Nghỉ thêm 200ms để trình duyệt kịp vẽ lên màn hình trước khi chụp
         await new Promise(r => setTimeout(r, 200));
 
-        // BƯỚC 2: Chụp ảnh bằng html2canvas
-        const canvas = await html2canvas(container.firstChild, { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: '#ffffff',
-          logging: false
-        });
+        // BƯỚC 2: Chụp ảnh bằng engine chuẩn Retina 2x (chờ font Be Vietnam Pro + logo)
+        const canvas = await exportElementToCanvas(container.firstChild);
         const dataUrl = canvas.toDataURL('image/png');
         const base64Data = dataUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
         zip.file(`Khoa_Moi_${s.name.replace(/\s+/g, '_')}.png`, base64Data, { base64: true });
@@ -1179,17 +1173,21 @@ export default function ExamsPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h4 style={{ margin: 0, color: '#334155' }}>📋 Phiếu Nhận Xét A4</h4>
-                  <button onClick={() => {
+                  <button onClick={async () => {
                      const el = document.getElementById(`modal-comment-report-${previewModalData.student.id}`);
-                     if(el) {
-                       import('html2canvas').then(html2canvas => {
-                         html2canvas.default(el, { scale: 2, useCORS: true, backgroundColor: '#fff', logging: false }).then(canvas => {
-                           const link = document.createElement('a');
-                           link.download = `Nhan_Xet_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
-                           link.href = canvas.toDataURL('image/png');
-                           link.click();
-                         });
-                       });
+                     if (!el) return;
+                     const parent = el.parentElement;
+                     const ot = parent ? parent.style.transform : '';
+                     const oh = parent ? parent.style.height : '';
+                     if (parent) { parent.style.transform = 'none'; parent.style.height = 'auto'; }
+                     try {
+                       const canvas = await exportElementToCanvas(el);
+                       const link = document.createElement('a');
+                       link.download = `Nhan_Xet_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                       link.href = canvas.toDataURL('image/png');
+                       link.click();
+                     } finally {
+                       if (parent) { parent.style.transform = ot; parent.style.height = oh; }
                      }
                   }} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
                     <i className="fa-solid fa-download"></i> Tải Nhận Xét
@@ -1206,17 +1204,21 @@ export default function ExamsPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h4 style={{ margin: 0, color: '#334155' }}>📋 Bảng Điểm {configs.find(c => c.id === parseInt(selectedConfig))?.examType || 'Khóa Học'}</h4>
-                  <button onClick={() => {
+                  <button onClick={async () => {
                      const el = document.getElementById(`modal-score-report-${previewModalData.student.id}`);
-                     if(el) {
-                       import('html2canvas').then(html2canvas => {
-                         html2canvas.default(el, { scale: 2, useCORS: true, backgroundColor: '#fff', logging: false }).then(canvas => {
-                           const link = document.createElement('a');
-                           link.download = `Bang_Diem_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
-                           link.href = canvas.toDataURL('image/png');
-                           link.click();
-                         });
-                       });
+                     if (!el) return;
+                     const parent = el.parentElement;
+                     const ot = parent ? parent.style.transform : '';
+                     const oh = parent ? parent.style.height : '';
+                     if (parent) { parent.style.transform = 'none'; parent.style.height = 'auto'; }
+                     try {
+                       const canvas = await exportElementToCanvas(el);
+                       const link = document.createElement('a');
+                       link.download = `Bang_Diem_${previewModalData.student.name.replace(/\s/g, '_')}.png`;
+                       link.href = canvas.toDataURL('image/png');
+                       link.click();
+                     } finally {
+                       if (parent) { parent.style.transform = ot; parent.style.height = oh; }
                      }
                   }} style={{ padding: '6px 12px', background: '#0D88C4', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
                     <i className="fa-solid fa-download"></i> Tải Bảng Điểm

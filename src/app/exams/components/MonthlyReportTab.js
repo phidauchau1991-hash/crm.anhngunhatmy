@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import html2canvas from 'html2canvas';
 import MonthlyAcademicReportTemplate from './MonthlyAcademicReportTemplate';
 import ClassSelect from '@/app/components/ClassSelect';
+import { exportElementToCanvas } from '@/lib/brandTheme';
 
 export default function MonthlyReportTab({ classes }) {
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -144,12 +144,7 @@ export default function MonthlyReportTab({ classes }) {
       }
 
       try {
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false
-        });
+        const canvas = await exportElementToCanvas(element);
         
         const dataUrl = canvas.toDataURL('image/png');
         

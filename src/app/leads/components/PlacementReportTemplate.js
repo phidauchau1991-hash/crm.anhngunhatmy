@@ -1,4 +1,9 @@
+'use client';
+
 import React, { forwardRef } from 'react';
+import BrandLetterShell from '@/components/BrandLetterShell';
+import OfficialRedSeal from '@/components/OfficialRedSeal';
+import { BRAND, FONT_UNIFIED, getTodayVnShortDate } from '@/lib/brandTheme';
 
 const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiResult }, ref) => {
   // Weighted score calculation
@@ -25,134 +30,502 @@ const PlacementReportTemplate = forwardRef(({ studentName, testDate, scores, aiR
   const totalContrib = Math.round((lsContrib + spContrib + rwContrib) * 100) / 100;
   const totalWeight  = lsWeight + spWeight + rwWeight;
 
-  const getEval = (pct) => {
-    if (pct >= 85) return 'Xuất sắc';
-    if (pct >= 70) return 'Khá - Tốt';
-    if (pct >= 50) return 'Trung bình';
-    return 'Cần cố gắng';
+  const getEvalBadge = (pct) => {
+    if (pct >= 85) return { label: 'Xuất sắc', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0' };
+    if (pct >= 70) return { label: 'Khá - Tốt', bg: '#E8F5FD', color: '#08557B', border: '#BAE6FD' };
+    if (pct >= 50) return { label: 'Trung bình', bg: '#FEF3C7', color: '#B45309', border: '#FDE68A' };
+    return { label: 'Cần củng cố nền tảng', bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA' };
   };
 
-  const font = "Arial, Helvetica, sans-serif";
+  const overallBadge = getEvalBadge(totalContrib);
+
+  const skillRows = [
+    {
+      label: 'Nghe (Listening)',
+      score: `${scores?.listening?.score || 0} / ${scores?.listening?.max || 0}`,
+      pct: lsPct,
+      weight: lsWeight,
+      contrib: lsContrib,
+    },
+    {
+      label: 'Nói (Speaking)',
+      score: `${scores?.speaking?.score || 0} / ${scores?.speaking?.max || 0}`,
+      pct: spPct,
+      weight: spWeight,
+      contrib: spContrib,
+    },
+    {
+      label: 'Đọc & Viết (Reading & Writing)',
+      score: `${scores?.rw?.score || 0} / ${scores?.rw?.max || 0}`,
+      pct: rwPct,
+      weight: rwWeight,
+      contrib: rwContrib,
+    },
+  ];
+
+  const remarkCards = [
+    {
+      title: 'Nghe & Nói (Listening & Speaking)',
+      content: aiResult?.ls_comments || '- Giáo viên đang cập nhật nhận xét...',
+      accent: BRAND.blue,
+      bg: '#F8FBFF',
+      titleColor: BRAND.blueDark,
+    },
+    {
+      title: 'Đọc & Viết (Reading & Writing)',
+      content: aiResult?.rw_comments || '- Giáo viên đang cập nhật nhận xét...',
+      accent: BRAND.goldDark,
+      bg: BRAND.goldBg,
+      titleColor: '#92400E',
+    },
+    {
+      title: 'Đánh Giá Chung & Lộ Trình Đề Xuất (Conclusion & Roadmap)',
+      content:
+        aiResult?.conclusion ||
+        'Trung tâm Anh ngữ Nhật Mỹ sẽ trao đổi trực tiếp cùng Quý Phụ huynh để tư vấn lộ trình học phù hợp nhất.',
+      accent: BRAND.greenBadge,
+      bg: '#F3FCF7',
+      titleColor: '#065F46',
+    },
+  ];
 
   return (
-    <div
+    <BrandLetterShell
       ref={ref}
       id="placement-report-capture"
-      style={{
-        width: '800px',
-        background: '#ffffff',
-        fontFamily: font,
-        color: '#1e293b',
-        boxSizing: 'border-box',
-        padding: '32px 38px',
-      }}
+      badgeTop="CAMBRIDGE ENGLISH"
+      badgeSub="Placement Assessment Report"
+      eyebrow="HỒ SƠ ĐÁNH GIÁ ĐẦU VÀO"
+      title="KẾT QUẢ ĐÁNH GIÁ NĂNG LỰC"
+      subtitleEn="English Placement Assessment &amp; Study Roadmap"
+      footerNote="Cảm ơn Quý Phụ huynh và học viên đã tin tưởng đồng hành cùng Hệ thống Anh ngữ Nhật Mỹ!"
     >
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #0d88c4', paddingBottom: '16px' }}>
-        <img src="/logo.png" alt="Logo" style={{ height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ color: '#0d88c4', fontSize: '20px', fontWeight: '800', fontFamily: font, letterSpacing: '0.5px' }}>
-            KẾT QUẢ ĐÁNH GIÁ NĂNG LỰC
+      {/* 1. THÔNG TIN HỌC VIÊN & TỔNG ĐIỂM */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '14px',
+          border: `1.5px solid ${BRAND.blueBorder}`,
+          padding: '16px 22px',
+          marginBottom: '18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          boxShadow: '0 2px 10px rgba(13, 136, 196, 0.06)',
+          fontFamily: FONT_UNIFIED,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: FONT_UNIFIED,
+              fontSize: '11.5px',
+              fontWeight: '800',
+              color: BRAND.subtle,
+              textTransform: 'uppercase',
+              letterSpacing: '0.8px',
+              marginBottom: '4px',
+            }}
+          >
+            HỌ VÀ TÊN HỌC VIÊN
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', fontFamily: font }}>
-            Placement Test Report
+          <div
+            style={{
+              fontFamily: FONT_UNIFIED,
+              fontSize: '23px',
+              fontWeight: '900',
+              color: BRAND.blueDark,
+              textTransform: 'uppercase',
+              lineHeight: 1.2,
+            }}
+          >
+            {studentName || 'HỌ VÀ TÊN HỌC VIÊN'}
+          </div>
+          {testDate && (
+            <div
+              style={{
+                fontFamily: FONT_UNIFIED,
+                fontSize: '12.5px',
+                fontWeight: '600',
+                color: BRAND.muted,
+                marginTop: '4px',
+              }}
+            >
+              📅 Ngày đánh giá: <strong>{testDate}</strong>
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            backgroundColor: BRAND.goldBg,
+            border: `2px solid ${BRAND.gold}`,
+            borderRadius: '12px',
+            padding: '10px 18px',
+            textAlign: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_UNIFIED,
+              fontSize: '11px',
+              fontWeight: '800',
+              color: BRAND.goldDark,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            ĐIỂM TỔNG KẾT
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_UNIFIED,
+              fontSize: '24px',
+              fontWeight: '900',
+              color: BRAND.blueDark,
+              lineHeight: 1.15,
+              marginTop: '2px',
+            }}
+          >
+            {totalContrib} <span style={{ fontSize: '14px', fontWeight: '700', color: BRAND.muted }}>/ 100</span>
+          </div>
+          <div
+            style={{
+              display: 'inline-block',
+              marginTop: '4px',
+              padding: '2px 10px',
+              borderRadius: '12px',
+              fontSize: '11.5px',
+              fontWeight: '800',
+              backgroundColor: overallBadge.bg,
+              color: overallBadge.color,
+              border: `1px solid ${overallBadge.border}`,
+              fontFamily: FONT_UNIFIED,
+            }}
+          >
+            {overallBadge.label}
           </div>
         </div>
       </div>
 
-      {/* Student Info */}
-      <div style={{ textAlign: 'center', padding: '16px 0 18px', borderBottom: '1px solid #e2e8f0' }}>
-        <div style={{ fontSize: '24px', color: '#0f172a', fontWeight: '700', textTransform: 'uppercase', fontFamily: font }}>
-          {studentName || 'Họ và Tên Học Viên'}
-        </div>
-        {testDate && (
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '5px', fontFamily: font }}>
-            Ngày đánh giá: {testDate}
-          </div>
-        )}
-      </div>
-
-      {/* Scores Table */}
-      <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-        <div style={{ color: '#0d88c4', fontSize: '13px', textTransform: 'uppercase', fontWeight: '700', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '7px', fontFamily: font }}>
-          <span style={{ display: 'inline-block', width: '5px', height: '14px', background: '#0ea5e9', borderRadius: '3px', flexShrink: 0 }}></span>
+      {/* 2. BẢNG ĐIỂM CHI TIẾT THEO KỸ NĂNG */}
+      <div style={{ marginBottom: '18px', fontFamily: FONT_UNIFIED }}>
+        <div
+          style={{
+            color: BRAND.blueDark,
+            fontSize: '13.5px',
+            textTransform: 'uppercase',
+            fontWeight: '800',
+            marginBottom: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            letterSpacing: '0.3px',
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: '5px',
+              height: '15px',
+              backgroundColor: BRAND.gold,
+              borderRadius: '3px',
+              flexShrink: 0,
+            }}
+          />
           Bảng Điểm Đánh Giá (Score Breakdown)
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font }}>
-          <thead>
-            <tr style={{ background: '#0d88c4' }}>
-              {['Kỹ năng (Skill)', 'Điểm đạt / Tối đa', 'Tỷ lệ % kỹ năng', 'Trọng số', 'Điểm đóng góp'].map((h, i) => (
-                <th key={i} style={{ padding: '9px 12px', border: '1px solid #93c5fd', fontSize: '12px', fontWeight: '700', color: '#fff', textAlign: i === 0 ? 'left' : 'center', fontFamily: font }}>{h}</th>
+
+        <div
+          style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: `1.5px solid ${BRAND.blueBorder}`,
+            backgroundColor: BRAND.white,
+          }}
+        >
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT_UNIFIED }}>
+            <thead>
+              <tr style={{ background: `linear-gradient(135deg, ${BRAND.blue} 0%, ${BRAND.blueDark} 100%)` }}>
+                {['Kỹ năng (Skill)', 'Điểm đạt / Tối đa', 'Tỷ lệ %', 'Trọng số', 'Điểm đóng góp'].map((h, i) => (
+                  <th
+                    key={i}
+                    style={{
+                      padding: '10px 12px',
+                      fontSize: '12.5px',
+                      fontWeight: '800',
+                      color: BRAND.white,
+                      textAlign: i === 0 ? 'left' : 'center',
+                      borderRight: i < 4 ? '1px solid rgba(255,255,255,0.18)' : 'none',
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {skillRows.map((row, idx) => (
+                <tr key={row.label} style={{ backgroundColor: idx % 2 === 1 ? '#F8FBFE' : BRAND.white }}>
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      borderTop: `1px solid ${BRAND.border}`,
+                      borderRight: `1px solid ${BRAND.border}`,
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      color: BRAND.ink,
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {row.label}
+                  </td>
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      borderTop: `1px solid ${BRAND.border}`,
+                      borderRight: `1px solid ${BRAND.border}`,
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: BRAND.slate,
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {row.score}
+                  </td>
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      borderTop: `1px solid ${BRAND.border}`,
+                      borderRight: `1px solid ${BRAND.border}`,
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      fontWeight: '800',
+                      color: BRAND.blue,
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {row.pct}%
+                  </td>
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      borderTop: `1px solid ${BRAND.border}`,
+                      borderRight: `1px solid ${BRAND.border}`,
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      color: BRAND.muted,
+                      fontWeight: '600',
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {row.weight}%
+                  </td>
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      borderTop: `1px solid ${BRAND.border}`,
+                      fontSize: '13.5px',
+                      textAlign: 'center',
+                      fontWeight: '800',
+                      color: BRAND.blueDark,
+                      fontFamily: FONT_UNIFIED,
+                    }}
+                  >
+                    {row.contrib}
+                  </td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: '600', fontFamily: font }}>Nghe (Listening)</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '600', fontFamily: font }}>{scores?.listening?.score || 0} / {scores?.listening?.max || 0}</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', color: '#0284c7', fontFamily: font }}>{lsPct}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', color: '#6b7280', fontFamily: font }}>{lsWeight}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', fontFamily: font }}>{lsContrib}</td>
-            </tr>
-            <tr style={{ background: '#f8fafc' }}>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: '600', fontFamily: font }}>Nói (Speaking)</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '600', fontFamily: font }}>{scores?.speaking?.score || 0} / {scores?.speaking?.max || 0}</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', color: '#0284c7', fontFamily: font }}>{spPct}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', color: '#6b7280', fontFamily: font }}>{spWeight}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', fontFamily: font }}>{spContrib}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: '600', fontFamily: font }}>Đọc &amp; Viết (Reading &amp; Writing)</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '600', fontFamily: font }}>{scores?.rw?.score || 0} / {scores?.rw?.max || 0}</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', color: '#0284c7', fontFamily: font }}>{rwPct}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', color: '#6b7280', fontFamily: font }}>{rwWeight}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #cbd5e1', fontSize: '12px', textAlign: 'center', fontWeight: '700', fontFamily: font }}>{rwContrib}</td>
-            </tr>
-            <tr style={{ background: '#dbeafe' }}>
-              <td style={{ padding: '10px 12px', border: '1px solid #93c5fd', fontSize: '13px', fontWeight: '800', color: '#1e40af', fontFamily: font }}>TỔNG KẾT (OVERALL)</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #93c5fd', fontSize: '12px', textAlign: 'center', color: '#64748b', fontFamily: font }}>—</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #93c5fd', fontSize: '12px', textAlign: 'center', color: '#64748b', fontFamily: font }}>—</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #93c5fd', fontSize: '13px', textAlign: 'center', fontWeight: '800', color: '#1e40af', fontFamily: font }}>{totalWeight}%</td>
-              <td style={{ padding: '10px 12px', border: '1px solid #93c5fd', fontSize: '15px', textAlign: 'center', fontWeight: '800', color: '#1e40af', fontFamily: font }}>{totalContrib} / 100</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '5px', fontStyle: 'italic', fontFamily: font }}>
-          * Điểm đóng góp = Tỷ lệ kỹ năng × Trọng số (tổng {totalWeight}% = 100 điểm)
+
+              <tr style={{ backgroundColor: BRAND.blueLight }}>
+                <td
+                  style={{
+                    padding: '11px 12px',
+                    borderTop: `2px solid ${BRAND.blue}`,
+                    borderRight: `1px solid ${BRAND.blueBorder}`,
+                    fontSize: '13.5px',
+                    fontWeight: '900',
+                    color: BRAND.blueDark,
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  TỔNG KẾT (OVERALL)
+                </td>
+                <td
+                  style={{
+                    padding: '11px 12px',
+                    borderTop: `2px solid ${BRAND.blue}`,
+                    borderRight: `1px solid ${BRAND.blueBorder}`,
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    color: BRAND.muted,
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  —
+                </td>
+                <td
+                  style={{
+                    padding: '11px 12px',
+                    borderTop: `2px solid ${BRAND.blue}`,
+                    borderRight: `1px solid ${BRAND.blueBorder}`,
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    color: BRAND.muted,
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  —
+                </td>
+                <td
+                  style={{
+                    padding: '11px 12px',
+                    borderTop: `2px solid ${BRAND.blue}`,
+                    borderRight: `1px solid ${BRAND.blueBorder}`,
+                    fontSize: '13.5px',
+                    textAlign: 'center',
+                    fontWeight: '800',
+                    color: BRAND.blueDark,
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {totalWeight}%
+                </td>
+                <td
+                  style={{
+                    padding: '11px 12px',
+                    borderTop: `2px solid ${BRAND.blue}`,
+                    fontSize: '15.5px',
+                    textAlign: 'center',
+                    fontWeight: '900',
+                    color: BRAND.blueDark,
+                    fontFamily: FONT_UNIFIED,
+                  }}
+                >
+                  {totalContrib} / 100
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            fontSize: '11.5px',
+            color: BRAND.subtle,
+            marginTop: '6px',
+            fontStyle: 'italic',
+            fontFamily: FONT_UNIFIED,
+          }}
+        >
+          * Điểm đóng góp = Tỷ lệ kỹ năng × Trọng số (Tổng trọng số {totalWeight}% quy đổi về thang 100 điểm)
         </div>
       </div>
 
-      {/* AI Remarks */}
-      <div>
-        <div style={{ color: '#0d88c4', fontSize: '13px', textTransform: 'uppercase', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '7px', fontFamily: font }}>
-          <span style={{ display: 'inline-block', width: '5px', height: '14px', background: '#0ea5e9', borderRadius: '3px', flexShrink: 0 }}></span>
-          Nhận Xét Từ Giáo Viên (Teacher's Remarks)
+      {/* 3. NHẬN XÉT CHUYÊN MÔN & LỘ TRÌNH */}
+      <div style={{ marginBottom: '16px', fontFamily: FONT_UNIFIED }}>
+        <div
+          style={{
+            color: BRAND.blueDark,
+            fontSize: '13.5px',
+            textTransform: 'uppercase',
+            fontWeight: '800',
+            marginBottom: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            letterSpacing: '0.3px',
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-block',
+              width: '5px',
+              height: '15px',
+              backgroundColor: BRAND.gold,
+              borderRadius: '3px',
+              flexShrink: 0,
+            }}
+          />
+          Nhận Xét Chuyên Môn &amp; Định Hướng (Teacher&apos;s Remarks)
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ background: '#eff6ff', padding: '12px 14px', borderRadius: '7px', borderLeft: '4px solid #3b82f6' }}>
-            <div style={{ marginBottom: '5px', color: '#1d4ed8', fontSize: '12px', fontWeight: '700', fontFamily: font }}>Nghe &amp; Nói (Listening &amp; Speaking)</div>
-            <div style={{ color: '#334155', fontSize: '12px', lineHeight: '1.7', whiteSpace: 'pre-line', fontFamily: font }}>{aiResult?.ls_comments || '- Giáo viên đang cập nhật nhận xét...'}</div>
-          </div>
-
-          <div style={{ background: '#fffbeb', padding: '12px 14px', borderRadius: '7px', borderLeft: '4px solid #f59e0b' }}>
-            <div style={{ marginBottom: '5px', color: '#b45309', fontSize: '12px', fontWeight: '700', fontFamily: font }}>Đọc &amp; Viết (Reading &amp; Writing)</div>
-            <div style={{ color: '#334155', fontSize: '12px', lineHeight: '1.7', whiteSpace: 'pre-line', fontFamily: font }}>{aiResult?.rw_comments || '- Giáo viên đang cập nhật nhận xét...'}</div>
-          </div>
-
-          <div style={{ background: '#f0fdf4', padding: '12px 14px', borderRadius: '7px', borderLeft: '4px solid #22c55e' }}>
-            <div style={{ marginBottom: '5px', color: '#15803d', fontSize: '12px', fontWeight: '700', fontFamily: font }}>Đánh Giá Chung &amp; Lộ Trình (Conclusion &amp; Roadmap)</div>
-            <div style={{ color: '#166534', fontSize: '12px', lineHeight: '1.7', whiteSpace: 'pre-line', fontFamily: font }}>{aiResult?.conclusion || 'Trung tâm Anh ngữ Nhật Mỹ sẽ liên hệ phụ huynh để tư vấn lộ trình phù hợp nhất cho bé.'}</div>
-          </div>
+          {remarkCards.map((card) => (
+            <div
+              key={card.title}
+              style={{
+                backgroundColor: card.bg,
+                padding: '12px 15px',
+                borderRadius: '10px',
+                border: `1px solid ${BRAND.border}`,
+                borderLeft: `4px solid ${card.accent}`,
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: '5px',
+                  color: card.titleColor,
+                  fontSize: '13px',
+                  fontWeight: '800',
+                  fontFamily: FONT_UNIFIED,
+                }}
+              >
+                {card.title}
+              </div>
+              <div
+                style={{
+                  color: BRAND.slate,
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  lineHeight: 1.65,
+                  whiteSpace: 'pre-line',
+                  fontFamily: FONT_UNIFIED,
+                }}
+              >
+                {card.content}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ marginTop: '24px', textAlign: 'right', fontSize: '12px', color: '#475569', borderTop: '1px solid #e2e8f0', paddingTop: '12px', fontFamily: font }}>
-        <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', fontFamily: font }}>Giáo viên Đánh giá</div>
-        <div style={{ marginTop: '2px', color: '#0d88c4', fontWeight: '600', fontFamily: font }}>Trung tâm Anh ngữ Nhật Mỹ</div>
+      {/* 4. XÁC NHẬN CHUYÊN MÔN & MỘC ĐỎ */}
+      <div
+        style={{
+          backgroundColor: BRAND.white,
+          borderRadius: '12px',
+          border: `1px solid ${BRAND.border}`,
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+        }}
+      >
+        <div>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12px', fontWeight: '700', color: BRAND.subtle, textTransform: 'uppercase' }}>
+            Xác nhận kết quả khảo sát
+          </div>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '14.5px', fontWeight: '800', color: BRAND.ink, marginTop: '2px' }}>
+            Hội đồng Chuyên môn — Hệ thống Anh ngữ Nhật Mỹ
+          </div>
+          <div style={{ fontFamily: FONT_UNIFIED, fontSize: '12.5px', fontStyle: 'italic', color: BRAND.muted, marginTop: '2px' }}>
+            Báo cáo được lập dựa trên bài kiểm tra đầu vào thực tế của học viên.
+          </div>
+        </div>
+        <OfficialRedSeal
+          title="ĐÃ ĐÁNH GIÁ"
+          subtitle="BAN CHUYÊN MÔN"
+          size={114}
+          date={testDate || getTodayVnShortDate()}
+        />
       </div>
-    </div>
+    </BrandLetterShell>
   );
 });
 

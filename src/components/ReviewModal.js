@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TrialReportTemplate, PeriodicReportTemplate } from '@/app/exams/components/ReportTemplates';
-import * as htmlToImage from 'html-to-image';
+import { copyElementPng, downloadElementPng } from '@/lib/brandTheme';
 
 export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', defaultStudent = null }) {
   const [step, setStep] = useState(1); // 1: Form, 2: Preview
@@ -29,6 +29,7 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
   const [isSaving, setIsSaving]       = useState(false);
   const [saveStatus, setSaveStatus]   = useState('');
   const [hasExisting, setHasExisting] = useState(false);
+  const captureRef                    = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -232,40 +233,28 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
     }
   };
 
+  const exportFilename = `NhanXet_${(studentName || 'HocVien').replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
+
   const handleDownload = async () => {
-    const el = document.getElementById('review-preview-card');
+    const el = captureRef.current;
     if (!el) return;
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const blob = await htmlToImage.toBlob(el, { quality: 1, pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
-      if (!blob) throw new Error('Không tạo được ảnh');
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `NhanXet_${studentName.replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
-      link.href = url;
-      link.rel = 'noopener';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      await downloadElementPng(el, exportFilename);
     } catch (error) {
       alert('Lỗi khi tạo ảnh: ' + error.message);
     }
   };
 
   const handleCopy = async () => {
-    const el = document.getElementById('review-preview-card');
+    const el = captureRef.current;
     if (!el) return;
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const blob = await htmlToImage.toBlob(el, { quality: 1, pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
-      if (!blob) throw new Error('Không tạo được ảnh');
-      if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
-        throw new Error('Trình duyệt không hỗ trợ copy ảnh. Vui lòng bấm Tải Ảnh.');
+      const result = await copyElementPng(el, exportFilename);
+      if (result.status === 'COPIED') {
+        alert('Đã copy ảnh vào bộ nhớ tạm. Có thể dán (Ctrl+V) vào Zalo ngay!');
+      } else {
+        alert('Trình duyệt không bật quyền dán ảnh trực tiếp nên đã tự tải ảnh PNG về máy.');
       }
-      const item = new ClipboardItem({ 'image/png': blob });
-      await navigator.clipboard.write([item]);
-      alert('Đã copy ảnh vào bộ nhớ tạm. Có thể dán (Ctrl+V) vào Zalo ngay!');
     } catch (err) {
       console.error('Error copying image:', err);
       alert('Lỗi copy ảnh: ' + (err.message || 'Vui lòng bấm Tải Ảnh.'));
@@ -482,6 +471,17 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
                     })}
                   </>
                 )}
+              </div>
+
+              {/* Bản ẩn full-size để chụp Retina 2x sắc nét */}
+              <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '800px', pointerEvents: 'none' }}>
+                <div ref={captureRef} style={{ width: '800px', backgroundColor: '#FFFFFF' }}>
+                  {type === 'trial' ? (
+                    <TrialReportTemplate student={{ name: studentName, classCode }} result={generatedResult} sessions={sessions} />
+                  ) : (
+                    <PeriodicReportTemplate student={{ name: studentName, classCode }} result={generatedResult} />
+                  )}
+                </div>
               </div>
 
               {/* Cột 2: Preview */}
