@@ -337,79 +337,89 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
         </div>
       </div>
 
-      {/* 1. QUÁ TRÌNH HỌC */}
+      {/* 1. QUÁ TRÌNH HỌC (CSS Grid 3 cột chống lỗi ẩn chữ rowSpan của html2canvas) */}
       <div style={{ marginBottom: '16px' }}>
         <SectionHeading title={`1. Đánh giá quá trình học (${config.processWeight}%)`} />
-        <div style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${BRAND.blueBorder}`, backgroundColor: BRAND.white }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {[
-                { label: 'Điểm danh (Attendance)', score: result.attendanceScore },
-                { label: 'Bài tập về nhà (Homework)', score: result.hwScore },
-                { label: 'Hoạt động lớp (Class Activity)', score: result.activityScore },
-                { label: 'Phát âm (Pronunciation)', score: result.pronunciationScore },
-                { label: 'Giao tiếp (Communication)', score: result.communicationScore },
-              ].map((item, idx) => (
-                <tr key={item.label} style={{ backgroundColor: idx % 2 === 1 ? '#F8FBFE' : BRAND.white }}>
-                  {idx === 0 && (
-                    <td
-                      rowSpan={5}
-                      style={{
-                        ...tdStyle,
-                        borderTop: 'none',
-                        width: '28%',
-                        textAlign: 'center',
-                        fontWeight: '800',
-                        color: BRAND.blueDark,
-                        backgroundColor: BRAND.blueSoft,
-                      }}
-                    >
-                      Chuyên cần
-                      <div style={{ fontSize: '11.5px', fontWeight: '500', color: BRAND.muted, marginTop: '2px' }}>
-                        (Class Participation)
-                      </div>
-                    </td>
-                  )}
-                  <td style={{ ...tdStyle, borderTop: idx === 0 ? 'none' : tdStyle.borderTop, width: '34%', fontWeight: '600' }}>
-                    {item.label}
-                  </td>
-                  <td
-                    style={{
-                      ...tdStyle,
-                      borderTop: idx === 0 ? 'none' : tdStyle.borderTop,
-                      width: '18%',
-                      textAlign: 'center',
-                      fontWeight: '800',
-                      color: BRAND.blue,
-                    }}
-                  >
-                    {item.score}/10
-                  </td>
-                  {idx === 0 && (
-                    <td
-                      rowSpan={5}
-                      style={{
-                        ...tdStyle,
-                        borderTop: 'none',
-                        borderRight: 'none',
-                        width: '20%',
-                        textAlign: 'center',
-                        backgroundColor: BRAND.goldBg,
-                        verticalAlign: 'middle',
-                      }}
-                    >
-                      <div style={{ fontSize: '11.5px', fontWeight: '700', color: BRAND.goldDark, textTransform: 'uppercase' }}>
-                        TB Chuyên Cần
-                      </div>
-                      <div style={{ color: '#DC2626', fontSize: '22px', fontWeight: '900', marginTop: '6px' }}>
-                        {processTotal.toFixed(1)}%
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div
+          style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: `1.5px solid ${BRAND.blueBorder}`,
+            backgroundColor: BRAND.white,
+            display: 'grid',
+            gridTemplateColumns: '28% 1fr 22%',
+            fontFamily: FONT_UNIFIED,
+          }}
+        >
+          {/* Cột trái: Chuyên cần */}
+          <div
+            style={{
+              backgroundColor: BRAND.blueSoft,
+              borderRight: `1px solid ${BRAND.border}`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '12px',
+            }}
+          >
+            <div style={{ fontSize: '14px', fontWeight: '800', color: BRAND.blueDark }}>
+              Chuyên cần
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: '500', color: BRAND.muted, marginTop: '3px' }}>
+              (Class Participation)
+            </div>
+          </div>
+
+          {/* Cột giữa: 5 tiêu chí đánh giá */}
+          <div>
+            {[
+              { label: 'Điểm danh (Attendance)', score: result.attendanceScore },
+              { label: 'Bài tập về nhà (Homework)', score: result.hwScore },
+              { label: 'Hoạt động lớp (Class Activity)', score: result.activityScore },
+              { label: 'Phát âm (Pronunciation)', score: result.pronunciationScore },
+              { label: 'Giao tiếp (Communication)', score: result.communicationScore },
+            ].map((item, idx) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 84px',
+                  backgroundColor: idx % 2 === 1 ? '#F8FBFE' : BRAND.white,
+                  borderTop: idx === 0 ? 'none' : `1px solid ${BRAND.border}`,
+                }}
+              >
+                <div style={{ padding: '7.5px 12px', fontSize: '13px', fontWeight: '600', color: BRAND.slate, borderRight: `1px solid ${BRAND.border}` }}>
+                  {item.label}
+                </div>
+                <div style={{ padding: '7.5px 10px', textAlign: 'center', fontSize: '13px', fontWeight: '800', color: BRAND.blue }}>
+                  {item.score}/10
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Cột phải: TB Chuyên Cần */}
+          <div
+            style={{
+              backgroundColor: BRAND.goldBg,
+              borderLeft: `1px solid ${BRAND.border}`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '12px 10px',
+            }}
+          >
+            <div style={{ fontSize: '11.5px', fontWeight: '800', color: BRAND.goldDark, textTransform: 'uppercase' }}>
+              TB Chuyên Cần
+            </div>
+            <div style={{ color: '#DC2626', fontSize: '23px', fontWeight: '900', marginTop: '5px', lineHeight: 1.1 }}>
+              {processTotal.toFixed(1)}%
+            </div>
+          </div>
         </div>
       </div>
 
@@ -460,13 +470,27 @@ export const ScoreReportTemplate = ({ student, config, result }) => {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: BRAND.slate, fontWeight: '500', lineHeight: 1.55 }}>
           <div>
-            • <strong>A+:</strong> 98 - 100 (Xuất sắc) • <strong>A:</strong> 95 - 97 (Rất giỏi)<br />
-            • <strong>B+:</strong> 90 - 94 (Giỏi) • <strong>B:</strong> 80 - 89 (Khá)
+            • <strong>A+:</strong> 98 - 100 (Xuất sắc) &nbsp;•&nbsp; <strong>A:</strong> 95 - 97 (Rất giỏi)<br />
+            • <strong>B+:</strong> 90 - 94 (Giỏi) &nbsp;•&nbsp; <strong>B:</strong> 80 - 89 (Khá)
           </div>
           <div>
-            • <strong>C+:</strong> 75 - 79 (TB Khá) • <strong>C:</strong> 65 - 74 (Cần cố gắng)<br />
-            • <strong>D:</strong> &lt; 65 (Chưa đạt) • <em>Xem chi tiết ở Phiếu Nhận Xét đính kèm</em>
+            • <strong>C+:</strong> 75 - 79 (TB Khá) &nbsp;•&nbsp; <strong>C:</strong> 65 - 74 (Cần cố gắng)<br />
+            • <strong>D:</strong> &lt; 65 (Chưa đạt)
           </div>
+        </div>
+        <div
+          style={{
+            marginTop: '8px',
+            paddingTop: '7px',
+            borderTop: `1px dashed ${BRAND.goldBorder}`,
+            textAlign: 'center',
+            fontSize: '12.5px',
+            fontWeight: '700',
+            fontStyle: 'italic',
+            color: BRAND.blueDark,
+          }}
+        >
+          * Quý Phụ huynh vui lòng xem chi tiết ở Phiếu Nhận Xét đính kèm.
         </div>
       </div>
 

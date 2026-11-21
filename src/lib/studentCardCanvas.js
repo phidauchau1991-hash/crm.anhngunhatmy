@@ -613,8 +613,8 @@ export async function renderStudentCardCanvas({
   setBrandFont(ctx, { weight: 900, size: 15.5, spacing: 0.6 });
   ctx.fillText('ANH NGỮ NHẬT MỸ', CARD_WIDTH / 2, footerY + 22);
 
-  // Hàng 2: Slogan Dedicated to Excellence (nằm dưới, nhỏ hơn, in nghiêng)
-  ctx.fillStyle = COLORS.goldLight;
+  // Hàng 2: Slogan Dedicated to Excellence (chữ trắng theo chuẩn nền xanh)
+  ctx.fillStyle = '#FFFFFF';
   setBrandFont(ctx, { weight: 600, size: 12.5, italic: true, spacing: 0.3 });
   ctx.fillText('Dedicated to Excellence', CARD_WIDTH / 2, footerY + 42);
 

@@ -160,9 +160,28 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
         // Tự động lưu vào cơ sở dữ liệu ngay sau khi AI sinh nhận xét
         await handleSaveAssessment(data.data, false);
       }
-      else setError(data.error || 'Lỗi khi gọi AI');
-    } catch { setError('Lỗi kết nối máy chủ'); }
+      else setError(data.error || 'Không thể kết nối AI. Thầy/Cô có thể bấm "Tự soạn / Xem trước Thư" bên cạnh.');
+    } catch { setError('Lỗi kết nối máy chủ AI.'); }
     setLoading(false);
+  };
+
+  // Mở thẳng Step 2 để tự nhập / chỉnh sửa nhận xét & xem trước thư mà không cần chờ AI
+  const handleOpenManualDraft = () => {
+    setError('');
+    if (!aiResult) {
+      setAiResult({
+        ls_comments: lsKeywords.trim()
+          ? `- ${lsKeywords.trim()}`
+          : '- Học viên tiếp thu hướng dẫn tốt trong phần Nghe & Nói.\n- Cần tiếp tục rèn phản xạ giao tiếp tự nhiên và phát âm chuẩn.',
+        rw_comments: rwKeywords.trim()
+          ? `- ${rwKeywords.trim()}`
+          : '- Nắm được nền tảng từ vựng cơ bản và đọc hiểu theo yêu cầu bài test.\n- Cần luyện thêm cấu trúc câu và viết đúng chính tả.',
+        conclusion: devKeywords.trim()
+          ? devKeywords.trim()
+          : `Học viên ${lead?.name || ''} có tiềm năng tiến bộ tốt. Trung tâm Anh ngữ Nhật Mỹ đề xuất lộ trình phù hợp giúp con phát triển đồng đều cả 4 kỹ năng.`,
+      });
+    }
+    setStep(2);
   };
 
   const exportFilename = `KQ_Test_${(lead?.name || 'HocVien').replace(/\s+/g, '_')}.png`;
@@ -327,10 +346,17 @@ export default function PlacementTestModal({ isOpen, onClose, lead }) {
                     {isSaving ? 'Đang lưu...' : 'Lưu Điểm & Từ Khóa'}
                   </button>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {error && <span style={{ color: '#ef4444', fontSize: '0.88rem' }}>{error}</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {error && <span style={{ color: '#ef4444', fontSize: '0.84rem', width: '100%' }}>{error}</span>}
+                    <button
+                      type="button"
+                      onClick={handleOpenManualDraft}
+                      style={{ background: '#ffffff', color: '#0d88c4', padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #0d88c4', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '7px' }}
+                    >
+                      <i className="fa-solid fa-pen-to-square"></i> Tự soạn / Xem trước
+                    </button>
                     <button onClick={generateAI} disabled={loading}
-                      style={{ background: loading ? '#94a3b8' : 'linear-gradient(135deg, #7c3aed, #1d4ed8)', color: '#fff', padding: '11px 24px', borderRadius: '10px', border: 'none', fontWeight: '700', fontSize: '0.95rem', cursor: loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
+                      style={{ background: loading ? '#94a3b8' : 'linear-gradient(135deg, #7c3aed, #1d4ed8)', color: '#fff', padding: '11px 22px', borderRadius: '10px', border: 'none', fontWeight: '700', fontSize: '0.95rem', cursor: loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
                       <i className={`fa-solid ${loading ? 'fa-spinner fa-spin' : 'fa-robot'}`}></i>
                       {loading ? 'Đang phân tích...' : 'Sinh Nhận Xét AI'}
                     </button>

@@ -605,7 +605,7 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             fontSize: '16.5px',
             fontWeight: '900',
             letterSpacing: '1px',
-            color: BRAND.gold,
+            color: BRAND.white,
             textTransform: 'uppercase',
             lineHeight: 1.2,
           }}
@@ -618,7 +618,8 @@ const CourseWelcomeTemplate = forwardRef(({ data }, ref) => {
             fontSize: '12.5px',
             fontStyle: 'italic',
             fontWeight: '500',
-            color: '#FEF08A',
+            color: BRAND.white,
+            opacity: 0.95,
             letterSpacing: '0.4px',
             marginTop: '2px',
             marginBottom: '8px',

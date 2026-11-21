@@ -224,7 +224,7 @@ const BrandLetterShell = forwardRef(({
               fontSize: '15px',
               fontWeight: '900',
               letterSpacing: '0.8px',
-              color: BRAND.gold,
+              color: BRAND.white,
               textTransform: 'uppercase',
               lineHeight: 1.15,
             }}
@@ -237,7 +237,8 @@ const BrandLetterShell = forwardRef(({
               fontSize: '12px',
               fontStyle: 'italic',
               fontWeight: '600',
-              color: '#FEF08A',
+              color: BRAND.white,
+              opacity: 0.95,
               letterSpacing: '0.3px',
               marginTop: '2px',
             }}

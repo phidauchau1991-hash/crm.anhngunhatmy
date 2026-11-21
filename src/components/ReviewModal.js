@@ -233,6 +233,41 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
     }
   };
 
+  // Cho phép tự soạn / xem trước trực tiếp mẫu thư mà không phụ thuộc AI
+  const handleOpenManualDraft = () => {
+    if (!generatedResult) {
+      if (type === 'trial') {
+        setGeneratedResult({
+          attitude: attitude.trim()
+            ? `- ${attitude.trim()}`
+            : `- ${studentName || 'Học viên'} hòa nhập tốt, chủ động tham gia các hoạt động cùng lớp.`,
+          skills: skills.trim()
+            ? `- ${skills.trim()}`
+            : '- Nghe hiểu hướng dẫn của giáo viên tốt, bước đầu tự tin phát âm và phản hồi.',
+          potential: potential.trim()
+            ? `- ${potential.trim()}`
+            : '- Có tiềm năng tiếp thu nhanh nếu được duy trì môi trường luyện tập đều đặn.',
+          recommendation: `- Ba mẹ nên cho con tham gia lộ trình chính thức để giữ nhịp tiến bộ tốt nhất.`,
+          advice: `- Ba mẹ nên cho con tham gia lộ trình chính thức để giữ nhịp tiến bộ tốt nhất.`,
+        });
+      } else {
+        setGeneratedResult({
+          speaking: speaking.trim() ? `- ${speaking.trim()}` : '- Tự tin trao đổi và phản hồi các mẫu câu trên lớp.',
+          listening: listening.trim() ? `- ${listening.trim()}` : '- Nghe hiểu tốt hướng dẫn của giáo viên và bài nghe chuẩn.',
+          rw: rw.trim() ? `- ${rw.trim()}` : '- Đọc hiểu nắm ý chính và hoàn thành bài tập viết đúng yêu cầu.',
+          dev: '- Tiếp tục duy trì thói quen ôn tập từ vựng và luyện nghe nói đều đặn tại nhà.',
+          ...(bilingual ? {
+            speaking_en: '- Speaks confidently and responds well during classroom activities.',
+            listening_en: '- Demonstrates good listening comprehension.',
+            rw_en: '- Reads with good understanding and completes writing tasks accurately.',
+            dev_en: '- Encouraged to maintain regular vocabulary and speaking practice at home.',
+          } : {}),
+        });
+      }
+    }
+    setStep(2);
+  };
+
   const exportFilename = `NhanXet_${(studentName || 'HocVien').replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
 
   const handleDownload = async () => {
@@ -360,14 +395,23 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
                 {isSaving ? 'Đang lưu...' : 'Lưu Nháp Từ Khóa'}
               </button>
 
-              <button 
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                style={{ background: 'var(--color-primary)', color: '#fff', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(13,136,196,0.3)' }}
-              >
-                <i className={`fa-solid ${isGenerating ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
-                {isGenerating ? 'Đang phân tích...' : 'Sinh Nhận Xét AI'}
-              </button>
+              <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenManualDraft}
+                  style={{ background: '#ffffff', color: '#0D88C4', padding: '0.75rem 1.15rem', borderRadius: '8px', border: '1.5px solid #0D88C4', fontWeight: 'bold', fontSize: '0.92rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '7px' }}
+                >
+                  <i className="fa-solid fa-pen-to-square"></i> Tự soạn / Xem trước
+                </button>
+                <button 
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  style={{ background: 'var(--color-primary)', color: '#fff', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(13,136,196,0.3)' }}
+                >
+                  <i className={`fa-solid ${isGenerating ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+                  {isGenerating ? 'Đang phân tích...' : 'Sinh Nhận Xét AI'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -396,7 +440,7 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '1.25rem', marginBottom: '1rem', alignItems: 'start' }}>
               
               {/* Cột 1: Live Editor */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#fff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
@@ -486,12 +530,14 @@ export default function ReviewModal({ isOpen, onClose, initialType = 'adhoc', de
 
               {/* Cột 2: Preview */}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ overflowX: 'auto', background: '#f1f5f9', padding: '1rem', borderRadius: '8px', display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'flex-start' }}>
-                  {type === 'trial' ? (
-                    <TrialReportTemplate student={{ name: studentName, classCode }} result={generatedResult} sessions={sessions} />
-                  ) : (
-                    <PeriodicReportTemplate student={{ name: studentName, classCode }} result={generatedResult} />
-                  )}
+                <div style={{ overflow: 'auto', background: '#f1f5f9', padding: '1rem', borderRadius: '8px', display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'flex-start' }}>
+                  <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center', marginBottom: '-160px' }}>
+                    {type === 'trial' ? (
+                      <TrialReportTemplate student={{ name: studentName, classCode }} result={generatedResult} sessions={sessions} />
+                    ) : (
+                      <PeriodicReportTemplate student={{ name: studentName, classCode }} result={generatedResult} />
+                    )}
+                  </div>
                 </div>
               </div>
 

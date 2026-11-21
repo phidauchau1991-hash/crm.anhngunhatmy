@@ -711,7 +711,7 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
                   fontSize: '15.5px',
                   fontWeight: '900',
                   letterSpacing: '0.8px',
-                  color: BRAND.gold,
+                  color: BRAND.white,
                   textTransform: 'uppercase',
                   lineHeight: 1.2,
                 }}
@@ -724,7 +724,8 @@ export default function TutoringLetterModal({ isOpen, onClose, plan = null, plan
                   fontSize: '12px',
                   fontStyle: 'italic',
                   fontWeight: '500',
-                  color: '#FEF08A',
+                  color: BRAND.white,
+                  opacity: 0.95,
                   letterSpacing: '0.35px',
                   marginTop: '2px',
                   marginBottom: '6px',
