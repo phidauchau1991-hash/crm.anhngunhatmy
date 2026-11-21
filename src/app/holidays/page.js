@@ -152,7 +152,7 @@ export default function HolidaysPage() {
     <div className="holidays-container" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Header */}
-      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--color-primary-dark)' }}>
             <i className="fa-solid fa-calendar-minus"></i> Quản lý Ngày nghỉ (Holidays)
@@ -161,6 +161,14 @@ export default function HolidaysPage() {
             Thiết lập lịch nghỉ toàn trung tâm, ca học hoặc lớp học. Hệ thống tự động tịnh tiến ngày kết thúc của lớp.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => openStudio(null)}
+          className="btn btn-primary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.2rem', fontWeight: '800', borderRadius: '10px', boxShadow: '0 4px 12px rgba(13, 136, 196, 0.25)' }}
+        >
+          <i className="fa-solid fa-palette"></i> Studio Thông Báo Nhanh (Lễ / Tết / Đột Xuất)
+        </button>
       </div>
 
       {message.text && (
